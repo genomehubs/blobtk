@@ -320,7 +320,6 @@ pub fn build_fast_lookup(
     let higher_rank_set: HashSet<&str> = HashSet::from_iter(HIGHER_RANKS.iter().cloned());
     let node_count = nodes.nodes.len();
     let progress_bar = styled_progress_bar(node_count, "Building lookup hash");
-
     for (tax_id, node) in nodes.nodes.iter() {
         progress_bar.inc(1);
         if rank_set.contains(node.rank.as_str()) {
@@ -352,6 +351,7 @@ pub fn build_fast_lookup(
     }
 
     progress_bar.finish();
+    dbg!(id_map.len());
 
     id_map
 }

@@ -42,3 +42,6 @@ pub mod taxonomy;
 
 /// Utility functions.
 pub mod utils;
+
+/// Validate files.
+pub mod validate;

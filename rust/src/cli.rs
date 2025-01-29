@@ -74,6 +74,9 @@ pub enum SubCommand {
     /// [experimental] Process a taxonomy and lookup lineages.
     /// Called as `blobtk taxonomy`
     Taxonomy(TaxonomyOptions),
+    /// [experimental] Validate BlobToolKit and GenomeHubs files.
+    /// Called as `blobtk validate`
+    Validate(ValidateOptions),
 }
 
 /// Options to pass to `blobtk depth`
@@ -86,6 +89,7 @@ pub enum SubCommand {
 #[pyclass]
 pub struct DepthOptions {
     /// List of sequence IDs
+    // Skipping this attribute because it is set to a default value using serde
     #[clap(skip)]
     pub list: Option<HashSet<Vec<u8>>>,
     /// Path to input file containing a list of sequence IDs
@@ -376,6 +380,7 @@ pub struct TaxonomyOptions {
     /// Path to backbone taxonomy file/directory
     #[arg(long = "taxdump", short = 't')]
     pub path: Option<PathBuf>,
+    /// Format of taxonomy file
     #[arg(long = "taxonomy-format", short = 'f')]
     pub taxonomy_format: Option<TaxonomyFormat>,
     /// Root taxon/taxa for filtered taxonomy
@@ -421,6 +426,25 @@ fn default_name_classes() -> Vec<String> {
 
 fn default_create_taxa() -> bool {
     false
+}
+
+/// Options to pass to `blobtk validate`
+#[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
+#[pyclass]
+pub struct ValidateOptions {
+    /// Path to backbone taxonomy file/directory
+    #[arg(long = "taxdump", short = 't')]
+    pub taxdump: Option<PathBuf>,
+    /// Format of taxonomy file
+    #[arg(long = "taxonomy-format", short = 'f')]
+    pub taxonomy_format: Option<TaxonomyFormat>,
+    /// List of name_classes to use during taxon lookup
+    #[clap(long = "name-classes", short = 'n', default_value = "scientific name")]
+    #[serde(default = "default_name_classes")]
+    pub name_classes: Vec<String>,
+    /// Files to match to taxIDs - Experimental
+    #[arg(long = "genomehubs_files", short = 'g')]
+    pub genomehubs_files: Option<Vec<PathBuf>>,
 }
 
 /// Command line argument parser

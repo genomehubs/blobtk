@@ -11,11 +11,16 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ffi::CString;
 use std::fmt;
+use std::fs::OpenOptions;
+use std::hash::Hash;
+use std::io::BufWriter;
 use std::io::Write;
+use std::os::unix::process;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow;
+use blart::NodeType;
 use blart::TreeMap;
 use convert_case::{Case, Casing};
 use cpc::{eval, units::Unit};
@@ -682,26 +687,44 @@ pub enum FieldType {
     FourDP,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub enum SkipPartial {
+    #[serde(rename = "row")]
+    Row,
+    #[serde(rename = "cell")]
+    Cell,
+}
+
 /// GenomeHubs file configuration options
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct GHubsFileConfig {
     /// File format
+    /// Default: tsv
     pub format: GHubsFileFormat,
     /// Flag to indicate whether file has a header row
     pub header: bool,
     /// Filename or path relative to the configuration file
     pub name: PathBuf,
     /// Additional configuration files that must be loaded
+    /// before this file
     pub needs: Option<PathBufOrVec>,
     // /// File source
     // pub source: Option<Source>,
+    /// Skip partial rows or cells
+    /// Default: row
+    /// Options: row, cell
+    pub skip_partial: Option<SkipPartial>,
 }
 
 /// GenomeHubs field constraint configuration options
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct ConstraintConfig {
     // List of valid values
-    #[serde(rename = "enum")]
+    #[serde(
+        rename = "enum",
+        deserialize_with = "deserialize_to_lowercase",
+        default
+    )]
     pub enum_values: Option<Vec<String>>,
     // Value length
     pub len: Option<usize>,
@@ -709,6 +732,14 @@ pub struct ConstraintConfig {
     pub max: Option<f64>,
     // Minimum value
     pub min: Option<f64>,
+}
+
+fn deserialize_to_lowercase<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let v: Vec<String> = Vec::deserialize(deserializer)?;
+    Ok(Some(v.into_iter().map(|s| s.to_lowercase()).collect()))
 }
 
 // Field types
@@ -950,7 +981,7 @@ pub struct Source {
 
 impl Source {
     pub fn new(config: &GHubsConfig) -> Source {
-        dbg!(&config);
+        // dbg!(&config);
 
         if let Some(file_config) = config.file.clone() {
             // let name = file_config.source.file_stem().unwrap().to_str().unwrap();
@@ -1068,6 +1099,34 @@ fn check_bounds<T: Into<f64> + Copy>(value: &T, constraint: &ConstraintConfig) -
             return false;
         }
     }
+    if let Some(len) = constraint.len {
+        if val.to_string().len() > len {
+            eprintln!("Value {} is longer than {}", val, len);
+            return false;
+        }
+    }
+    if let Some(enum_values) = &constraint.enum_values {
+        if !enum_values.contains(&val.to_string().to_lowercase()) {
+            // eprintln!("Value {} is not in {:?}", val, enum_values);
+            return false;
+        }
+    }
+    true
+}
+
+fn check_string_bounds(value: &String, constraint: &ConstraintConfig) -> bool {
+    if let Some(len) = constraint.len {
+        if value.len() > len {
+            eprintln!("Value {} is longer than {}", value, len);
+            return false;
+        }
+    }
+    if let Some(enum_values) = &constraint.enum_values {
+        if !enum_values.contains(&value.to_lowercase()) {
+            // eprintln!("Value {} is not in {:?}", value, enum_values);
+            return false;
+        }
+    }
     true
 }
 
@@ -1114,7 +1173,12 @@ fn apply_validation(value: String, field: &GHubsFieldConfig) -> Result<bool, err
             })?;
             check_bounds(&v, &constraint)
         }
-        FieldType::Keyword => true,
+        FieldType::Keyword => {
+            let v = value.parse::<String>().map_err(|_| {
+                error::Error::ParseError(format!("Invalid keyword value: {}", value))
+            })?;
+            check_string_bounds(&v, &constraint)
+        }
         FieldType::Integer => {
             let dot_pos = value.find(".").unwrap_or(value.len());
             let v = value[..dot_pos].parse::<i32>().map_err(|_| {
@@ -1144,9 +1208,93 @@ fn apply_validation(value: String, field: &GHubsFieldConfig) -> Result<bool, err
     Ok(valid)
 }
 
-fn apply_function(value: String, field: &GHubsFieldConfig) -> String {
+#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum ValidationStatus {
+    Valid,
+    Invalid,
+    Partial,
+    Blank,
+    Error,
+    #[default]
+    None,
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+pub struct ValidationCounts {
+    pub valid: usize,
+    pub invalid: usize,
+    pub partial: usize,
+    pub blank: usize,
+    pub errors: usize,
+    pub total: usize,
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+pub struct ValidationReport {
+    pub row_index: usize,
+    pub status: ValidationStatus,
+    pub counts: ValidationCounts,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub invalid: HashMap<String, Vec<String>>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub partial: HashMap<String, Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub blank: Vec<String>,
+    #[serde(skip)]
+    pub validated: HashMap<String, String>,
+    pub errors: Vec<String>,
+}
+
+impl ValidationReport {
+    pub fn to_json(&self) -> String {
+        // summarise as json
+        serde_json::to_string_pretty(&self).unwrap()
+    }
+
+    pub fn to_jsonl(&self) -> String {
+        // summarise as jsonl
+        serde_json::to_string(&self).unwrap()
+    }
+
+    pub fn combine_reports(&mut self, other: ValidationReport) {
+        self.status = match other.status {
+            ValidationStatus::Partial => ValidationStatus::Partial,
+            ValidationStatus::Error => ValidationStatus::Error,
+            _ => {
+                if self.status == other.status {
+                    self.status.clone()
+                } else if self.status == ValidationStatus::None {
+                    other.status
+                } else if self.status == ValidationStatus::Valid
+                    && other.status == ValidationStatus::Invalid
+                {
+                    ValidationStatus::Partial
+                } else if self.status == ValidationStatus::Invalid
+                    && other.status == ValidationStatus::Valid
+                {
+                    ValidationStatus::Partial
+                } else {
+                    self.status.clone()
+                }
+            }
+        };
+        self.counts.valid += other.counts.valid;
+        self.counts.invalid += other.counts.invalid;
+        self.counts.partial += other.counts.partial;
+        self.counts.blank += other.counts.blank;
+        self.counts.errors += other.counts.errors;
+        self.counts.total += other.counts.total;
+        self.invalid.extend(other.invalid);
+        self.partial.extend(other.partial);
+        self.blank.extend(other.blank);
+        self.validated.extend(other.validated);
+    }
+}
+
+fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, ValidationStatus) {
+    let mut valid = true;
     if value == "" || value == "None" || value == "NA" {
-        return "None".to_string();
+        return ("None".to_string(), ValidationStatus::Blank);
     }
     let mut val = value;
     if let Some(ref function) = field.function {
@@ -1157,12 +1305,12 @@ fn apply_function(value: String, field: &GHubsFieldConfig) -> String {
     match apply_validation(val.clone(), &field) {
         Ok(is_valid) => {
             if is_valid {
-                val
+                (val, ValidationStatus::Valid)
             } else {
-                "None".to_string()
+                ("None".to_string(), ValidationStatus::Invalid)
             }
         }
-        Err(_) => "None".to_string(),
+        Err(_) => ("None".to_string(), ValidationStatus::Error),
     }
 }
 
@@ -1184,9 +1332,20 @@ fn translate_value(field: &GHubsFieldConfig, value: &String) -> Vec<String> {
     values
 }
 
-fn process_value(value: String, field: &GHubsFieldConfig) -> Result<Vec<String>, error::Error> {
+fn process_value(
+    value: String,
+    field: &GHubsFieldConfig,
+) -> Result<
+    (
+        Vec<(String, ValidationStatus)>,
+        Vec<String>,
+        ValidationStatus,
+    ),
+    error::Error,
+> {
     let values = translate_value(field, &value);
     let mut ret_values = vec![];
+    let mut invalid_values = vec![];
     for value in values {
         if let Some(separator) = &field.separator {
             let re = match separator {
@@ -1202,21 +1361,62 @@ fn process_value(value: String, field: &GHubsFieldConfig) -> Result<Vec<String>,
                 .unwrap(),
             };
             for val in re.split(value.as_str()) {
-                ret_values.push(apply_function(val.to_string(), &field));
+                validate_value(field, &mut ret_values, &mut invalid_values, val.to_string());
             }
         } else {
-            ret_values.push(apply_function(value, &field));
+            validate_value(field, &mut ret_values, &mut invalid_values, value.clone());
         }
     }
-    Ok(ret_values)
+    let status = if invalid_values.is_empty() {
+        ValidationStatus::Valid
+    } else if invalid_values.len() < ret_values.len() {
+        ValidationStatus::Partial
+    } else {
+        ValidationStatus::Invalid
+    };
+    Ok((ret_values, invalid_values, status))
+}
+
+fn validate_value(
+    field: &GHubsFieldConfig,
+    ret_values: &mut Vec<(String, ValidationStatus)>,
+    invalid_values: &mut Vec<String>,
+    val: String,
+) {
+    let (v, status) = apply_function(val.to_string(), &field);
+    let is_valid = match status {
+        ValidationStatus::Valid => true,
+        ValidationStatus::Invalid => false,
+        ValidationStatus::Partial => false,
+        ValidationStatus::Blank => true,
+        ValidationStatus::Error => false,
+        ValidationStatus::None => false,
+    };
+    if !is_valid {
+        invalid_values.push(val.to_string());
+    }
+    ret_values.push((v, status));
 }
 
 fn validate_values(
     key: &str,
     ghubs_config: &mut GHubsConfig,
     record: &StringRecord,
-) -> HashMap<String, String> {
+) -> ValidationReport {
     let mut validated = HashMap::new();
+    let mut invalid: HashMap<String, Vec<String>> = HashMap::new();
+    let mut partial: HashMap<String, Vec<String>> = HashMap::new();
+    let mut blank: Vec<String> = vec![];
+    let mut field_counts = ValidationCounts {
+        valid: 0,
+        invalid: 0,
+        partial: 0,
+        blank: 0,
+        errors: 0,
+        total: 0,
+    };
+    let skip_partial = ghubs_config.file.as_ref().unwrap().skip_partial.clone();
+
     for (field_name, field) in ghubs_config.borrow_mut().get_mut(key).unwrap().iter_mut() {
         if let Some(index) = &field.index {
             let string_value = match index {
@@ -1227,11 +1427,76 @@ fn validate_values(
                     .collect::<Vec<&str>>()
                     .join(&field.join.as_ref().unwrap_or(&"".to_string())),
             };
-            let values = process_value(string_value, field).unwrap().join(";");
-            validated.insert(field_name.clone(), values);
+            let (values, invalid_values, status) = process_value(string_value, field).unwrap();
+            field_counts.total += 1;
+            let is_valid = match status {
+                ValidationStatus::Valid => true,
+                ValidationStatus::Invalid => false,
+                ValidationStatus::Partial => false,
+                ValidationStatus::Blank => true,
+                ValidationStatus::Error => false,
+                ValidationStatus::None => false,
+            };
+            match status {
+                ValidationStatus::Valid => field_counts.valid += 1,
+                ValidationStatus::Invalid => {
+                    field_counts.invalid += 1;
+                    invalid.insert(field_name.clone(), invalid_values);
+                }
+                ValidationStatus::Partial => {
+                    field_counts.partial += 1;
+                    partial.insert(field_name.clone(), invalid_values);
+                }
+                ValidationStatus::Blank => {
+                    field_counts.blank += 1;
+                    field_counts.valid += 1;
+                }
+                ValidationStatus::Error => {
+                    field_counts.errors += 1;
+                    field_counts.invalid += 1;
+                    invalid.insert(field_name.clone(), invalid_values);
+                }
+                ValidationStatus::None => {
+                    field_counts.valid -= 1;
+                }
+            }
+            let mut validated_value: String = values
+                .iter()
+                .map(|(v, _)| v.clone())
+                .collect::<Vec<String>>()
+                .join(";");
+            if !is_valid {
+                if let Some(skip) = skip_partial.clone() {
+                    if skip == SkipPartial::Cell {
+                        validated_value = "None".to_string();
+                    }
+                }
+            }
+            validated.insert(field_name.clone(), validated_value);
         }
     }
-    validated
+    let status = {
+        if field_counts.valid == field_counts.total {
+            ValidationStatus::Valid
+        } else if field_counts.valid > 0 {
+            ValidationStatus::Partial
+        } else if field_counts.blank == field_counts.total {
+            ValidationStatus::Blank
+        } else {
+            ValidationStatus::Invalid
+        }
+    };
+    let report = ValidationReport {
+        row_index: 0,
+        status,
+        counts: field_counts,
+        invalid,
+        partial,
+        blank,
+        validated,
+        ..Default::default()
+    };
+    report
 }
 
 // Add new names to the taxonomy
@@ -1315,6 +1580,7 @@ fn nodes_from_file(
     config_file: &PathBuf,
     ghubs_config: &mut GHubsConfig,
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
+    write_validated: bool,
 ) -> Result<(HashMap<String, Vec<Name>>, HashMap<String, Node>), error::Error> {
     let file_config = ghubs_config.file.as_ref().unwrap();
     let delimiter = match file_config.format {
@@ -1356,6 +1622,42 @@ fn nodes_from_file(
     let mut nodes = HashMap::new();
     // dbg!(&ghubs_config);
 
+    let mut writer = if write_validated {
+        let mut path = config_file.clone();
+        let file_name = path.file_stem().unwrap().to_str().unwrap().to_string();
+        path.pop();
+        path.push("validated");
+        std::fs::create_dir_all(&path).unwrap();
+        path.push(file_name);
+        let file = std::fs::File::create(&path).map_err(|e| {
+            error::Error::FileNotFound(format!(
+                "Failed to create file {}: {}\nCalled from: {}",
+                path.display(),
+                e,
+                config_file.display()
+            ))
+        })?;
+        Some(csv::Writer::from_writer(file))
+    } else {
+        None
+    };
+
+    // set up file to write exceptions as jsonl in exceptions subdirectory
+    let mut exception_path = config_file.clone();
+    exception_path.pop();
+    exception_path.push("exceptions");
+    std::fs::create_dir_all(&exception_path).unwrap();
+    exception_path.push("exceptions.jsonl");
+    // let exception_file = std::fs::File::create(&exception_path).unwrap();
+    // let mut exception_writer = BufWriter::new(exception_file);
+    if exception_path.exists() {
+        std::fs::remove_file(&exception_path)?;
+    }
+    let mut exception_writer = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(exception_path)?;
+
     // let mut encountered = HashSet::new();
 
     let mut ctr_assigned = 0;
@@ -1368,26 +1670,88 @@ fn nodes_from_file(
     let mut putative_ctr = 0;
     let mut none_ctr = 0;
     let mut spellcheck_ctr = 0;
+    let mut output_headers = vec![];
 
-    for result in rdr.records() {
+    for (row_index, result) in rdr.records().enumerate() {
         if let Err(err) = result {
-            eprintln!("Error reading record: {}", err);
-            // TODO: log error & write record to error file
+            let report = ValidationReport {
+                row_index,
+                counts: ValidationCounts {
+                    errors: 1,
+                    total: 1,
+                    ..Default::default()
+                },
+                status: ValidationStatus::Error,
+                errors: vec![format!("Error reading record: {}", err)],
+                ..Default::default()
+            };
+            exception_writer
+                .write_all(report.to_jsonl().as_bytes())
+                .unwrap();
+            exception_writer.write_all(b"\n").unwrap();
             continue;
         }
         let record = result?;
         let mut processed = HashMap::new();
+        let mut combined_report = ValidationReport {
+            row_index,
+            ..Default::default()
+        };
         for key in keys.iter() {
             if ghubs_config.get(key).is_some() {
-                let value = validate_values(key, ghubs_config, &record);
-                processed.insert(key, value);
+                let report = validate_values(key, &mut ghubs_config.clone(), &record);
+                let validated = report.validated.clone();
+                combined_report.combine_reports(report);
+                processed.insert(key, validated);
             }
         }
-        // let status = record.get(4).unwrap();
+
+        if combined_report.status != ValidationStatus::Valid {
+            exception_writer
+                .write_all(combined_report.to_jsonl().as_bytes())
+                .unwrap();
+            exception_writer.write_all(b"\n").unwrap();
+            exception_writer.flush().unwrap();
+            if combined_report.status == ValidationStatus::Partial {
+                if ghubs_config.file.as_ref().unwrap().skip_partial == Some(SkipPartial::Row) {
+                    continue;
+                }
+            }
+        }
+        // if output_headers is not set
+        // flatten top-level keys in processed and store rows ready to write to CSV file
+        if let Some(writer) = &mut writer {
+            // flatten top-level keys in processed
+            // if output_headers is not set then set it
+            // write to CSV/TSV file
+            if output_headers.is_empty() {
+                for (key, _) in processed.iter() {
+                    // output_headers.push(key.to_string());
+                    for (field, _) in ghubs_config.get(key).unwrap().iter() {
+                        output_headers.push((key.to_owned().clone(), field.clone()));
+                    }
+                }
+                writer.write_record(output_headers.iter().map(|(_, field)| field))?;
+            }
+            let mut row = vec![];
+            for (key, field) in output_headers.clone() {
+                if let Some(nested) = processed.get(&key) {
+                    if let Some(value) = nested.get(&field) {
+                        row.push(value.clone());
+                    } else {
+                        row.push("None".to_string());
+                    }
+                }
+            }
+            writer.write_record(&row)?;
+        }
+
+        // dbg!(processed.clone());
+
         let taxonomy_section = processed.get(&"taxonomy");
         let taxon_names_section = processed.get(&"taxon_names");
 
-        if taxonomy_section.is_none() {
+        if taxonomy_section.is_none() || id_map.is_empty() {
             continue;
         }
 
@@ -1414,7 +1778,7 @@ fn nodes_from_file(
                     unmatched = true;
                 }
             }
-        } else if let Some(otions) = &taxon_match.rank_options {
+        } else if let Some(options) = &taxon_match.rank_options {
             spellcheck_ctr += 1;
         } else {
             none_ctr += 1;
@@ -1448,6 +1812,7 @@ fn nodes_from_file(
 pub fn parse_file(
     config_file: PathBuf,
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
+    write_validated: bool,
 ) -> Result<(Nodes, HashMap<String, Vec<Name>>, Source), error::Error> {
     // let mut children = HashMap::new();
 
@@ -1456,7 +1821,8 @@ pub fn parse_file(
         Err(err) => return Err(err),
     };
     // let source = Source::new(&ghubs_config);
-    let (names, tmp_nodes) = nodes_from_file(&config_file, &mut ghubs_config, &id_map)?;
+    let (names, tmp_nodes) =
+        nodes_from_file(&config_file, &mut ghubs_config, &id_map, write_validated)?;
     let mut nodes = Nodes {
         nodes: HashMap::new(),
         children: HashMap::new(),

@@ -99,7 +99,7 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
     Ok(options.clone())
 }
 
-fn taxdump_to_nodes(
+pub fn taxdump_to_nodes(
     options: &cli::TaxonomyOptions,
     existing: Option<&mut Nodes>,
 ) -> Result<Nodes, error::Error> {
@@ -166,7 +166,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
         for genomehubs_file in genomehubs_files {
             // match taxa to nodes
             // todo: add support for multiple genomehubs files
-            let (new_nodes, new_names, source) = parse_file(genomehubs_file, &id_map)?;
+            let (new_nodes, new_names, source) = parse_file(genomehubs_file, &id_map, false)?;
             // add new nodes to existing nodes
             dbg!(new_nodes.nodes.len());
             nodes.add_names(&new_names)?;
