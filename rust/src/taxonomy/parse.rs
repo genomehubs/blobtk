@@ -1229,6 +1229,18 @@ pub struct ValidationCounts {
     pub total: usize,
 }
 
+impl ValidationCounts {
+    pub fn to_json(&self) -> String {
+        // summarise as json
+        serde_json::to_string_pretty(&self).unwrap()
+    }
+
+    pub fn to_jsonl(&self) -> String {
+        // summarise as jsonl
+        serde_json::to_string(&self).unwrap()
+    }
+}
+
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct ValidationReport {
     pub row_index: usize,
@@ -1658,6 +1670,15 @@ fn nodes_from_file(
         .create(true)
         .open(exception_path)?;
 
+    let mut counts = ValidationCounts {
+        valid: 0,
+        invalid: 0,
+        partial: 0,
+        blank: 0,
+        errors: 0,
+        total: 0,
+    };
+
     // let mut encountered = HashSet::new();
 
     let mut ctr_assigned = 0;
@@ -1685,6 +1706,7 @@ fn nodes_from_file(
                 errors: vec![format!("Error reading record: {}", err)],
                 ..Default::default()
             };
+            counts.errors += 1;
             exception_writer
                 .write_all(report.to_jsonl().as_bytes())
                 .unwrap();
@@ -1704,6 +1726,15 @@ fn nodes_from_file(
                 combined_report.combine_reports(report);
                 processed.insert(key, validated);
             }
+        }
+
+        match combined_report.status {
+            ValidationStatus::Valid => counts.valid += 1,
+            ValidationStatus::Invalid => counts.invalid += 1,
+            ValidationStatus::Partial => counts.partial += 1,
+            ValidationStatus::Blank => counts.blank += 1,
+            ValidationStatus::Error => counts.errors += 1,
+            ValidationStatus::None => {}
         }
 
         if combined_report.status != ValidationStatus::Valid {
@@ -1801,6 +1832,7 @@ fn nodes_from_file(
             }
         }
     }
+    println!("{}", counts.to_json());
     println!("Assigned: {}, Unassigned: {}", ctr_assigned, ctr_unassigned);
     println!(
         "Match: {}, Merge Match: {}, Mismatch: {}, Multi Match: {}, Putative: {}, None: {}, Spellcheck: {}",
