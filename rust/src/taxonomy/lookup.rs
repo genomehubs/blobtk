@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
 
 use blart::TreeMap;
+use serde::{Deserialize, Serialize};
 
 use crate::taxonomy::parse::{Name, Node};
 use crate::{taxonomy::parse, utils::styled_progress_bar};
@@ -356,15 +357,17 @@ pub fn build_fast_lookup(
     id_map
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Candidate {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tax_id: Option<String>,
     pub rank: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub anc_ids: Option<HashSet<String>>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum MatchStatus {
     Match(Candidate),
     MergeMatch(Candidate),
@@ -375,14 +378,31 @@ pub enum MatchStatus {
     None,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TaxonMatch {
     pub taxon: Candidate,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub taxon_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rank_status: Option<MatchStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rank_options: Option<Vec<Candidate>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub higher_status: Option<MatchStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub higher_options: Option<Vec<Candidate>>,
+}
+
+impl TaxonMatch {
+    pub fn to_json(&self) -> String {
+        // summarise as json
+        serde_json::to_string_pretty(&self).unwrap()
+    }
+
+    pub fn to_jsonl(&self) -> String {
+        // summarise as jsonl
+        serde_json::to_string(&self).unwrap()
+    }
 }
 
 fn check_higher_taxon(taxon: &Candidate, higher_taxon: &Candidate) -> bool {

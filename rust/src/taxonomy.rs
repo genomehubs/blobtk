@@ -107,12 +107,9 @@ pub fn taxdump_to_nodes(
     let nodes;
     if let Some(taxdump) = options.path.clone() {
         nodes = match options.taxonomy_format {
-            Some(cli::TaxonomyFormat::NCBI) => {
-                parse_taxdump(taxdump, options.xref_label.clone()).unwrap()
-            }
             Some(cli::TaxonomyFormat::GBIF) => parse_gbif(taxdump).unwrap(),
             Some(cli::TaxonomyFormat::ENA) => parse_ena_jsonl(taxdump, existing).unwrap(),
-            None => return Err(error::Error::NotDefined(format!("taxonomy-format"))),
+            _ => parse_taxdump(taxdump, options.xref_label.clone()).unwrap(),
         };
     } else {
         return Err(error::Error::NotDefined(format!("taxdump")));

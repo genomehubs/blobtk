@@ -12,19 +12,16 @@ use std::collections::HashSet;
 use std::ffi::CString;
 use std::fmt;
 use std::fs::OpenOptions;
-use std::hash::Hash;
-use std::io::BufWriter;
 use std::io::Write;
-use std::os::unix::process;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow;
-use blart::NodeType;
 use blart::TreeMap;
 use convert_case::{Case, Casing};
 use cpc::{eval, units::Unit};
 use csv::{ReaderBuilder, StringRecord};
+use indicatif::ProgressBar;
 use nom::{
     bytes::complete::{tag, take_until},
     combinator::map,
@@ -981,9 +978,7 @@ pub struct Source {
 
 impl Source {
     pub fn new(config: &GHubsConfig) -> Source {
-        // dbg!(&config);
-
-        if let Some(file_config) = config.file.clone() {
+        if let Some(_file_config) = config.file.clone() {
             // let name = file_config.source.file_stem().unwrap().to_str().unwrap();
             // let abbreviation = name.to_case(Case::Upper);
             // Source {
@@ -1217,16 +1212,30 @@ pub enum ValidationStatus {
     Error,
     #[default]
     None,
+    Spellcheck,
+    Putative,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct ValidationCounts {
-    pub valid: usize,
-    pub invalid: usize,
-    pub partial: usize,
-    pub blank: usize,
-    pub errors: usize,
     pub total: usize,
+    pub valid: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub invalid: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub partial: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub blank: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub errors: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub spellcheck: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub putative: usize,
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
 }
 
 impl ValidationCounts {
@@ -1254,7 +1263,12 @@ pub struct ValidationReport {
     pub blank: Vec<String>,
     #[serde(skip)]
     pub validated: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub spellcheck: Vec<TaxonMatch>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub putative: Vec<TaxonMatch>,
 }
 
 impl ValidationReport {
@@ -1304,7 +1318,6 @@ impl ValidationReport {
 }
 
 fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, ValidationStatus) {
-    let mut valid = true;
     if value == "" || value == "None" || value == "NA" {
         return ("None".to_string(), ValidationStatus::Blank);
     }
@@ -1398,11 +1411,8 @@ fn validate_value(
     let (v, status) = apply_function(val.to_string(), &field);
     let is_valid = match status {
         ValidationStatus::Valid => true,
-        ValidationStatus::Invalid => false,
-        ValidationStatus::Partial => false,
         ValidationStatus::Blank => true,
-        ValidationStatus::Error => false,
-        ValidationStatus::None => false,
+        _ => false,
     };
     if !is_valid {
         invalid_values.push(val.to_string());
@@ -1418,15 +1428,8 @@ fn validate_values(
     let mut validated = HashMap::new();
     let mut invalid: HashMap<String, Vec<String>> = HashMap::new();
     let mut partial: HashMap<String, Vec<String>> = HashMap::new();
-    let mut blank: Vec<String> = vec![];
-    let mut field_counts = ValidationCounts {
-        valid: 0,
-        invalid: 0,
-        partial: 0,
-        blank: 0,
-        errors: 0,
-        total: 0,
-    };
+    let blank: Vec<String> = vec![];
+    let mut field_counts = ValidationCounts::default();
     let skip_partial = ghubs_config.file.as_ref().unwrap().skip_partial.clone();
 
     for (field_name, field) in ghubs_config.borrow_mut().get_mut(key).unwrap().iter_mut() {
@@ -1443,11 +1446,8 @@ fn validate_values(
             field_counts.total += 1;
             let is_valid = match status {
                 ValidationStatus::Valid => true,
-                ValidationStatus::Invalid => false,
-                ValidationStatus::Partial => false,
                 ValidationStatus::Blank => true,
-                ValidationStatus::Error => false,
-                ValidationStatus::None => false,
+                _ => false,
             };
             match status {
                 ValidationStatus::Valid => field_counts.valid += 1,
@@ -1469,8 +1469,9 @@ fn validate_values(
                     invalid.insert(field_name.clone(), invalid_values);
                 }
                 ValidationStatus::None => {
-                    field_counts.valid -= 1;
+                    field_counts.total -= 1;
                 }
+                _ => {}
             }
             let mut validated_value: String = values
                 .iter()
@@ -1649,7 +1650,11 @@ fn nodes_from_file(
                 config_file.display()
             ))
         })?;
-        Some(csv::Writer::from_writer(file))
+        Some(
+            csv::WriterBuilder::new()
+                .delimiter(delimiter)
+                .from_writer(file),
+        )
     } else {
         None
     };
@@ -1670,14 +1675,7 @@ fn nodes_from_file(
         .create(true)
         .open(exception_path)?;
 
-    let mut counts = ValidationCounts {
-        valid: 0,
-        invalid: 0,
-        partial: 0,
-        blank: 0,
-        errors: 0,
-        total: 0,
-    };
+    let mut counts = ValidationCounts::default();
 
     // let mut encountered = HashSet::new();
 
@@ -1691,9 +1689,13 @@ fn nodes_from_file(
     let mut putative_ctr = 0;
     let mut none_ctr = 0;
     let mut spellcheck_ctr = 0;
-    let mut output_headers = vec![];
+    let mut output_headers: Vec<(String, String)> = vec![];
+
+    let pb = ProgressBar::new_spinner();
 
     for (row_index, result) in rdr.records().enumerate() {
+        pb.set_message(format!("[+] {}", counts.to_jsonl().as_str()));
+        pb.inc(1);
         if let Err(err) = result {
             let report = ValidationReport {
                 row_index,
@@ -1724,9 +1726,10 @@ fn nodes_from_file(
                 let report = validate_values(key, &mut ghubs_config.clone(), &record);
                 let validated = report.validated.clone();
                 combined_report.combine_reports(report);
-                processed.insert(key, validated);
+                processed.insert(key.to_string(), validated);
             }
         }
+        counts.total += 1;
 
         match combined_report.status {
             ValidationStatus::Valid => counts.valid += 1,
@@ -1734,7 +1737,7 @@ fn nodes_from_file(
             ValidationStatus::Partial => counts.partial += 1,
             ValidationStatus::Blank => counts.blank += 1,
             ValidationStatus::Error => counts.errors += 1,
-            ValidationStatus::None => {}
+            _ => {}
         }
 
         if combined_report.status != ValidationStatus::Valid {
@@ -1749,50 +1752,26 @@ fn nodes_from_file(
                 }
             }
         }
-        // if output_headers is not set
-        // flatten top-level keys in processed and store rows ready to write to CSV file
-        if let Some(writer) = &mut writer {
-            // flatten top-level keys in processed
-            // if output_headers is not set then set it
-            // write to CSV/TSV file
-            if output_headers.is_empty() {
-                for (key, _) in processed.iter() {
-                    // output_headers.push(key.to_string());
-                    for (field, _) in ghubs_config.get(key).unwrap().iter() {
-                        output_headers.push((key.to_owned().clone(), field.clone()));
-                    }
-                }
-                writer.write_record(output_headers.iter().map(|(_, field)| field))?;
-            }
-            let mut row = vec![];
-            for (key, field) in output_headers.clone() {
-                if let Some(nested) = processed.get(&key) {
-                    if let Some(value) = nested.get(&field) {
-                        row.push(value.clone());
-                    } else {
-                        row.push("None".to_string());
-                    }
-                }
-            }
-            writer.write_record(&row)?;
-        }
 
         // dbg!(processed.clone());
 
-        let taxonomy_section = processed.get(&"taxonomy");
-        let taxon_names_section = processed.get(&"taxon_names");
+        let taxonomy_section = processed.get(&"taxonomy".to_string());
+        let taxon_names_section = processed.get(&"taxon_names".to_string());
 
         if taxonomy_section.is_none() || id_map.is_empty() {
+            write_processed_row(ghubs_config, &mut writer, &mut output_headers, &processed)?;
+
             continue;
         }
 
         let (assigned_taxon, taxon_match) =
             match_taxonomy_section(taxonomy_section.unwrap(), id_map);
-        if let Some(taxon) = assigned_taxon {
+        if let Some(taxon) = &assigned_taxon {
             ctr_assigned += 1;
             if let Some(taxon_names) = taxon_names_section {
                 add_new_names(&taxon, taxon_names, &mut names, &id_map);
             }
+            write_processed_row(ghubs_config, &mut writer, &mut output_headers, &processed)?;
         } else {
             ctr_unassigned += 1;
         }
@@ -1803,14 +1782,36 @@ fn nodes_from_file(
                 MatchStatus::MergeMatch(_) => merge_match_ctr += 1,
                 MatchStatus::Mismatch(_) => mismatch_ctr += 1,
                 MatchStatus::MultiMatch(_) => multimatch_ctr += 1,
-                MatchStatus::PutativeMatch(_) => putative_ctr += 1,
+                MatchStatus::PutativeMatch(_) => {
+                    putative_ctr += 1;
+
+                    if assigned_taxon.is_none() {
+                        combined_report.status = ValidationStatus::Putative;
+                        combined_report.putative.push(taxon_match.clone());
+                        counts.putative += 1;
+                        counts.valid -= 1;
+
+                        exception_writer
+                            .write_all(combined_report.to_jsonl().as_bytes())
+                            .unwrap();
+                        exception_writer.write_all(b"\n").unwrap();
+                    }
+                }
                 MatchStatus::None => {
                     none_ctr += 1;
                     unmatched = true;
                 }
             }
-        } else if let Some(options) = &taxon_match.rank_options {
+        } else if let Some(_options) = &taxon_match.rank_options {
             spellcheck_ctr += 1;
+            counts.spellcheck += 1;
+            counts.valid -= 1;
+            combined_report.status = ValidationStatus::Spellcheck;
+            combined_report.spellcheck.push(taxon_match.clone());
+            exception_writer
+                .write_all(combined_report.to_jsonl().as_bytes())
+                .unwrap();
+            exception_writer.write_all(b"\n").unwrap();
         } else {
             none_ctr += 1;
             unmatched = true;
@@ -1829,16 +1830,51 @@ fn nodes_from_file(
                         &id_map,
                     );
                 }
+                write_processed_row(ghubs_config, &mut writer, &mut output_headers, &processed)?;
+                // TODO: add new taxid to id_map and increment counter
             }
         }
     }
-    println!("{}", counts.to_json());
+    pb.finish_with_message(format!("done {}", counts.to_jsonl().as_str()));
     println!("Assigned: {}, Unassigned: {}", ctr_assigned, ctr_unassigned);
     println!(
         "Match: {}, Merge Match: {}, Mismatch: {}, Multi Match: {}, Putative: {}, None: {}, Spellcheck: {}",
         match_ctr, merge_match_ctr, mismatch_ctr, multimatch_ctr, putative_ctr, none_ctr, spellcheck_ctr
     );
     Ok((names, nodes))
+}
+
+fn write_processed_row(
+    ghubs_config: &mut GHubsConfig,
+    writer: &mut Option<csv::Writer<std::fs::File>>,
+    output_headers: &mut Vec<(String, String)>,
+    processed: &HashMap<String, HashMap<String, String>>,
+) -> Result<(), error::Error> {
+    Ok(if let Some(writer) = writer {
+        // flatten top-level keys in processed
+        // if output_headers is not set then set it
+        // write to CSV/TSV file
+        if output_headers.is_empty() {
+            for key in processed.keys() {
+                // output_headers.push(key.to_string());
+                for (field, _) in ghubs_config.get(key).unwrap().iter() {
+                    output_headers.push((key.clone(), field.clone()));
+                }
+            }
+            writer.write_record(output_headers.iter().map(|(_, field)| field))?;
+        }
+        let mut row = vec![];
+        for (key, field) in output_headers.clone() {
+            if let Some(nested) = processed.get(&key) {
+                if let Some(value) = nested.get(&field) {
+                    row.push(value.clone());
+                } else {
+                    row.push("None".to_string());
+                }
+            }
+        }
+        writer.write_record(&row)?;
+    })
 }
 
 pub fn parse_file(
