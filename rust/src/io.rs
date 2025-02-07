@@ -86,6 +86,29 @@ pub fn get_writer(file_path: &Option<PathBuf>) -> Box<dyn Write> {
     writer
 }
 
+pub fn get_csv_writer(file_path: &Option<PathBuf>, delimiter: u8) -> csv::Writer<Box<dyn Write>> {
+    let file_writer = get_writer(file_path);
+    if delimiter == b'\t' {
+        csv::WriterBuilder::new()
+            .delimiter(b'\t')
+            .from_writer(file_writer)
+    } else {
+        csv::WriterBuilder::new().from_writer(file_writer)
+    }
+}
+
+pub fn get_csv_reader(
+    file_path: &Option<PathBuf>,
+    delimiter: u8,
+    has_headers: bool,
+) -> csv::Reader<Box<dyn BufRead>> {
+    let file_reader = file_reader(file_path.as_ref().unwrap().clone()).unwrap();
+    csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .has_headers(has_headers)
+        .from_reader(file_reader)
+}
+
 pub fn write_list(entries: &HashSet<Vec<u8>>, file_path: &Option<PathBuf>) -> Result<()> {
     let mut writer = get_writer(file_path);
     for line in entries.iter() {
@@ -100,10 +123,12 @@ pub fn append_to_path(p: &PathBuf, s: &str) -> PathBuf {
     p.into()
 }
 
+/// Return a BufRead object for a given file path.
+/// If the file path has a `.gz` extension, the file is decompressed on the fly.
 pub fn file_reader(path: PathBuf) -> Option<Box<dyn BufRead>> {
     let file = File::open(&path).expect("no such file");
 
-    if path.ends_with(".gz") {
+    if path.extension() == Some(OsStr::new("gz")) {
         return Some(Box::new(BufReader::new(GzDecoder::new(file))));
     } else {
         return Some(Box::new(BufReader::new(file)));

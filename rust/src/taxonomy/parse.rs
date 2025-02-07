@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::ffi::CString;
 use std::fmt;
 use std::fs::OpenOptions;
+use std::hash::Hash;
 use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -37,6 +38,8 @@ use struct_iterable::Iterable;
 
 use crate::error;
 use crate::io;
+use crate::io::get_csv_reader;
+use crate::io::get_csv_writer;
 use crate::taxonomy::lookup::MatchStatus;
 
 use super::lookup::Candidate;
@@ -704,13 +707,39 @@ pub struct GHubsFileConfig {
     pub name: PathBuf,
     /// Additional configuration files that must be loaded
     /// before this file
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub needs: Option<PathBufOrVec>,
     // /// File source
     // pub source: Option<Source>,
     /// Skip partial rows or cells
     /// Default: row
     /// Options: row, cell
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub skip_partial: Option<SkipPartial>,
+}
+
+impl GHubsFileConfig {
+    pub fn get_needs(&self) -> Vec<PathBuf> {
+        match &self.needs {
+            Some(needs) => match needs {
+                PathBufOrVec::Single(path) => vec![path.clone()],
+                PathBufOrVec::Multiple(paths) => paths.clone(),
+            },
+            None => vec![],
+        }
+    }
+
+    pub fn file_path(&self, config_path: &PathBuf, subdir: Option<&str>) -> PathBuf {
+        let mut file_path = config_path.clone();
+
+        file_path.pop();
+        if let Some(subdir) = subdir {
+            file_path.push(subdir);
+        }
+        std::fs::create_dir_all(&file_path).unwrap();
+        file_path.push(&self.name);
+        file_path
+    }
 }
 
 /// GenomeHubs field constraint configuration options
@@ -720,14 +749,18 @@ pub struct ConstraintConfig {
     #[serde(
         rename = "enum",
         deserialize_with = "deserialize_to_lowercase",
+        skip_serializing_if = "Option::is_none",
         default
     )]
     pub enum_values: Option<Vec<String>>,
     // Value length
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub len: Option<usize>,
     // Maximum value
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max: Option<f64>,
     // Minimum value
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
 }
 
@@ -759,6 +792,7 @@ pub struct BinsConfig {
     // List of valid values
     pub count: u32,
     // Geographic resolution (hexagonal)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub h3res: Option<u8>,
     // Maximum value
     pub max: f64,
@@ -772,10 +806,13 @@ pub struct BinsConfig {
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct DisplayConfig {
     // Display group
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
     // Display level
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub level: Option<u8>,
-    // Displa name
+    // Display name
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
 
@@ -792,43 +829,58 @@ pub enum FieldStatus {
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct GHubsFieldConfig {
     // Default settings for value bins
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bins: Option<BinsConfig>,
     // Constraint on field values
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub constraint: Option<ConstraintConfig>,
     // Default value
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
     // Field description
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     // Display options
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display: Option<DisplayConfig>,
     // Function to apply to value
+    #[serde(skip_serializing)]
     pub function: Option<String>,
     // Column header
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<StringOrVec>,
     // Column index
+    #[serde(skip_serializing)]
     pub index: Option<UsizeOrVec>,
     // String to join columns
+    #[serde(skip_serializing)]
     pub join: Option<String>,
     // Attribute key
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     // Attribute name
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     // Value separator
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub separator: Option<StringOrVec>,
     // Attribute status
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FieldStatus>,
     // Attribute summary functions
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<StringOrVec>,
     // Attribute name synonyms
-    #[serde(alias = "synonym")]
+    #[serde(alias = "synonym", skip_serializing_if = "Option::is_none")]
     pub synonyms: Option<StringOrVec>,
     // List of values to translate
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub translate: Option<HashMap<String, StringOrVec>>,
     // Field type
     #[serde(rename = "type", default = "default_field_type")]
     pub field_type: FieldType,
     // Attribute value units
-    #[serde(alias = "unit")]
+    #[serde(alias = "unit", skip_serializing_if = "Option::is_none")]
     pub units: Option<String>,
 }
 
@@ -900,12 +952,16 @@ fn merge_attributes(
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct GHubsConfig {
     /// File configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<GHubsFileConfig>,
     /// Attribute fields
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, GHubsFieldConfig>>,
     /// Taxon names
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub taxon_names: Option<HashMap<String, GHubsFieldConfig>>,
     /// Taxonomy fields
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub taxonomy: Option<HashMap<String, GHubsFieldConfig>>,
 }
 
@@ -1214,6 +1270,9 @@ pub enum ValidationStatus {
     None,
     Spellcheck,
     Putative,
+    Mismatch,
+    Multimatch,
+    Nomatch,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -1232,6 +1291,12 @@ pub struct ValidationCounts {
     pub spellcheck: usize,
     #[serde(skip_serializing_if = "is_zero")]
     pub putative: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub mismatch: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub multimatch: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub nomatch: usize,
 }
 
 fn is_zero(value: &usize) -> bool {
@@ -1261,7 +1326,7 @@ pub struct ValidationReport {
     pub partial: HashMap<String, Vec<String>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blank: Vec<String>,
-    #[serde(skip)]
+    #[serde(skip_serializing)]
     pub validated: HashMap<String, String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
@@ -1269,6 +1334,10 @@ pub struct ValidationReport {
     pub spellcheck: Vec<TaxonMatch>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub putative: Vec<TaxonMatch>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mismatch: Vec<TaxonMatch>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub multimatch: Vec<TaxonMatch>,
 }
 
 impl ValidationReport {
@@ -1595,35 +1664,20 @@ fn nodes_from_file(
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
     write_validated: bool,
 ) -> Result<(HashMap<String, Vec<Name>>, HashMap<String, Node>), error::Error> {
-    let file_config = ghubs_config.file.as_ref().unwrap();
+    let file_config = ghubs_config.file.as_ref().unwrap().clone();
     let delimiter = match file_config.format {
         GHubsFileFormat::CSV => b',',
         GHubsFileFormat::TSV => b'\t',
     };
-    let mut path = config_file.clone();
-    path.pop();
-    path.push(file_config.name.clone());
-
-    let mut rdr = {
-        let file = std::fs::File::open(&path).map_err(|e| {
-            error::Error::FileNotFound(format!(
-                "Failed to open file {}: {}\nCalled from: {}",
-                path.display(),
-                e,
-                config_file.display()
-            ))
-        })?;
-        let reader: Box<dyn std::io::Read> =
-            if path.extension().and_then(|s| s.to_str()) == Some("gz") {
-                Box::new(flate2::read::GzDecoder::new(file))
-            } else {
-                Box::new(file)
-            };
-        ReaderBuilder::new()
-            .has_headers(file_config.header)
-            .delimiter(delimiter)
-            .from_reader(reader)
-    };
+    // let mut path = config_file.clone();
+    // path.pop();
+    // let tsv_name = file_config.name.clone();
+    // path.push(&tsv_name);
+    let mut rdr = get_csv_reader(
+        &Some(file_config.file_path(&config_file, None)),
+        delimiter,
+        file_config.header,
+    );
     let headers = rdr.headers()?;
     let keys = vec!["attributes", "taxon_names", "taxonomy"];
     for key in keys.iter() {
@@ -1636,25 +1690,10 @@ fn nodes_from_file(
     // dbg!(&ghubs_config);
 
     let mut writer = if write_validated {
-        let mut path = config_file.clone();
-        let file_name = path.file_stem().unwrap().to_str().unwrap().to_string();
-        path.pop();
-        path.push("validated");
-        std::fs::create_dir_all(&path).unwrap();
-        path.push(file_name);
-        let file = std::fs::File::create(&path).map_err(|e| {
-            error::Error::FileNotFound(format!(
-                "Failed to create file {}: {}\nCalled from: {}",
-                path.display(),
-                e,
-                config_file.display()
-            ))
-        })?;
-        Some(
-            csv::WriterBuilder::new()
-                .delimiter(delimiter)
-                .from_writer(file),
-        )
+        Some(get_csv_writer(
+            &Some(file_config.file_path(&config_file, Some("validated"))),
+            delimiter,
+        ))
     } else {
         None
     };
@@ -1756,13 +1795,34 @@ fn nodes_from_file(
         // dbg!(processed.clone());
 
         let taxonomy_section = processed.get(&"taxonomy".to_string());
-        let taxon_names_section = processed.get(&"taxon_names".to_string());
 
         if taxonomy_section.is_none() || id_map.is_empty() {
             write_processed_row(ghubs_config, &mut writer, &mut output_headers, &processed)?;
 
             continue;
         }
+
+        if let Some(tax_section) = taxonomy_section {
+            if let Some(_taxon_id) = tax_section.get("taxon_id") {
+                // do nothing
+            } else {
+                let mut taxon_id_section = tax_section.clone();
+                taxon_id_section.insert("taxon_id".to_string(), "None".to_string());
+                // replace taxonomy section with new section
+                processed.insert("taxonomy".to_string(), taxon_id_section);
+                let taxon_id_config = GHubsFieldConfig {
+                    field_type: FieldType::Keyword,
+                    header: Some(StringOrVec::Single("taxon_id".to_string())),
+                    ..Default::default()
+                };
+                ghubs_config
+                    .get_mut("taxonomy")
+                    .unwrap()
+                    .insert("taxon_id".to_string(), taxon_id_config);
+            }
+        }
+        let taxonomy_section = processed.get(&"taxonomy".to_string());
+        let taxon_names_section = processed.get(&"taxon_names".to_string());
 
         let (assigned_taxon, taxon_match) =
             match_taxonomy_section(taxonomy_section.unwrap(), id_map);
@@ -1771,7 +1831,13 @@ fn nodes_from_file(
             if let Some(taxon_names) = taxon_names_section {
                 add_new_names(&taxon, taxon_names, &mut names, &id_map);
             }
-            write_processed_row(ghubs_config, &mut writer, &mut output_headers, &processed)?;
+            let taxon_id = taxon.tax_id.clone().unwrap();
+            let mut updated = processed.clone();
+            updated
+                .get_mut("taxonomy")
+                .unwrap()
+                .insert("taxon_id".to_string(), taxon_id);
+            write_processed_row(ghubs_config, &mut writer, &mut output_headers, &updated)?;
         } else {
             ctr_unassigned += 1;
         }
@@ -1780,8 +1846,28 @@ fn nodes_from_file(
             match status {
                 MatchStatus::Match(_) => match_ctr += 1,
                 MatchStatus::MergeMatch(_) => merge_match_ctr += 1,
-                MatchStatus::Mismatch(_) => mismatch_ctr += 1,
-                MatchStatus::MultiMatch(_) => multimatch_ctr += 1,
+                MatchStatus::Mismatch(_) => {
+                    mismatch_ctr += 1;
+                    combined_report.status = ValidationStatus::Mismatch;
+                    combined_report.mismatch.push(taxon_match.clone());
+                    counts.mismatch += 1;
+
+                    exception_writer
+                        .write_all(combined_report.to_jsonl().as_bytes())
+                        .unwrap();
+                    exception_writer.write_all(b"\n").unwrap();
+                }
+                MatchStatus::MultiMatch(_) => {
+                    multimatch_ctr += 1;
+                    combined_report.status = ValidationStatus::Multimatch;
+                    combined_report.multimatch.push(taxon_match.clone());
+                    counts.multimatch += 1;
+
+                    exception_writer
+                        .write_all(combined_report.to_jsonl().as_bytes())
+                        .unwrap();
+                    exception_writer.write_all(b"\n").unwrap();
+                }
                 MatchStatus::PutativeMatch(_) => {
                     putative_ctr += 1;
 
@@ -1789,7 +1875,6 @@ fn nodes_from_file(
                         combined_report.status = ValidationStatus::Putative;
                         combined_report.putative.push(taxon_match.clone());
                         counts.putative += 1;
-                        counts.valid -= 1;
 
                         exception_writer
                             .write_all(combined_report.to_jsonl().as_bytes())
@@ -1800,12 +1885,19 @@ fn nodes_from_file(
                 MatchStatus::None => {
                     none_ctr += 1;
                     unmatched = true;
+                    combined_report.status = ValidationStatus::Nomatch;
+                    // combined_report.multimatch.push(taxon_match.clone());
+                    counts.nomatch += 1;
+
+                    exception_writer
+                        .write_all(combined_report.to_jsonl().as_bytes())
+                        .unwrap();
+                    exception_writer.write_all(b"\n").unwrap();
                 }
             }
         } else if let Some(_options) = &taxon_match.rank_options {
             spellcheck_ctr += 1;
             counts.spellcheck += 1;
-            counts.valid -= 1;
             combined_report.status = ValidationStatus::Spellcheck;
             combined_report.spellcheck.push(taxon_match.clone());
             exception_writer
@@ -1815,6 +1907,14 @@ fn nodes_from_file(
         } else {
             none_ctr += 1;
             unmatched = true;
+            combined_report.status = ValidationStatus::Nomatch;
+            // combined_report.multimatch.push(taxon_match.clone());
+            counts.nomatch += 1;
+
+            exception_writer
+                .write_all(combined_report.to_jsonl().as_bytes())
+                .unwrap();
+            exception_writer.write_all(b"\n").unwrap();
         }
         if unmatched {
             if let Some(node) = add_new_taxid(&taxon_match, taxonomy_section.unwrap(), &id_map) {
@@ -1830,12 +1930,39 @@ fn nodes_from_file(
                         &id_map,
                     );
                 }
-                write_processed_row(ghubs_config, &mut writer, &mut output_headers, &processed)?;
+                let mut updated = processed.clone();
+                updated
+                    .get_mut("taxonomy")
+                    .unwrap()
+                    .insert("taxon_id".to_string(), node.tax_id.clone());
+
+                write_processed_row(ghubs_config, &mut writer, &mut output_headers, &updated)?;
                 // TODO: add new taxid to id_map and increment counter
             }
         }
     }
     pb.finish_with_message(format!("done {}", counts.to_jsonl().as_str()));
+    // write ghubs_config back to file in validated directory
+    let mut new_config_file = config_file.clone();
+    // get file name
+    let config_file_name = config_file.file_name().unwrap().to_str().unwrap();
+    new_config_file.pop();
+    new_config_file.push("validated");
+    std::fs::create_dir_all(&new_config_file).unwrap();
+    new_config_file.push(config_file_name);
+    for key in keys.iter() {
+        if ghubs_config.get(key).is_some() {
+            for (field, value) in ghubs_config.get_mut(key).unwrap().iter_mut() {
+                value.header = Some(StringOrVec::Single(field.clone()));
+            }
+        }
+    }
+
+    let mut file = std::fs::File::create(&new_config_file).unwrap();
+    // write ghubs_config YAML to file
+    file.write_all(serde_yaml::to_string(&ghubs_config).unwrap().as_bytes())
+        .unwrap();
+
     println!("Assigned: {}, Unassigned: {}", ctr_assigned, ctr_unassigned);
     println!(
         "Match: {}, Merge Match: {}, Mismatch: {}, Multi Match: {}, Putative: {}, None: {}, Spellcheck: {}",
@@ -1846,7 +1973,7 @@ fn nodes_from_file(
 
 fn write_processed_row(
     ghubs_config: &mut GHubsConfig,
-    writer: &mut Option<csv::Writer<std::fs::File>>,
+    writer: &mut Option<csv::Writer<Box<dyn Write>>>,
     output_headers: &mut Vec<(String, String)>,
     processed: &HashMap<String, HashMap<String, String>>,
 ) -> Result<(), error::Error> {
