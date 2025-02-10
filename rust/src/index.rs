@@ -8,7 +8,7 @@ use serde_json::to_string_pretty;
 
 use crate::cli;
 use crate::io::get_writer;
-use crate::taxonomy::parse::GHubsConfig;
+use crate::parse::genomehubs::GHubsConfig;
 
 pub use cli::IndexOptions;
 

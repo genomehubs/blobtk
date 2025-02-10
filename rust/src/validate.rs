@@ -1,10 +1,10 @@
 use anyhow;
 
 use crate::cli;
+use crate::parse::lookup::build_fast_lookup;
+use crate::parse::nodes::Nodes;
+use crate::parse::parse_file;
 use crate::taxonomy;
-use crate::taxonomy::build_fast_lookup;
-use crate::taxonomy::parse::parse_file;
-use crate::taxonomy::parse::Nodes;
 
 pub use cli::TaxonomyOptions;
 
@@ -32,7 +32,7 @@ pub fn validate(options: &cli::ValidateOptions) -> Result<(), anyhow::Error> {
             // match taxa to nodes
             // todo: add support for multiple genomehubs files
             println!("Parsing file: {:?}", genomehubs_file);
-            let (new_nodes, new_names, source) = parse_file(genomehubs_file, &id_map, true)?;
+            let (_new_nodes, _new_names, _source) = parse_file(genomehubs_file, &id_map, true)?;
         }
     }
     Ok(())

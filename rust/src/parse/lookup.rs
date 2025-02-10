@@ -5,10 +5,8 @@ use std::ffi::CString;
 use blart::TreeMap;
 use serde::{Deserialize, Serialize};
 
-use crate::taxonomy::parse::{Name, Node};
-use crate::{taxonomy::parse, utils::styled_progress_bar};
-
-use parse::Nodes;
+use crate::parse::nodes::{Name, Node, Nodes};
+use crate::utils::styled_progress_bar;
 
 const RANKS: [&str; 8] = [
     "subspecies",
@@ -105,8 +103,9 @@ pub fn lookup_nodes(
     let progress_bar = styled_progress_bar(node_count, "Looking up names");
     for node in new_nodes.nodes.values() {
         progress_bar.inc(1);
-        let taxonomy_section = node.to_taxonomy_section(&new_nodes);
-        let (assigned_taxon, taxon_match) = match_taxonomy_section(&taxonomy_section, &id_map);
+        let mut taxonomy_section = node.to_taxonomy_section(&new_nodes);
+        let (assigned_taxon, taxon_match) =
+            match_taxonomy_section(&mut taxonomy_section, &id_map, None);
         if let Some(taxon) = assigned_taxon {
             let tax_id = taxon.tax_id.clone().unwrap();
             let new_tax_id = node.tax_id();
@@ -352,7 +351,6 @@ pub fn build_fast_lookup(
     }
 
     progress_bar.finish();
-    dbg!(id_map.len());
 
     id_map
 }
@@ -445,10 +443,59 @@ fn check_higher_rank(taxon: &Candidate, taxon_match: &TaxonMatch) -> bool {
     }
 }
 
+fn set_ranks(taxonomy_section: &HashMap<String, String>) -> (Vec<String>, HashSet<&str>) {
+    // Set ranks to check
+    let mut ranks = vec![];
+    if taxonomy_section.contains_key("taxon") {
+        ranks.push("taxon".to_string());
+    }
+    for rank in RANKS.iter() {
+        if taxonomy_section.contains_key(*rank) {
+            ranks.push(rank.to_string());
+        }
+    }
+    let lower_ranks: HashSet<&str> = RANKS[0..3].iter().cloned().collect();
+    (ranks, lower_ranks)
+}
+
+fn update_taxon_id(
+    taxonomy_section: &mut HashMap<String, String>,
+    ranks: &Vec<String>,
+    fixed_names: Option<&HashMap<String, HashMap<String, String>>>,
+) {
+    // Iterate over ranks
+    for rank in ranks.iter() {
+        let name = taxonomy_section.get(rank);
+        if name.is_none() {
+            continue;
+        }
+
+        // Check if name is in fixed_names
+        let mut tax_id = None;
+        if let Some(fixed_names) = fixed_names {
+            if let Some(fixed) = fixed_names.get(rank) {
+                if let Some(taxon_id) = fixed.get(&name.unwrap().clone()) {
+                    tax_id = Some(taxon_id.clone());
+                }
+            }
+        }
+        // update taxon_id in taxonomy_section
+        if let Some(tax_id) = tax_id {
+            taxonomy_section.insert("taxon_id".to_string(), tax_id);
+        }
+        break;
+    }
+}
+
 pub fn match_taxonomy_section(
     taxonomy_section: &HashMap<String, String>,
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
+    fixed_names: Option<&HashMap<String, HashMap<String, String>>>,
 ) -> (Option<Candidate>, TaxonMatch) {
+    let (ranks, lower_ranks) = set_ranks(taxonomy_section);
+    let mut taxonomy_section = taxonomy_section.clone();
+    update_taxon_id(&mut taxonomy_section, &ranks, fixed_names);
+
     // Check if taxon_id is present
     let mut taxon_id = taxonomy_section.get("taxon_id");
     if let Some(tax_id) = taxon_id {
@@ -475,22 +522,10 @@ pub fn match_taxonomy_section(
         }
     }
 
-    // Set ranks to check
-    let mut ranks = vec![];
-    if taxonomy_section.contains_key("taxon") {
-        ranks.push("taxon".to_string());
-    }
-    for rank in RANKS.iter() {
-        if taxonomy_section.contains_key(*rank) {
-            ranks.push(rank.to_string());
-        }
-    }
-    let lower_ranks: HashSet<&str> = RANKS[0..3].iter().cloned().collect();
-
     let mut taxon_match = TaxonMatch::default();
     // Iterate over ranks
     for (i, rank) in ranks.iter().enumerate() {
-        let mut name = taxonomy_section.get(rank).unwrap().clone();
+        let name = taxonomy_section.get(rank).unwrap().clone();
         let taxon = Candidate {
             name: name.clone(),
             tax_id: taxon_id.clone().map(|s| s.clone()),
@@ -509,17 +544,16 @@ pub fn match_taxonomy_section(
         }
 
         // Clean name
-        name = name
-            .chars()
-            .map(|c| {
-                if c.is_alphanumeric() {
-                    c.to_ascii_lowercase()
-                } else {
-                    ' '
-                }
-            })
-            .collect();
+        let mut name = clean_name(name);
 
+        // Check if name is in fixed_names
+        if let Some(fixed_names) = fixed_names {
+            if let Some(fixed) = fixed_names.get(rank) {
+                if let Some(taxon_id) = fixed.get(&name) {
+                    name = taxon_id.clone();
+                }
+            }
+        }
         // Check if name is in id_map
         match id_map.get(&CString::new(name.clone()).unwrap()) {
             Some(ids) => {
@@ -758,4 +792,16 @@ pub fn match_taxonomy_section(
         }
     }
     (assigned_taxon, taxon_match)
+}
+
+fn clean_name(name: String) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                ' '
+            }
+        })
+        .collect()
 }
