@@ -1,5 +1,5 @@
 path: test/taxonomy/all/plants
-# out: test/taxonomy/all/plants
+out: test/taxonomy/all/plants/combined
 taxonomy_format: ncbi
 root_taxon_id:
   - 9608
