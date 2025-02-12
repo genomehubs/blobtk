@@ -104,10 +104,10 @@ jobs:
       matrix:
         python:
           - "3.9"
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
+          # - "3.10"
+          # - "3.11"
+          # - "3.12"
+          # - "3.13"
         target:
           - x86_64 # , x86, aarch64, armv7, s390x, ppc64le]
     steps:
@@ -158,10 +158,10 @@ jobs:
       matrix:
         python:
           - "3.9"
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
+          # - "3.10"
+          # - "3.11"
+          # - "3.12"
+          # - "3.13"
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -331,7 +331,10 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
+          ls -l ./dist
+          ls -l ./dist/wheels-*/*
           cp -r ./dist/wheels-*/* ./*
+          ls -l
           pip install --upgrade twine
           twine upload --skip-existing *
 
@@ -378,6 +381,9 @@ jobs:
       - name: conda upload
         shell: bash -l {0}
         run: |
+          ls -l ./dist
+          ls -l ./dist/conda-linux*
+          ls -l ./dist/conda-linux-*/*
           conda install -y anaconda-client
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
           anaconda upload --force --label main ./dist/conda-linux-*/linux-64/*.tar.bz2
