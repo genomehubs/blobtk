@@ -107,6 +107,7 @@ jobs:
           - "3.10"
           - "3.11"
           - "3.12"
+          - "3.13"
         target:
           - x86_64 # , x86, aarch64, armv7, s390x, ppc64le]
     steps:
@@ -125,7 +126,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux
+          name: wheels-linux-${{ matrix.python }}
           path: dist
 
   # windows:
@@ -160,6 +161,7 @@ jobs:
           - "3.10"
           - "3.11"
           - "3.12"
+          - "3.13"
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -178,7 +180,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos
+          name: wheels-macos-${{matrix.python}}
           path: dist
 
   build-and-push-docker-develop:
