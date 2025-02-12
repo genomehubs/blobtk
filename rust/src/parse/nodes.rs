@@ -210,6 +210,8 @@ impl fmt::Display for Node {
                     values.push(format!("{:?}", string_opt));
                 } else if let Some(string_opt) = field_value.downcast_ref::<String>() {
                     values.push(string_opt.clone());
+                } else {
+                    values.push("".to_string());
                 }
             }
         }
@@ -268,11 +270,21 @@ impl Nodes {
         root_taxon_ids: Option<Vec<String>>,
         base_id: Option<String>,
         taxdump_path: &PathBuf,
+        append: bool,
     ) -> () {
-        let mut nodes_writer =
-            io::get_writer(&Some(io::append_to_path(taxdump_path, "/nodes.dmp")));
-        let mut names_writer =
-            io::get_writer(&Some(io::append_to_path(taxdump_path, "/names.dmp")));
+        let nodes_path = io::append_to_path(taxdump_path, "/nodes.dmp");
+        let names_path = io::append_to_path(taxdump_path, "/names.dmp");
+
+        let mut nodes_writer = if append {
+            io::get_append_writer(&Some(nodes_path.clone()))
+        } else {
+            io::get_writer(&Some(nodes_path.clone()))
+        };
+        let mut names_writer = if append {
+            io::get_append_writer(&Some(names_path.clone()))
+        } else {
+            io::get_writer(&Some(names_path.clone()))
+        };
 
         let mut root_ids = vec![];
         match root_taxon_ids {
@@ -291,9 +303,11 @@ impl Nodes {
                 for anc_node in lineage {
                     if !ancestors.contains(&anc_node.tax_id.clone()) {
                         writeln!(nodes_writer, "{}", &anc_node).unwrap();
+                        nodes_writer.flush().unwrap();
                         if let Some(names) = anc_node.names.as_ref() {
                             for name in names {
                                 writeln!(names_writer, "{}", &name).unwrap();
+                                names_writer.flush().unwrap();
                             }
                         }
                         ancestors.insert(anc_node.tax_id.clone());
@@ -302,14 +316,16 @@ impl Nodes {
             }
             if let Some(root_node) = self.nodes.get(&root_id) {
                 writeln!(nodes_writer, "{}", &root_node).unwrap();
+                nodes_writer.flush().unwrap();
                 if let Some(names) = root_node.names.as_ref() {
                     for name in names {
                         writeln!(names_writer, "{}", &name).unwrap();
+                        names_writer.flush().unwrap();
                     }
                 }
                 if let Some(children) = self.children.get(&root_id) {
                     for child in children {
-                        self.write_taxdump(Some(vec![child.clone()]), None, taxdump_path);
+                        self.write_taxdump(Some(vec![child.clone()]), None, taxdump_path, true);
                     }
                 }
             }

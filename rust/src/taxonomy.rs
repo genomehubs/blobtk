@@ -18,8 +18,8 @@ use crate::parse::{parse_ena_jsonl, parse_file};
 fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, error::Error> {
     if let Some(config_file) = options.config_file.clone() {
         let reader = match io::file_reader(config_file.clone()) {
-            Some(r) => r,
-            None => {
+            Ok(r) => r,
+            Err(_) => {
                 return Err(error::Error::FileNotFound(format!(
                     "{}",
                     &config_file.to_str().unwrap()
@@ -141,7 +141,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     if let Some(taxdump_out) = options.out.clone() {
         let root_taxon_ids = options.root_taxon_id.clone();
         let base_taxon_id = options.base_taxon_id.clone();
-        nodes.write_taxdump(root_taxon_ids, base_taxon_id, &taxdump_out);
+        nodes.write_taxdump(root_taxon_ids, base_taxon_id, &taxdump_out, false);
     }
 
     // if let Some(gbif_backbone) = options.gbif_backbone.clone() {

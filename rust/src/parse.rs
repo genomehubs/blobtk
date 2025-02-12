@@ -30,10 +30,10 @@ pub mod genomehubs;
 use crate::error;
 use crate::io;
 
-use lookup::Candidate;
-use lookup::MatchStatus;
 use lookup::TaxonMatch;
 use lookup::{build_lookup, match_taxonomy_section, TaxonInfo};
+use lookup::{clean_name, MatchStatus};
+use lookup::{Candidate, MatchCounts};
 
 use nodes::{Name, Node, Nodes};
 
@@ -58,7 +58,7 @@ fn add_new_names(
         }
         // does name already exist in id_map associated with the same class and taxid?
         // if so, skip for now
-        if let Some(tax_info) = id_map.get(&CString::new(name.clone()).unwrap()) {
+        if let Some(tax_info) = id_map.get(&CString::new(clean_name(&name)).unwrap()) {
             let mut found = false;
             for info in tax_info {
                 if info.tax_id == tax_id {
@@ -136,26 +136,14 @@ fn nodes_from_file(
     let mut names = HashMap::new();
     let mut nodes = HashMap::new();
 
-    let mut counts = ValidationCounts::default();
-
-    // let mut encountered = HashSet::new();
-
-    let mut ctr_assigned = 0;
-    let mut ctr_unassigned = 0;
-
-    let mut match_ctr = 0;
-    let mut merge_match_ctr = 0;
-    let mut mismatch_ctr = 0;
-    let mut multimatch_ctr = 0;
-    let mut putative_ctr = 0;
-    let mut none_ctr = 0;
-    let mut spellcheck_ctr = 0;
+    let mut validation_counts: ValidationCounts = ValidationCounts::default();
+    let mut match_counts = MatchCounts::default();
 
     let pb = ProgressBar::new_spinner();
+    // dbg!(&id_map);
 
-    let records: Vec<_> = ghubs_config.stream_records().collect();
-    for (row_index, result) in records {
-        pb.set_message(format!("[+] {}", counts.to_jsonl().as_str()));
+    for (row_index, result) in ghubs_config.init_csv_reader(None).records().enumerate() {
+        pb.set_message(format!("[+] {}", validation_counts.to_jsonl().as_str()));
         pb.inc(1);
         if let Err(err) = result {
             let err: error::Error = err.into();
@@ -165,6 +153,7 @@ fn nodes_from_file(
         let record = result?;
         let (mut processed, mut combined_report) =
             ghubs_config.validate_record(&record, row_index, &keys);
+        validation_counts.update(&combined_report.counts);
         if combined_report.status == ValidationStatus::Partial {
             if ghubs_config.file.as_ref().unwrap().skip_partial == Some(SkipPartial::Row) {
                 continue;
@@ -188,11 +177,13 @@ fn nodes_from_file(
         }
         let taxonomy_section = processed.get(&"taxonomy".to_string());
         let taxon_names_section = processed.get(&"taxon_names".to_string());
-
         let (assigned_taxon, taxon_match) =
             match_taxonomy_section(taxonomy_section.unwrap(), id_map, Some(&fixed_names));
+        let taxon_name = taxon_match.taxon.name.clone();
+        // add taxon name to combined report
+        combined_report.taxon_name = Some(taxon_name.clone());
         if let Some(taxon) = &assigned_taxon {
-            ctr_assigned += 1;
+            match_counts.assigned += 1;
             if let Some(taxon_names) = taxon_names_section {
                 add_new_names(&taxon, taxon_names, &mut names, &id_map);
             }
@@ -203,62 +194,63 @@ fn nodes_from_file(
                 taxon.tax_id.clone().unwrap(),
             )?;
         } else {
-            ctr_unassigned += 1;
+            match_counts.unassigned += 1;
         }
         let mut unmatched = false;
         if let Some(status) = taxon_match.rank_status.as_ref() {
             match status {
-                MatchStatus::Match(_) => match_ctr += 1,
-                MatchStatus::MergeMatch(_) => merge_match_ctr += 1,
+                MatchStatus::Match(_) => match_counts.id_match += 1,
+                MatchStatus::MergeMatch(_) => match_counts.merge_match += 1,
                 MatchStatus::Mismatch(_) => {
-                    mismatch_ctr += 1;
+                    match_counts.mismatch += 1;
                     combined_report.status = ValidationStatus::Mismatch;
                     combined_report.mismatch.push(taxon_match.clone());
-                    counts.mismatch += 1;
+                    validation_counts.mismatch += 1;
 
                     ghubs_config.write_exception(&combined_report);
                 }
                 MatchStatus::MultiMatch(_) => {
-                    multimatch_ctr += 1;
+                    match_counts.multimatch += 1;
                     combined_report.status = ValidationStatus::Multimatch;
                     combined_report.multimatch.push(taxon_match.clone());
-                    counts.multimatch += 1;
+                    validation_counts.multimatch += 1;
 
                     ghubs_config.write_exception(&combined_report);
                 }
                 MatchStatus::PutativeMatch(_) => {
-                    putative_ctr += 1;
+                    match_counts.putative += 1;
 
                     if assigned_taxon.is_none() {
                         combined_report.status = ValidationStatus::Putative;
                         combined_report.putative.push(taxon_match.clone());
-                        counts.putative += 1;
+                        validation_counts.putative += 1;
 
                         ghubs_config.write_exception(&combined_report);
                     }
                 }
                 MatchStatus::None => {
-                    none_ctr += 1;
+                    match_counts.none += 1;
                     unmatched = true;
                     combined_report.status = ValidationStatus::Nomatch;
                     // combined_report.multimatch.push(taxon_match.clone());
-                    counts.nomatch += 1;
+                    validation_counts.nomatch += 1;
 
                     ghubs_config.write_exception(&combined_report);
                 }
             }
         } else if let Some(_options) = &taxon_match.rank_options {
-            spellcheck_ctr += 1;
-            counts.spellcheck += 1;
+            match_counts.spellcheck += 1;
+            validation_counts.spellcheck += 1;
             combined_report.status = ValidationStatus::Spellcheck;
             combined_report.spellcheck.push(taxon_match.clone());
             ghubs_config.write_exception(&combined_report);
         } else {
-            none_ctr += 1;
+            dbg!(&taxon_match);
+            match_counts.none += 1;
             unmatched = true;
             combined_report.status = ValidationStatus::Nomatch;
             // combined_report.multimatch.push(taxon_match.clone());
-            counts.nomatch += 1;
+            validation_counts.nomatch += 1;
 
             ghubs_config.write_exception(&combined_report);
         }
@@ -287,7 +279,8 @@ fn nodes_from_file(
             }
         }
     }
-    pb.finish_with_message(format!("done {}", counts.to_jsonl().as_str()));
+    pb.finish_with_message(format!("done"));
+    println!("{}", validation_counts.to_jsonl());
     // write ghubs_config back to file in validated directory
     let mut new_config_file = config_file.clone();
     // get file name
@@ -309,11 +302,7 @@ fn nodes_from_file(
     file.write_all(serde_yaml::to_string(&ghubs_config).unwrap().as_bytes())
         .unwrap();
 
-    println!("Assigned: {}, Unassigned: {}", ctr_assigned, ctr_unassigned);
-    println!(
-        "Match: {}, Merge Match: {}, Mismatch: {}, Multi Match: {}, Putative: {}, None: {}, Spellcheck: {}",
-        match_ctr, merge_match_ctr, mismatch_ctr, multimatch_ctr, putative_ctr, none_ctr, spellcheck_ctr
-    );
+    println!("{}", match_counts.to_jsonl());
     Ok((names, nodes))
 }
 

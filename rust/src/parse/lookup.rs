@@ -310,6 +310,23 @@ pub struct TaxonInfo {
     pub anc_ids: HashSet<String>,
 }
 
+pub fn clean_name(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join(" ")
+        .trim()
+        .to_string()
+}
+
 pub fn build_fast_lookup(
     nodes: &Nodes,
     name_classes: &Vec<String>,
@@ -322,32 +339,31 @@ pub fn build_fast_lookup(
     let progress_bar = styled_progress_bar(node_count, "Building lookup hash");
     for (tax_id, node) in nodes.nodes.iter() {
         progress_bar.inc(1);
-        if rank_set.contains(node.rank.as_str()) {
-            let lineage = nodes.lineage(&"1".to_string(), tax_id);
-            let names = node.names_by_class(Some(&name_classes), true);
-            let anc_ids: HashSet<String> = lineage
-                .iter()
-                .filter(|n| higher_rank_set.contains(n.rank.as_str()))
-                .map(|n| n.tax_id())
-                .collect();
-            for name in names {
-                let key = name.clone();
-                let taxon_info = TaxonInfo {
-                    tax_id: tax_id.clone(),
-                    name: node.scientific_name(),
-                    rank: node.rank(),
-                    anc_ids: anc_ids.clone(),
-                };
-                match id_map.entry(CString::new(key.clone()).unwrap()) {
-                    blart::map::Entry::Vacant(e) => {
-                        e.insert(vec![taxon_info]);
-                    }
-                    blart::map::Entry::Occupied(mut e) => {
-                        e.get_mut().push(taxon_info);
-                    }
+        // if rank_set.contains(node.rank.as_str()) {
+        let lineage = nodes.lineage(&"1".to_string(), tax_id);
+        let names = node.names_by_class(Some(&name_classes), true);
+        let anc_ids: HashSet<String> = lineage
+            .iter()
+            .filter(|n| higher_rank_set.contains(n.rank.as_str()))
+            .map(|n| n.tax_id())
+            .collect();
+        for name in names {
+            let taxon_info = TaxonInfo {
+                tax_id: tax_id.clone(),
+                name: node.scientific_name(),
+                rank: node.rank(),
+                anc_ids: anc_ids.clone(),
+            };
+            match id_map.entry(CString::new(clean_name(&name)).unwrap()) {
+                blart::map::Entry::Vacant(e) => {
+                    e.insert(vec![taxon_info]);
+                }
+                blart::map::Entry::Occupied(mut e) => {
+                    e.get_mut().push(taxon_info);
                 }
             }
         }
+        // }
     }
 
     progress_bar.finish();
@@ -392,6 +408,44 @@ pub struct TaxonMatch {
 }
 
 impl TaxonMatch {
+    pub fn to_json(&self) -> String {
+        // summarise as json
+        serde_json::to_string_pretty(&self).unwrap()
+    }
+
+    pub fn to_jsonl(&self) -> String {
+        // summarise as jsonl
+        serde_json::to_string(&self).unwrap()
+    }
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct MatchCounts {
+    #[serde(skip_serializing_if = "is_zero")]
+    pub assigned: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub unassigned: usize,
+    #[serde(rename = "match", skip_serializing_if = "is_zero")]
+    pub id_match: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub merge_match: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub mismatch: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub multimatch: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub putative: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub none: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub spellcheck: usize,
+}
+
+fn is_zero(value: &usize) -> bool {
+    *value == 0
+}
+
+impl MatchCounts {
     pub fn to_json(&self) -> String {
         // summarise as json
         serde_json::to_string_pretty(&self).unwrap()
@@ -543,19 +597,23 @@ pub fn match_taxonomy_section(
             continue;
         }
 
-        // Clean name
-        let mut name = clean_name(name);
+        // // Clean name
+        // let mut name = clean_name(&name);
 
-        // Check if name is in fixed_names
-        if let Some(fixed_names) = fixed_names {
-            if let Some(fixed) = fixed_names.get(rank) {
-                if let Some(taxon_id) = fixed.get(&name) {
-                    name = taxon_id.clone();
-                }
-            }
-        }
+        // // Check if name is in fixed_names
+        // if let Some(fixed_names) = fixed_names {
+        //     if let Some(fixed) = fixed_names.get(rank) {
+        //         if let Some(taxon_id) = fixed.get(&name) {
+        //             name = taxon_id.clone();
+        //         }
+        //     }
+        // }
         // Check if name is in id_map
-        match id_map.get(&CString::new(name.clone()).unwrap()) {
+        // dbg!(&name);
+        // dbg!(clean_name(&name));
+        // dbg!(&CString::new(clean_name(&name)));
+        // dbg!(id_map.get(&CString::new(clean_name(&name)).unwrap()));
+        match id_map.get(&CString::new(clean_name(&name)).unwrap()) {
             Some(ids) => {
                 // Check if multiple matches
                 if ids.len() > 1 {
@@ -792,16 +850,4 @@ pub fn match_taxonomy_section(
         }
     }
     (assigned_taxon, taxon_match)
-}
-
-fn clean_name(name: String) -> String {
-    name.chars()
-        .map(|c| {
-            if c.is_alphanumeric() {
-                c.to_ascii_lowercase()
-            } else {
-                ' '
-            }
-        })
-        .collect()
 }

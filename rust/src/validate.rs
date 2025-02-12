@@ -1,17 +1,32 @@
+use std::ffi::CString;
+use std::process::exit;
+
 use anyhow;
 
 use crate::cli;
-use crate::parse::lookup::build_fast_lookup;
+use crate::parse::lookup::{build_fast_lookup, clean_name};
 use crate::parse::nodes::Nodes;
 use crate::parse::parse_file;
 use crate::taxonomy;
 
 pub use cli::TaxonomyOptions;
 
+use blart::TreeMap;
 pub use taxonomy::taxdump_to_nodes;
 
 /// Execute the `validate` subcommand from `blobtk`.
 pub fn validate(options: &cli::ValidateOptions) -> Result<(), anyhow::Error> {
+    // let mut id_map = TreeMap::new();
+    // id_map.insert(CString::new(clean_name("test")).unwrap(), 1);
+    // let mut name = "Accipiter tachiro".to_string();
+    // id_map.insert(CString::new(clean_name(&name)).unwrap(), 2);
+    // // let res = id_map.get(&CString::new("test").unwrap());
+    // let res = id_map.get(&CString::new(clean_name(&name)).unwrap());
+    // dbg!(&name);
+    // dbg!(clean_name(&name));
+    // dbg!(res);
+
+    // exit(1);
     let mut nodes = Nodes {
         ..Default::default()
     };
@@ -31,7 +46,7 @@ pub fn validate(options: &cli::ValidateOptions) -> Result<(), anyhow::Error> {
         for genomehubs_file in genomehubs_files {
             // match taxa to nodes
             // todo: add support for multiple genomehubs files
-            println!("Parsing file: {:?}", genomehubs_file);
+            eprintln!("Parsing file: {:?}", genomehubs_file);
             let (_new_nodes, _new_names, _source) = parse_file(genomehubs_file, &id_map, true)?;
         }
     }

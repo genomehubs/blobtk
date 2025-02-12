@@ -19,6 +19,8 @@ use crate::parse::lookup;
 
 use lookup::TaxonMatch;
 
+use super::lookup::clean_name;
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
 pub enum GHubsFileFormat {
     #[serde(rename = "csv")]
@@ -468,7 +470,7 @@ impl GHubsConfig {
         }
     }
 
-    pub fn init_csv_reader(&mut self, keys: Option<Vec<&str>>) {
+    pub fn init_csv_reader(&mut self, keys: Option<Vec<&str>>) -> csv::Reader<Box<dyn BufRead>> {
         let file_config = self.file.clone().unwrap();
         let config_path = self.file_path.clone();
         let file_path = file_config.file_path(&config_path, None);
@@ -476,16 +478,22 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(&Some(file_path), delimiter, file_config.header);
-        if file_config.header {
-            let headers = rdr.headers().unwrap().clone();
-            for key in keys.unwrap().iter() {
-                if self.get(key).is_some() {
-                    self.update_config(key, &headers);
+        if !file_path.exists() {
+            panic!("File does not exist: {:?}", &file_path);
+        }
+        let mut rdr = io::get_csv_reader(&Some(file_path.clone()), delimiter, file_config.header);
+
+        if let Some(keys) = keys {
+            if file_config.header {
+                let headers = rdr.headers().unwrap().clone();
+                for key in keys.iter() {
+                    if self.get(key).is_some() {
+                        self.update_config(key, &headers);
+                    }
                 }
             }
         }
-        self.csv_reader = Some(rdr);
+        rdr
     }
 
     pub fn init_file_writers(&mut self, write_validated: bool, write_exceptions: bool) -> () {
@@ -565,25 +573,9 @@ impl GHubsConfig {
             let name = record.get(1).unwrap().to_string();
             let rank = record.get(2).unwrap().to_string();
             let at_rank = fixed_names.entry(rank).or_insert(HashMap::new());
-            at_rank.insert(name, taxon_id);
+            at_rank.insert(clean_name(&name), taxon_id);
         }
         fixed_names
-    }
-
-    pub fn stream_records(
-        &mut self,
-    ) -> impl Iterator<Item = (usize, Result<StringRecord, csv::Error>)> + '_ {
-        self.csv_reader
-            .as_mut()
-            .map(|reader| {
-                reader
-                    .records()
-                    .enumerate()
-                    .map(|(i, record)| (i, record))
-                    .collect::<Vec<_>>()
-                    .into_iter()
-            })
-            .unwrap_or_else(|| Vec::new().into_iter())
     }
 
     pub fn write_processed_row(
@@ -834,8 +826,8 @@ impl Source {
 // Parse a GenomeHubs configuration file
 fn parse_genomehubs_config(config_file: &PathBuf) -> Result<GHubsConfig, error::Error> {
     let reader = match io::file_reader(config_file.clone()) {
-        Some(r) => r,
-        None => {
+        Ok(r) => r,
+        Err(_) => {
             return Err(error::Error::FileNotFound(format!(
                 "{}",
                 &config_file.to_str().unwrap()
@@ -1070,11 +1062,49 @@ impl ValidationCounts {
         // summarise as jsonl
         serde_json::to_string(&self).unwrap()
     }
+
+    pub fn update(&mut self, other: &ValidationCounts) {
+        if other.total >= 1 {
+            self.total += 1
+        };
+        if other.valid >= 1 {
+            self.valid += 1
+        };
+        if other.invalid >= 1 {
+            self.invalid += 1
+        };
+        if other.partial >= 1 {
+            self.partial += 1
+        };
+        if other.blank >= 1 {
+            self.blank += 1
+        };
+        if other.errors >= 1 {
+            self.errors += 1
+        };
+        if other.spellcheck >= 1 {
+            self.spellcheck += 1
+        };
+        if other.putative >= 1 {
+            self.putative += 1
+        };
+        if other.mismatch >= 1 {
+            self.mismatch += 1
+        };
+        if other.multimatch >= 1 {
+            self.multimatch += 1
+        };
+        if other.nomatch >= 1 {
+            self.nomatch += 1
+        };
+    }
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct ValidationReport {
     pub row_index: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_name: Option<String>,
     pub status: ValidationStatus,
     pub counts: ValidationCounts,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
