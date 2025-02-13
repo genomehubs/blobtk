@@ -235,12 +235,12 @@ jobs:
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
           mkdir -p ./dist/osx-64
           conda build --no-anaconda-upload ./conda --output-folder ./dist
-          ls ./dist/*
+          # conda build --no-anaconda-upload ./conda --output-folder ./dist
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: conda-macos
-          path: dist
+          path: dist/osx-64
 
   create-conda-release-linux:
     name: Create conda release Linux
@@ -269,13 +269,14 @@ jobs:
           conda install -y conda-build
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
           mkdir -p ./dist/linux-64
-          conda build --no-anaconda-upload ./conda --output-folder ./dist
-          ls ./dist/*
+          conda build ./conda --output-folder ./dist
+          # conda build --no-anaconda-upload ./conda --output-folder ./dist
+          # ls ./dist/*
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: conda-linux
-          path: dist
+          path: dist/linux-64
 
   create-github-release:
     name: Create GitHub release
@@ -336,7 +337,6 @@ jobs:
           cp -r ./dist/wheels-*/* ./
           rm -rf ./dist
           ls -l
-          exit 1
           pip install --upgrade twine
           twine upload --skip-existing *
 
@@ -384,9 +384,7 @@ jobs:
         shell: bash -l {0}
         run: |
           ls -l ./dist
-          ls -l ./dist/conda-linux*
-          ls -l ./dist/conda-linux/*
-          ls -l ./dist/conda-linux/linux-64
+          ls -l ./dist/*
           exit 1
           conda install -y anaconda-client
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
