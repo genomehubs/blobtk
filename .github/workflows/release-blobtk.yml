@@ -333,8 +333,10 @@ jobs:
         run: |
           ls -l ./dist
           ls -l ./dist/wheels-*/*
-          cp -r ./dist/wheels-*/* ./*
+          cp -r ./dist/wheels-*/* ./
+          rm -rf ./dist
           ls -l
+          exit 1
           pip install --upgrade twine
           twine upload --skip-existing *
 
@@ -383,9 +385,11 @@ jobs:
         run: |
           ls -l ./dist
           ls -l ./dist/conda-linux*
-          ls -l ./dist/conda-linux-*/*
+          ls -l ./dist/conda-linux/*
+          ls -l ./dist/conda-linux/linux-64
+          exit 1
           conda install -y anaconda-client
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
-          anaconda upload --force --label main ./dist/conda-linux-*/linux-64/*.tar.bz2
-          anaconda upload --force --label main ./dist/conda-macos-*/osx-64/*.tar.bz2
+          anaconda upload --force --label main ./dist/conda-linux/linux-64/*.tar.bz2
+          anaconda upload --force --label main ./dist/conda-macos/osx-64/*.tar.bz2
         # anaconda upload --force --label main ./dist/osx-arm64/*.tar.bz2
