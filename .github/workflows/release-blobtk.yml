@@ -235,7 +235,6 @@ jobs:
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
           mkdir -p ./dist/osx-64
           conda build --no-anaconda-upload ./conda --output-folder ./dist
-          # conda build --no-anaconda-upload ./conda --output-folder ./dist
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
@@ -269,9 +268,7 @@ jobs:
           conda install -y conda-build
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
           mkdir -p ./dist/linux-64
-          conda build ./conda --output-folder ./dist
-          # conda build --no-anaconda-upload ./conda --output-folder ./dist
-          # ls ./dist/*
+          conda build --no-anaconda-upload ./conda --output-folder ./dist
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
@@ -332,11 +329,9 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          ls -l ./dist
-          ls -l ./dist/wheels-*/*
           cp -r ./dist/wheels-*/* ./
-          rm -rf ./dist
           ls -l
+          exit 0
           pip install --upgrade twine
           twine upload --skip-existing *
 
@@ -388,6 +383,6 @@ jobs:
           exit 1
           conda install -y anaconda-client
           export ANACONDA_API_TOKEN=${{ secrets.ANACONDA_API_TOKEN }}
-          anaconda upload --force --label main ./dist/conda-linux/linux-64/*.tar.bz2
-          anaconda upload --force --label main ./dist/conda-macos/osx-64/*.tar.bz2
+          anaconda upload --force --label main ./dist/conda-linux/linux-64/*.conda
+          anaconda upload --force --label main ./dist/conda-macos/osx-64/*.conda
         # anaconda upload --force --label main ./dist/osx-arm64/*.tar.bz2
