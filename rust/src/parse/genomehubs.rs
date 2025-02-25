@@ -111,6 +111,7 @@ pub enum SkipPartial {
 
 /// GenomeHubs file configuration options
 #[derive(Default, Serialize, Deserialize, Clone, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct GHubsFileConfig {
     /// File format
     /// Default: tsv
@@ -123,13 +124,53 @@ pub struct GHubsFileConfig {
     /// before this file
     #[serde(skip_serializing_if = "Option::is_none")]
     pub needs: Option<PathBufOrVec>,
-    // /// File source
-    // pub source: Option<Source>,
+    /// Source name
+    #[serde(rename = "source", alias = "source_name")]
+    pub source_name: Option<String>,
+    /// Source abbreviation
+    #[serde(
+        rename = "source_abbreviation",
+        alias = "abbreviation",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_abbreviation: Option<String>,
+    /// Source URL (Single URL for all values)
+    #[serde(
+        rename = "source_url",
+        alias = "source_link",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_url: Option<String>,
+    /// Source URL stub (base URL for values)
+    #[serde(rename = "source_url_stub", skip_serializing_if = "Option::is_none")]
+    pub source_stub: Option<String>,
+    /// Source URL suffix (suffix for values)
+    #[serde(rename = "source_slug", skip_serializing_if = "Option::is_none")]
+    pub source_slug: Option<String>,
+    /// Source description
+    #[serde(rename = "source_description", skip_serializing_if = "Option::is_none")]
+    pub source_description: Option<String>,
+    /// Source last updated date
+    #[serde(
+        rename = "source_date",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "date_format"
+    )]
+    pub source_date: Option<String>,
+    /// Source contact name
+    #[serde(rename = "source_contact", skip_serializing_if = "Option::is_none")]
+    pub source_contact: Option<String>,
     /// Skip partial rows or cells
     /// Default: row
     /// Options: row, cell
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skip_partial: Option<SkipPartial>,
+    /// Relative path to a directory containing test files
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub test: Option<PathBuf>,
+    /// URL to download file
+    #[serde(rename = "url", skip_serializing_if = "Option::is_none")]
+    pub file_url: Option<String>,
 }
 
 impl GHubsFileConfig {
@@ -158,6 +199,7 @@ impl GHubsFileConfig {
 
 /// GenomeHubs field constraint configuration options
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ConstraintConfig {
     // List of valid values
     #[serde(
@@ -171,10 +213,16 @@ pub struct ConstraintConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub len: Option<usize>,
     // Maximum value
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "format_number"
+    )]
     pub max: Option<f64>,
     // Minimum value
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "format_number"
+    )]
     pub min: Option<f64>,
 }
 
@@ -200,8 +248,77 @@ pub enum FieldScale {
     SQRT,
 }
 
+/// Valid summary functions
+#[derive(Default, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub enum SummaryFunction {
+    // Count
+    #[serde(rename = "count")]
+    Count,
+    // Highest ranked value from an ordered list
+    #[serde(rename = "enum")]
+    Enum,
+    // List of values
+    #[default]
+    #[serde(rename = "list")]
+    List,
+    // Maximum
+    #[serde(rename = "max")]
+    Max,
+    // Mean
+    #[serde(rename = "mean")]
+    Mean,
+    // Median
+    #[serde(rename = "median")]
+    Median,
+    // Median with ties broken by minimum value
+    #[serde(rename = "median_low")]
+    MedianLow,
+    // Median with ties broken by maximum value
+    #[serde(rename = "median_high")]
+    MedianHigh,
+    // Minimum
+    #[serde(rename = "min")]
+    Min,
+    // Mode
+    #[serde(rename = "mode")]
+    Mode,
+    // Mode with ties broken by minimum value
+    #[serde(rename = "mode_low")]
+    ModeLow,
+    // Mode with ties broken by maximum value
+    #[serde(rename = "mode_high")]
+    ModeHigh,
+    // Mode with both values listed if there are two modes
+    #[serde(rename = "mode_list")]
+    ModeList,
+    // No summary function
+    #[serde(rename = "false")]
+    None,
+    // Prefer values marked as primary
+    #[serde(rename = "primary")]
+    Primary,
+    // Standard deviation
+    #[serde(rename = "std_dev")]
+    StdDev,
+    // Sum
+    #[serde(rename = "sum")]
+    Sum,
+    // Variance
+    #[serde(rename = "variance")]
+    Variance,
+}
+
+// value may be Summary Function or Vec of Summary Functions
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum SummaryFunctionOrVec {
+    Single(SummaryFunction),
+    Multiple(Vec<SummaryFunction>),
+}
+
 /// GenomeHubs value bins configuration options
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct BinsConfig {
     // List of valid values
     pub count: u32,
@@ -209,25 +326,64 @@ pub struct BinsConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub h3res: Option<u8>,
     // Maximum value
-    pub max: f64,
+    #[serde(serialize_with = "format_number")]
+    pub max: Option<f64>,
     // Minimum value
-    pub min: f64,
+    #[serde(serialize_with = "format_number")]
+    pub min: Option<f64>,
     // Value length
     pub scale: FieldScale,
 }
 
-/// GenomeHubs field display configuration options
+// format numbers such that any float ending in .0 is converted to an integer
+fn format_number<S>(number: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    if let Some(number) = number {
+        if number.fract() == 0.0 {
+            serializer.serialize_i64(number.trunc() as i64)
+        } else {
+            serializer.serialize_f64(*number)
+        }
+    } else {
+        serializer.serialize_none()
+    }
+}
+
+/// Traverse direction values
+#[derive(Default, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub enum TraverseDirection {
+    // Both
+    #[serde(rename = "both")]
+    Both,
+    // Down
+    #[serde(rename = "down")]
+    Down,
+    // None
+    #[serde(rename = "false")]
+    None,
+    // Up
+    #[default]
+    #[serde(rename = "up")]
+    Up,
+}
+
+/// GenomeHubs exclusion configuration options.
+/// Defines a list of keys to check for exclusion
+/// based on the associated values
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
-pub struct DisplayConfig {
-    // Display group
+#[serde(deny_unknown_fields)]
+pub struct ExclusionConfig {
+    // Attribute keys
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub group: Option<String>,
-    // Display level
+    pub attributes: Option<Vec<String>>,
+    // Identifier keys
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub level: Option<u8>,
-    // Display name
+    pub identifiers: Option<Vec<String>>,
+    // Taxonomy keys
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub taxonomy: Option<Vec<String>>,
 }
 
 /// GenomeHubs field status values
@@ -239,12 +395,52 @@ pub enum FieldStatus {
     Temporary,
 }
 
+/// Valid organelle values
+#[derive(Default, Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub enum Organelle {
+    // Apicoplast
+    #[serde(rename = "apicoplast")]
+    Apicoplast,
+    // Chloroplast
+    #[serde(rename = "chloroplast")]
+    Chloroplast,
+    // Mitochondrion
+    #[serde(rename = "mitochondrion")]
+    Mitochondrion,
+    // Nucleus
+    #[default]
+    #[serde(rename = "nucleus")]
+    Nucleus,
+    // Plastid
+    #[serde(rename = "plastid")]
+    Plastid,
+}
+
+/// Value metadata configuration options
+#[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ValueMetadataConfig {
+    // value description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // value link
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+    // value long description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub long_description: Option<String>,
+}
+
 /// GenomeHubs field configuration options
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct GHubsFieldConfig {
     // Default settings for value bins
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bins: Option<BinsConfig>,
+    // Free text comment
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
     // Constraint on field values
     #[serde(skip_serializing_if = "Option::is_none")]
     pub constraint: Option<ConstraintConfig>,
@@ -254,27 +450,61 @@ pub struct GHubsFieldConfig {
     // Field description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    // Display options
+    // Display group
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub display: Option<DisplayConfig>,
+    pub display_group: Option<String>,
+    // Display level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_level: Option<u8>,
+    // Display name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    // Exclusions options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusions: Option<ExclusionConfig>,
     // Function to apply to value
     #[serde(skip_serializing)]
     pub function: Option<String>,
+    // Resolution of h3 grid
+    // Used for geographic resolution
+    // valid values range from 0 to 15
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub h3res: Option<u8>,
     // Column header
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<StringOrVec>,
     // Column index
     #[serde(skip_serializing)]
     pub index: Option<UsizeOrVec>,
+    // Flag to indicate value status
+    // This may be represented by an integer (0 or 1) or a boolean (true or false)
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_bool_from_int_or_bool"
+    )]
+    pub is_primary_value: Option<bool>,
     // String to join columns
     #[serde(skip_serializing)]
     pub join: Option<String>,
     // Attribute key
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
+    // Long description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub long_description: Option<String>,
+    // Additional metadata
+    #[serde(skip_serializing)]
+    pub metadata: Option<Box<GHubsFieldConfig>>,
     // Attribute name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    // Organelle type
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organelle: Option<Organelle>,
+    // Path to data value in raw input file
+    #[serde(skip_serializing)]
+    pub path: Option<String>,
     // Value separator
     #[serde(skip_serializing_if = "Option::is_none")]
     pub separator: Option<StringOrVec>,
@@ -283,23 +513,86 @@ pub struct GHubsFieldConfig {
     pub status: Option<FieldStatus>,
     // Attribute summary functions
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<StringOrVec>,
+    pub summary: Option<SummaryFunctionOrVec>,
     // Attribute name synonyms
     #[serde(alias = "synonym", skip_serializing_if = "Option::is_none")]
     pub synonyms: Option<StringOrVec>,
+    // Taxon bins
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_bins: Option<BinsConfig>,
+    // Taxon display group
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_display_group: Option<String>,
+    // Taxon display level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_display_level: Option<u8>,
+    // Taxon display name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_display_name: Option<String>,
+    // Taxon key
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_key: Option<String>,
+    // Taxon name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_name: Option<String>,
+    // Taxon summary
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_summary: Option<SummaryFunctionOrVec>,
+    // Taxon synonyms
+    #[serde(
+        rename = "taxon_synonyms",
+        alias = "taxon_synonym",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub taxon_synonyms: Option<StringOrVec>,
+    // Traverse function
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_traverse: Option<SummaryFunction>,
+    // Traverse direction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_traverse_direction: Option<TraverseDirection>,
+    // Traverse limit is a taxon rank at which to stop filling values
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_traverse_limit: Option<String>,
+    // Field type
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taxon_type: Option<String>,
     // List of values to translate
     #[serde(skip_serializing_if = "Option::is_none")]
     pub translate: Option<HashMap<String, StringOrVec>>,
+    // Traverse function
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub traverse: Option<SummaryFunction>,
+    // Traverse direction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub traverse_direction: Option<TraverseDirection>,
+    // Traverse limit is a taxon rank at which to stop filling values
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub traverse_limit: Option<String>,
     // Field type
     #[serde(rename = "type", default = "default_field_type")]
     pub field_type: FieldType,
     // Attribute value units
     #[serde(alias = "unit", skip_serializing_if = "Option::is_none")]
     pub units: Option<String>,
+    // Value metadata
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_metadata: Option<HashMap<String, ValueMetadataConfig>>,
 }
 
 fn default_field_type() -> FieldType {
     FieldType::Keyword
+}
+
+fn deserialize_bool_from_int_or_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match serde_json::Value::deserialize(deserializer)? {
+        serde_json::Value::Bool(value) => Ok(Some(value)),
+        serde_json::Value::Number(value) => Ok(Some(value.as_u64().unwrap() == 1)),
+        _ => Ok(None),
+    }
 }
 
 impl GHubsFieldConfig {
@@ -307,22 +600,50 @@ impl GHubsFieldConfig {
         Self {
             bins: self.bins.or(other.bins),
             constraint: self.constraint.or(other.constraint),
+            comment: self.comment.or(other.comment),
             default: self.default.or(other.default),
             description: self.description.or(other.description),
-            display: self.display.or(other.display),
+            display_group: self.display_group.or(other.display_group),
+            display_level: self.display_level.or(other.display_level),
+            display_name: self.display_name.or(other.display_name),
+            exclusions: self.exclusions.or(other.exclusions),
             function: self.function.or(other.function),
+            h3res: self.h3res.or(other.h3res),
             header: self.header.or(other.header),
             index: self.index.or(other.index),
+            is_primary_value: self.is_primary_value.or(other.is_primary_value),
             join: self.join.or(other.join),
             key: self.key.or(other.key),
+            long_description: self.long_description.or(other.long_description),
+            metadata: self.metadata.or(other.metadata),
             name: self.name.or(other.name),
+            organelle: self.organelle.or(other.organelle),
+            path: self.path.or(other.path),
             separator: self.separator.or(other.separator),
             status: self.status.or(other.status),
             summary: self.summary.or(other.summary),
             synonyms: self.synonyms.or(other.synonyms),
+            taxon_bins: self.taxon_bins.or(other.taxon_bins),
+            taxon_display_group: self.taxon_display_group.or(other.taxon_display_group),
+            taxon_display_level: self.taxon_display_level.or(other.taxon_display_level),
+            taxon_display_name: self.taxon_display_name.or(other.taxon_display_name),
+            taxon_key: self.taxon_key.or(other.taxon_key),
+            taxon_name: self.taxon_name.or(other.taxon_name),
+            taxon_summary: self.taxon_summary.or(other.taxon_summary),
+            taxon_synonyms: self.taxon_synonyms.or(other.taxon_synonyms),
+            taxon_traverse: self.taxon_traverse.or(other.taxon_traverse),
+            taxon_traverse_direction: self
+                .taxon_traverse_direction
+                .or(other.taxon_traverse_direction),
+            taxon_traverse_limit: self.taxon_traverse_limit.or(other.taxon_traverse_limit),
+            taxon_type: self.taxon_type.or(other.taxon_type),
             translate: self.translate.or(other.translate),
+            traverse: self.traverse.or(other.traverse),
+            traverse_direction: self.traverse_direction.or(other.traverse_direction),
+            traverse_limit: self.traverse_limit.or(other.traverse_limit),
             field_type: self.field_type,
             units: self.units.or(other.units),
+            value_metadata: self.value_metadata.or(other.value_metadata),
         }
     }
 }
@@ -371,6 +692,9 @@ pub struct GHubsConfig {
     /// Attribute fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, GHubsFieldConfig>>,
+    /// Metadata fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<GHubsFieldConfig>,
     /// Taxon names
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxon_names: Option<HashMap<String, GHubsFieldConfig>>,
@@ -408,6 +732,7 @@ pub struct GHubsConfig {
 impl GHubsConfig {
     pub fn new(config_file: &PathBuf) -> Result<GHubsConfig, error::Error> {
         let ghubs_config = parse_genomehubs_config(config_file)?;
+
         Ok(ghubs_config)
     }
 
@@ -471,6 +796,10 @@ impl GHubsConfig {
     }
 
     pub fn init_csv_reader(&mut self, keys: Option<Vec<&str>>) -> csv::Reader<Box<dyn BufRead>> {
+        if self.file.is_none() {
+            // return an empty reader
+            return csv::Reader::from_reader(io::get_empty_reader());
+        }
         let file_config = self.file.clone().unwrap();
         let config_path = self.file_path.clone();
         let file_path = file_config.file_path(&config_path, None);
@@ -497,6 +826,9 @@ impl GHubsConfig {
     }
 
     pub fn init_file_writers(&mut self, write_validated: bool, write_exceptions: bool) -> () {
+        if self.file.is_none() {
+            return;
+        }
         let file_config = self.file.clone().unwrap();
         let config_path = self.file_path.clone();
         let delimiter = match file_config.format {
@@ -775,31 +1107,60 @@ impl GHubsConfig {
 }
 
 /// GenomeHubs source options
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct Source {
     /// Source name
     #[serde(rename = "source")]
-    pub name: String,
+    pub source: String,
     /// Source abbreviation
+    #[serde(
+        rename = "source_abbreviation",
+        alias = "abbreviation",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub abbreviation: Option<String>,
     /// Source URL (Single URL for all values)
-    #[serde(rename = "source_url")]
+    #[serde(
+        rename = "source_url",
+        alias = "source_link",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub url: Option<String>,
     /// Source URL stub (base URL for values)
-    #[serde(rename = "source_url_stub")]
+    #[serde(rename = "source_url_stub", skip_serializing_if = "Option::is_none")]
     pub stub: Option<String>,
     /// Source URL suffix (suffix for values)
-    #[serde(rename = "source_slug")]
+    #[serde(rename = "source_slug", skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     /// Source description
-    #[serde(rename = "source_description")]
+    #[serde(rename = "source_description", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Source last updated date
-    #[serde(rename = "source_date")]
+    #[serde(
+        rename = "source_date",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "date_format"
+    )]
     pub date: Option<String>,
     /// Source contact name
-    #[serde(rename = "source_contact")]
+    #[serde(rename = "source_contact", skip_serializing_if = "Option::is_none")]
     pub contact: Option<String>,
+}
+
+// enforce YYYY-MM-DD date format or rasie error
+fn date_format<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").is_ok() {
+        Ok(Some(s))
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "Invalid date format `{}`. Dates must be `YYYY-MM-DD`",
+            s
+        )))
+    }
 }
 
 impl Source {

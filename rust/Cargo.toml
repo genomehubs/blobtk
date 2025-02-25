@@ -33,6 +33,7 @@ panic = "abort"
 anyhow = "1.0.71"
 atty = "0.2.14"
 blart = "0.3.0"
+chrono = "0.4.39"
 clap = { version = "4.0.29", features = [ "derive" ]}
 clap-num = "1.0.2"
 colorous = "1.0.10"

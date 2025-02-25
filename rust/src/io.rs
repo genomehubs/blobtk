@@ -128,6 +128,14 @@ pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
     }
 }
 
+/// Return an empty Box<dyn BufRead>.
+/// This is useful when we want to read from stdin.
+pub fn get_empty_reader() -> Box<dyn BufRead> {
+    Box::new(BufReader::new(io::empty()))
+}
+
+/// Return a csv::Reader object for a given file path.
+/// If the file path has a `.gz` extension, the file is decompressed on the fly.
 pub fn get_csv_reader(
     file_path: &Option<PathBuf>,
     delimiter: u8,

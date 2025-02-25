@@ -245,7 +245,7 @@ fn nodes_from_file(
             combined_report.spellcheck.push(taxon_match.clone());
             ghubs_config.write_exception(&combined_report);
         } else {
-            dbg!(&taxon_match);
+            // dbg!(&taxon_match);
             match_counts.none += 1;
             unmatched = true;
             combined_report.status = ValidationStatus::Nomatch;
