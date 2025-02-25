@@ -2,8 +2,11 @@ use std::ffi::CString;
 use std::process::exit;
 
 use anyhow;
+use schemars::schema_for;
 
 use crate::cli;
+use crate::io::get_file_writer;
+use crate::parse::genomehubs::GHubsConfig;
 use crate::parse::lookup::{build_fast_lookup, clean_name};
 use crate::parse::nodes::Nodes;
 use crate::parse::parse_file;
@@ -30,6 +33,12 @@ pub fn validate(options: &cli::ValidateOptions) -> Result<(), anyhow::Error> {
     let mut nodes = Nodes {
         ..Default::default()
     };
+    if let Some(schema_file) = options.schema.clone() {
+        let schema = schema_for!(GHubsConfig);
+        let file_writer = get_file_writer(&schema_file, false);
+        serde_json::to_writer_pretty(file_writer, &schema)?;
+        return Ok(());
+    }
     if options.taxdump.is_some() {
         let taxonomy_options = TaxonomyOptions {
             path: options.taxdump.clone(),

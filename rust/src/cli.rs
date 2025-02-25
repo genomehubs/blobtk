@@ -445,6 +445,9 @@ pub struct ValidateOptions {
     /// Files to match to taxIDs - Experimental
     #[arg(long = "genomehubs_files", short = 'g')]
     pub genomehubs_files: Option<Vec<PathBuf>>,
+    /// Path to output JSON Schema file
+    #[arg(long = "schema", short = 'S')]
+    pub schema: Option<PathBuf>,
 }
 
 /// Command line argument parser
