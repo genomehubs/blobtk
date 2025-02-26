@@ -448,6 +448,9 @@ pub struct ValidateOptions {
     /// Path to output JSON Schema file
     #[arg(long = "schema", short = 'S')]
     pub schema: Option<PathBuf>,
+    // Dry run flag
+    #[arg(long = "dry-run", short = 'd')]
+    pub dry_run: bool,
 }
 
 /// Command line argument parser

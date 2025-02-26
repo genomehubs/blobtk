@@ -280,8 +280,17 @@ fn nodes_from_file(
         }
     }
     pb.finish_with_message(format!("done"));
-    println!("{}", validation_counts.to_jsonl());
-    // write ghubs_config back to file in validated directory
+    println!("Validation Report: {}", validation_counts.to_jsonl());
+    if write_validated {
+        // write ghubs_config back to file in validated directory
+        write_updated_config(config_file, ghubs_config, keys);
+    }
+
+    println!("Taxon Assignment Report: {}", match_counts.to_jsonl());
+    Ok((names, nodes))
+}
+
+fn write_updated_config(config_file: &PathBuf, ghubs_config: &mut GHubsConfig, keys: Vec<&str>) {
     let mut new_config_file = config_file.clone();
     // get file name
     let config_file_name = config_file.file_name().unwrap().to_str().unwrap();
@@ -301,9 +310,6 @@ fn nodes_from_file(
     // write ghubs_config YAML to file
     file.write_all(serde_yaml::to_string(&ghubs_config).unwrap().as_bytes())
         .unwrap();
-
-    println!("{}", match_counts.to_jsonl());
-    Ok((names, nodes))
 }
 
 pub fn parse_file(

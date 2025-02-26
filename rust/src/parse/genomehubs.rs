@@ -685,6 +685,7 @@ fn merge_attributes(
 
 /// GenomeHubs configuration options
 #[derive(Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct GHubsConfig {
     /// File configuration options
     #[serde(skip_serializing_if = "Option::is_none")]
