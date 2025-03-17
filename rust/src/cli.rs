@@ -74,6 +74,9 @@ pub enum SubCommand {
     /// [experimental] Process a taxonomy and lookup lineages.
     /// Called as `blobtk taxonomy`
     Taxonomy(TaxonomyOptions),
+    /// [experimental] Validate BlobToolKit and GenomeHubs files.
+    /// Called as `blobtk validate`
+    Validate(ValidateOptions),
 }
 
 /// Options to pass to `blobtk depth`
@@ -86,6 +89,7 @@ pub enum SubCommand {
 #[pyclass]
 pub struct DepthOptions {
     /// List of sequence IDs
+    // Skipping this attribute because it is set to a default value using serde
     #[clap(skip)]
     pub list: Option<HashSet<Vec<u8>>>,
     /// Path to input file containing a list of sequence IDs
@@ -361,7 +365,7 @@ pub struct PlotOptions {
 #[derive(ValueEnum, Parser, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum TaxonomyFormat {
-    /// NCBI taxdump containing nodes.dmp and names.dmp
+    /// NCBI taxdump containing nodes.dmp, names.dmp and merged.dmp
     NCBI,
     /// GBIF simple format backbone taxonomy
     GBIF,
@@ -376,6 +380,7 @@ pub struct TaxonomyOptions {
     /// Path to backbone taxonomy file/directory
     #[arg(long = "taxdump", short = 't')]
     pub path: Option<PathBuf>,
+    /// Format of taxonomy file
     #[arg(long = "taxonomy-format", short = 'f')]
     pub taxonomy_format: Option<TaxonomyFormat>,
     /// Root taxon/taxa for filtered taxonomy
@@ -388,7 +393,7 @@ pub struct TaxonomyOptions {
     // #[arg(long = "data-dir", short = 'd')]
     // pub data_dir: Option<Vec<PathBuf>>,
     /// Path to output filtered backbone taxonomy
-    #[arg(long = "taxdump-out")]
+    #[arg(long = "taxdump-out", short = 'O')]
     pub out: Option<PathBuf>,
     // /// Path to GBIF backbone taxonomy file (simple text)
     // #[arg(long = "gbif-backbone", short = 'g')]
@@ -401,7 +406,7 @@ pub struct TaxonomyOptions {
     #[serde(default = "default_name_classes")]
     pub name_classes: Vec<String>,
     /// Label to use when setting as xref
-    #[clap(skip)]
+    #[arg(long = "xref-label", short = 'x')]
     pub xref_label: Option<String>,
     /// List of taxonomies to map to backbone
     #[clap(skip)]
@@ -421,6 +426,31 @@ fn default_name_classes() -> Vec<String> {
 
 fn default_create_taxa() -> bool {
     false
+}
+
+/// Options to pass to `blobtk validate`
+#[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
+#[pyclass]
+pub struct ValidateOptions {
+    /// Path to backbone taxonomy file/directory
+    #[arg(long = "taxdump", short = 't')]
+    pub taxdump: Option<PathBuf>,
+    /// Format of taxonomy file
+    #[arg(long = "taxonomy-format", short = 'f')]
+    pub taxonomy_format: Option<TaxonomyFormat>,
+    /// List of name_classes to use during taxon lookup
+    #[clap(long = "name-classes", short = 'n', default_value = "scientific name")]
+    #[serde(default = "default_name_classes")]
+    pub name_classes: Vec<String>,
+    /// Files to match to taxIDs - Experimental
+    #[arg(long = "genomehubs_files", short = 'g')]
+    pub genomehubs_files: Option<Vec<PathBuf>>,
+    /// Path to output JSON Schema file
+    #[arg(long = "schema", short = 'S')]
+    pub schema: Option<PathBuf>,
+    // Dry run flag
+    #[arg(long = "dry-run", short = 'd')]
+    pub dry_run: bool,
 }
 
 /// Command line argument parser

@@ -195,7 +195,7 @@ pub fn get_path(dir: &PathBuf, prefix: &str) -> Option<String> {
     None
 }
 
-pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
+pub fn remote_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
     let blobdir = dir.to_str().unwrap();
     if blobdir.starts_with("http") {
         let mut url = format!("{}", dir.to_str().unwrap());
@@ -224,6 +224,20 @@ pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
         } else {
             return Some(Box::new(BufReader::new(file)));
         }
+    }
+}
+
+pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
+    let path = match get_path(dir, prefix) {
+        Some(string) => string,
+        None => return None,
+    };
+    let file = File::open(&path).expect("no such file");
+
+    if path.ends_with(".gz") {
+        return Some(Box::new(BufReader::new(GzDecoder::new(file))));
+    } else {
+        return Some(Box::new(BufReader::new(file)));
     }
 }
 

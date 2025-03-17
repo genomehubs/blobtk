@@ -1,0 +1,206 @@
+33208	|	Animalia	|		|	synonym	|
+33208	|	animals	|		|	blast name	|
+33208	|	metazoans	|		|	genbank common name	|
+33208	|	Metazoa	|		|	scientific name	|
+33208	|	multicellular animals	|		|	common name	|
+6072	|	Eumetazoa	|		|	scientific name	|
+33213	|	Bilateria	|		|	scientific name	|
+33511	|	deuterostomes	|		|	common name	|
+33511	|	Deuterostomia	|		|	scientific name	|
+7711	|	Chordata	|		|	scientific name	|
+7711	|	chordates	|		|	blast name	|
+7711	|	chordates	|		|	genbank common name	|
+89593	|	Craniata	|		|	scientific name	|
+7742	|	Vertebrata Cuvier, 1812	|		|	authority	|
+7742	|	Vertebrata	|		|	scientific name	|
+7742	|	vertebrates	|		|	blast name	|
+7742	|	vertebrates	|		|	genbank common name	|
+7776	|	Gnathostomata	|		|	scientific name	|
+7776	|	jawed vertebrates	|		|	genbank common name	|
+117570	|	Teleostomi	|		|	scientific name	|
+117571	|	bony vertebrates	|		|	genbank common name	|
+117571	|	Euteleostomi	|		|	scientific name	|
+8287	|	Sarcopterygii	|		|	scientific name	|
+1338369	|	Dipnotetrapodomorpha	|		|	scientific name	|
+32523	|	Tetrapoda	|		|	scientific name	|
+32523	|	tetrapods	|		|	genbank common name	|
+32524	|	Amniota	|		|	scientific name	|
+32524	|	amniotes	|		|	genbank common name	|
+40674	|	Mammalia	|		|	scientific name	|
+40674	|	mammals	|		|	blast name	|
+40674	|	mammals	|		|	genbank common name	|
+32525	|	Theria Parker & Haswell, 1897	|		|	authority	|
+32525	|	Theria	|		|	scientific name	|
+9347	|	eutherian mammals	|		|	common name	|
+9347	|	Eutheria	|		|	scientific name	|
+9347	|	Placentalia	|		|	synonym	|
+9347	|	placental mammals	|		|	common name	|
+9347	|	placentals	|		|	blast name	|
+9347	|	placentals	|		|	genbank common name	|
+1437010	|	Boreoeutheria	|		|	scientific name	|
+1437010	|	Boreotheria	|		|	synonym	|
+314145	|	Laurasiatheria	|		|	scientific name	|
+33554	|	Carnivora	|		|	scientific name	|
+33554	|	carnivores	|		|	blast name	|
+33554	|	carnivores	|		|	genbank common name	|
+379584	|	Caniformia	|		|	scientific name	|
+9608	|	Canidae	|		|	scientific name	|
+9608	|	dog, coyote, wolf, fox	|		|	genbank common name	|
+9611	|	Canis	|		|	scientific name	|
+9612	|	Canis lupus Linnaeus, 1758	|		|	authority	|
+9612	|	Canis lupus	|		|	scientific name	|
+9612	|	gray wolf	|		|	genbank common name	|
+9612	|	grey wolf	|		|	common name	|
+9615	|	beagle dog	|		|	includes	|
+9615	|	beagle dogs	|		|	includes	|
+9615	|	Canis canis	|		|	synonym	|
+9615	|	Canis domesticus	|		|	synonym	|
+9615	|	Canis familiaris Linnaeus, 1758	|		|	authority	|
+9615	|	Canis familiaris	|		|	synonym	|
+9615	|	Canis lupus familiaris Linnaeus, 1758	|		|	authority	|
+9615	|	Canis lupus familiaris	|		|	scientific name	|
+9615	|	dog	|		|	genbank common name	|
+9615	|	dogs	|		|	common name	|
+143281	|	Canis lupus baileyi Nelson & Goldman, 1929	|		|	authority	|
+143281	|	Canis lupus baileyi	|		|	scientific name	|
+143281	|	Mexican gray wolf	|		|	genbank common name	|
+188536	|	Canis lupus hodophilax	|		|	scientific name	|
+188536	|	Canis lupus hodophilax (Temminck, 1839)	|		|	authority	|
+188536	|	Japanese wolf	|		|	genbank common name	|
+228401	|	Canis lupus lycaon Schreber, 1775	|		|	authority	|
+228401	|	Canis lupus lycaon	|		|	scientific name	|
+228401	|	Canis lycaon	|		|	synonym	|
+228401	|	eastern Canadian wolf	|		|	genbank common name	|
+246881	|	Canis lupus chanco Gray, 1863	|		|	authority	|
+246881	|	Canis lupus chanco	|		|	scientific name	|
+246881	|	Mongolian wolf	|		|	genbank common name	|
+246882	|	Canis lupus pallipes	|		|	scientific name	|
+246882	|	Canis lupus pallipes Sykes, 1831	|		|	authority	|
+246882	|	Indian wolf	|		|	genbank common name	|
+286419	|	Canis dingo Meyer, 1793	|		|	authority	|
+286419	|	Canis dingo	|		|	synonym	|
+286419	|	Canis familiaris dingo Meyer, 1793	|		|	authority	|
+286419	|	Canis familiaris dingo	|		|	synonym	|
+286419	|	Canis lupus dingo Meyer, 1793	|		|	authority	|
+286419	|	Canis lupus dingo	|		|	scientific name	|
+286419	|	dingo	|		|	genbank common name	|
+425934	|	Canis lupus signatus Cabrera, 1907	|		|	authority	|
+425934	|	Canis lupus signatus	|		|	scientific name	|
+425934	|	Iberian wolf	|		|	genbank common name	|
+425934	|	lobo iberico	|		|	common name	|
+443256	|	Canis lupus lupus Linnaeus, 1758	|		|	authority	|
+443256	|	Canis lupus lupus	|		|	scientific name	|
+443256	|	Eurasian wolf	|		|	genbank common name	|
+554455	|	Canis lupus laniger Hodgson, 1847	|		|	authority	|
+554455	|	Canis lupus laniger	|		|	scientific name	|
+554455	|	Tibetan wolf	|		|	genbank common name	|
+644627	|	Canis lupus hattai Kishida, 1931	|		|	authority	|
+644627	|	Canis lupus hattai	|		|	scientific name	|
+644627	|	Ezo wolf	|		|	genbank common name	|
+644627	|	Hokkaido wolf	|		|	common name	|
+659069	|	Canis lupus mogollonensis Goldman, 1937	|		|	authority	|
+659069	|	Canis lupus mogollonensis	|		|	scientific name	|
+659069	|	Mogollon mountain wolf	|		|	common name	|
+676787	|	Canis lupus labradorius Goldman, 1937	|		|	authority	|
+676787	|	Canis lupus labradorius	|		|	scientific name	|
+676787	|	Labrador wolf	|		|	genbank common name	|
+990119	|	Canis lupus x Canis lupus familiaris	|		|	scientific name	|
+990119	|	wolfdog	|		|	genbank common name	|
+990119	|	wolf-dog hybrid	|		|	common name	|
+1295334	|	Canis lupus desertorum Bogdanov, 1882	|		|	authority	|
+1295334	|	Canis lupus desertorum	|		|	scientific name	|
+1320375	|	Arctic wolf	|		|	genbank common name	|
+1320375	|	Canis lupus arctos Pocock, 1935	|		|	authority	|
+1320375	|	Canis lupus arctos	|		|	scientific name	|
+1320375	|	snow wolf	|		|	common name	|
+1320375	|	white wolf	|		|	common name	|
+1341016	|	Canis lupus campestris Dwigubski, 1804	|		|	authority	|
+1341016	|	Canis lupus campestris	|		|	scientific name	|
+1341016	|	steppe wolf	|		|	genbank common name	|
+1605264	|	Canis lupus variabilis	|		|	scientific name	|
+1605264	|	Canis lupus variabilis Wied-Neuwied 1841	|		|	authority	|
+1605264	|	Canis variabilis	|		|	synonym	|
+2605939	|	Canis lupus orion Pocock, 1935	|		|	authority	|
+2605939	|	Canis lupus orion	|		|	scientific name	|
+2605939	|	Greenland wolf	|		|	genbank common name	|
+2841922	|	Canis lupus nubilus Say, 1823	|		|	authority	|
+2841922	|	Canis lupus nubilus	|		|	scientific name	|
+9614	|	Canis latrans Say, 1823	|		|	authority	|
+9614	|	Canis latrans	|		|	scientific name	|
+9614	|	coyote	|		|	genbank common name	|
+2841923	|	Canis latrans latrans Say, 1823	|		|	authority	|
+2841923	|	Canis latrans latrans	|		|	scientific name	|
+32534	|	Canis simensis Ruppell, 1840	|		|	authority	|
+32534	|	Canis simensis	|		|	scientific name	|
+32534	|	Ethiopian wolf	|		|	genbank common name	|
+32534	|	simian jackal	|		|	common name	|
+45781	|	Canis rufus Audubon & Bachman, 1851	|		|	authority	|
+45781	|	Canis rufus	|		|	scientific name	|
+45781	|	red wolf	|		|	genbank common name	|
+2841919	|	Canis rufus gregoryi Goldman, 1937	|		|	authority	|
+2841919	|	Canis rufus gregoryi	|		|	scientific name	|
+2841920	|	Canis rufus rufus Audubon & Bachman, 1851	|		|	authority	|
+2841920	|	Canis rufus rufus	|		|	scientific name	|
+2841921	|	Canis rufus floridanus Miller, 1912	|		|	authority	|
+2841921	|	Canis rufus floridanus	|		|	scientific name	|
+68723	|	Canis adustus	|		|	scientific name	|
+68723	|	Canis adustus Sundevall, 1847	|		|	authority	|
+68723	|	side-striped jackal	|		|	genbank common name	|
+68724	|	Canis aureus Linnaeus, 1758	|		|	authority	|
+68724	|	Canis aureus	|		|	scientific name	|
+68724	|	golden jackal	|		|	genbank common name	|
+2957507	|	Canis aureus cruesemanni Matschie, 1900	|		|	authority	|
+2957507	|	Canis aureus cruesemanni	|		|	scientific name	|
+68725	|	black-backed jackal	|		|	genbank common name	|
+68725	|	Canis mesomelas Schreber, 1775	|		|	authority	|
+68725	|	Canis mesomelas	|		|	scientific name	|
+69045	|	Canis mesomelas elongae	|		|	scientific name	|
+69045	|	eastern African black-backed jackal	|		|	genbank common name	|
+242524	|	Canis indica Aggarwal, Kivisild, Ramadevi & Singh, 2007	|		|	authority	|
+242524	|	Canis indica	|		|	scientific name	|
+242524	|	Canis lupus indica	|		|	synonym	|
+242524	|	Indian gray wolf	|		|	synonym	|
+242525	|	Canis himalayensis	|		|	scientific name	|
+242525	|	Canis lupus himalayensis Aggarwal, Ramadevi & Singh, 2003	|		|	authority	|
+242525	|	Canis lupus himalayensis	|		|	synonym	|
+242525	|	Himalayan wolf	|		|	genbank common name	|
+1002243	|	environmental samples	|		|	scientific name	|
+1002244	|	Canis environmental sample	|		|	scientific name	|
+1707807	|	African golden wolf	|		|	genbank common name	|
+1707807	|	African wolf	|		|	common name	|
+1707807	|	Canis anthus	|		|	synonym	|
+1707807	|	Canis aureus anthus Cuvier, 1820	|		|	authority	|
+1707807	|	Canis aureus anthus	|		|	synonym	|
+1707807	|	Canis aureus lupaster Hemprich & Ehrenberg, 1832	|		|	authority	|
+1707807	|	Canis aureus lupaster	|		|	synonym	|
+1707807	|	Canis lupaster Hemprich & Ehrenberg, 1832	|		|	synonym	|
+1707807	|	Canis lupaster	|		|	scientific name	|
+1707807	|	Canis lupus lupaster (Hemprich & Ehrenberg, 1833)	|		|	authority	|
+1707807	|	Canis lupus lupaster	|		|	synonym	|
+1707807	|	Canis senegalensis	|		|	synonym	|
+1707807	|	Egyptian jackal	|		|	common name	|
+1707807	|	thoa	|		|	common name	|
+2562269	|	Canis dirus Leidy, 1858	|		|	authority	|
+2562269	|	Canis dirus	|		|	scientific name	|
+2562269	|	dire wolf	|		|	genbank common name	|
+2626217	|	unclassified Canis	|		|	scientific name	|
+9616	|	Canis sp.	|		|	scientific name	|
+613187	|	Canis sp. CANInt1	|		|	scientific name	|
+1419257	|	Canis sp. Belgium/36,000	|		|	scientific name	|
+1419257	|	Canis sp. Belgium 36,000	|		|	synonym	|
+1419257	|	Canis sp. OT-2013/Belgium	|		|	synonym	|
+1419712	|	Canis sp. OT-2013/Russia	|		|	synonym	|
+1419712	|	Canis sp. Russia/33,500	|		|	scientific name	|
+1419712	|	Canis sp. Russia 33,500	|		|	synonym	|
+1785177	|	Canis sp. KEB-2016	|		|	scientific name	|
+2714668	|	Canis sp. 70-TX-01	|		|	scientific name	|
+2714669	|	Canis sp. 70-TX-02	|		|	scientific name	|
+2714670	|	Canis sp. 70-TX-03	|		|	scientific name	|
+2714671	|	Canis sp. 70-TX-05	|		|	scientific name	|
+2714672	|	Canis sp. 70-TX-06	|		|	scientific name	|
+2714673	|	Canis sp. 70-TX-07	|		|	scientific name	|
+2714674	|	Canis sp. 70-TX-08	|		|	scientific name	|
+2714675	|	Canis sp. 70-TX-09	|		|	scientific name	|
+2769327	|	Canis sp. CM0006548	|		|	scientific name	|
+2769328	|	Canis sp. UMMZ91100	|		|	scientific name	|
+2769329	|	Canis sp. CM038379	|		|	scientific name	|

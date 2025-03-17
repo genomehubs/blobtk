@@ -1,6 +1,6 @@
 extern crate atty;
 use std::collections::HashSet;
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Result, Write};
 use std::path::{Path, PathBuf};
 
@@ -57,10 +57,17 @@ pub fn get_list(file_path: &Option<PathBuf>) -> HashSet<Vec<u8>> {
     HashSet::from_iter(list)
 }
 
-pub fn get_file_writer(file_path: &PathBuf) -> Box<dyn Write> {
-    let file = match File::create(file_path) {
-        Err(why) => panic!("couldn't open {}: {}", file_path.display(), why),
-        Ok(file) => file,
+pub fn get_file_writer(file_path: &PathBuf, append: bool) -> Box<dyn Write> {
+    let file = if append {
+        match OpenOptions::new().append(true).open(file_path) {
+            Err(why) => panic!("couldn't open {}: {}", file_path.display(), why),
+            Ok(file) => file,
+        }
+    } else {
+        match File::create(file_path) {
+            Err(why) => panic!("couldn't open {}: {}", file_path.display(), why),
+            Ok(file) => file,
+        }
     };
 
     let writer: Box<dyn Write> = if file_path.extension() == Some(OsStr::new("gz")) {
@@ -79,11 +86,68 @@ pub fn get_writer(file_path: &Option<PathBuf>) -> Box<dyn Write> {
         Some(path) if path == Path::new("-") => Box::new(BufWriter::new(io::stdout().lock())),
         Some(path) => {
             create_dir_all(path.parent().unwrap()).unwrap();
-            get_file_writer(path)
+            get_file_writer(path, false)
         }
         None => Box::new(BufWriter::new(io::stdout().lock())),
     };
     writer
+}
+
+pub fn get_append_writer(file_path: &Option<PathBuf>) -> Box<dyn Write> {
+    let writer: Box<dyn Write> = match file_path {
+        Some(path) if path == Path::new("-") => Box::new(BufWriter::new(io::stdout().lock())),
+        Some(path) => {
+            create_dir_all(path.parent().unwrap()).unwrap();
+            get_file_writer(path, true)
+        }
+        None => Box::new(BufWriter::new(io::stdout().lock())),
+    };
+    writer
+}
+
+pub fn get_csv_writer(file_path: &Option<PathBuf>, delimiter: u8) -> csv::Writer<Box<dyn Write>> {
+    let file_writer = get_writer(file_path);
+    if delimiter == b'\t' {
+        csv::WriterBuilder::new()
+            .delimiter(b'\t')
+            .from_writer(file_writer)
+    } else {
+        csv::WriterBuilder::new().from_writer(file_writer)
+    }
+}
+
+/// Return a BufRead object for a given file path.
+/// If the file path has a `.gz` extension, the file is decompressed on the fly.
+pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
+    let file = File::open(&path)?;
+
+    if path.extension() == Some(OsStr::new("gz")) {
+        Ok(Box::new(BufReader::new(GzDecoder::new(file))))
+    } else {
+        Ok(Box::new(BufReader::new(file)))
+    }
+}
+
+/// Return an empty Box<dyn BufRead>.
+/// This is useful when we want to read from stdin.
+pub fn get_empty_reader() -> Box<dyn BufRead> {
+    Box::new(BufReader::new(io::empty()))
+}
+
+/// Return a csv::Reader object for a given file path.
+/// If the file path has a `.gz` extension, the file is decompressed on the fly.
+pub fn get_csv_reader(
+    file_path: &Option<PathBuf>,
+    delimiter: u8,
+    has_headers: bool,
+) -> csv::Reader<Box<dyn BufRead>> {
+    let file_reader =
+        file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
+
+    csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .has_headers(has_headers)
+        .from_reader(file_reader)
 }
 
 pub fn write_list(entries: &HashSet<Vec<u8>>, file_path: &Option<PathBuf>) -> Result<()> {
@@ -98,14 +162,4 @@ pub fn append_to_path(p: &PathBuf, s: &str) -> PathBuf {
     let mut p = p.clone().into_os_string();
     p.push(s);
     p.into()
-}
-
-pub fn file_reader(path: PathBuf) -> Option<Box<dyn BufRead>> {
-    let file = File::open(&path).expect("no such file");
-
-    if path.ends_with(".gz") {
-        return Some(Box::new(BufReader::new(GzDecoder::new(file))));
-    } else {
-        return Some(Box::new(BufReader::new(file)));
-    };
 }

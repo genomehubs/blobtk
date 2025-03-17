@@ -8,6 +8,7 @@ use blobtk::filter;
 use blobtk::index;
 use blobtk::plot;
 use blobtk::taxonomy;
+use blobtk::validate;
 
 fn cmd(args: cli::Arguments) -> Result<(), anyhow::Error> {
     match args.cmd {
@@ -16,6 +17,7 @@ fn cmd(args: cli::Arguments) -> Result<(), anyhow::Error> {
         cli::SubCommand::Index(options) => index::index(&options)?,
         cli::SubCommand::Plot(options) => plot::plot(&options)?,
         cli::SubCommand::Taxonomy(options) => taxonomy::taxonomy(&options)?,
+        cli::SubCommand::Validate(options) => validate::validate(&options)?,
     }
     Ok(())
 }

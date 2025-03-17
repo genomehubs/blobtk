@@ -21,6 +21,8 @@ pub enum Error {
     ReaderError(String),
     #[error("Unable to process JSON: {0}")]
     SerdeError(String),
+    #[error("Unable to process JSON: {0} {1}: unknown field `{2}`")]
+    UnknownField(String, String, String),
 }
 
 impl From<std::io::Error> for Error {

@@ -31,6 +31,9 @@ pub mod index;
 /// Functions for file/terminal IO.
 pub mod io;
 
+/// Functions for parsing files
+pub mod parse;
+
 /// Generate a plot.
 pub mod plot;
 
@@ -42,3 +45,6 @@ pub mod taxonomy;
 
 /// Utility functions.
 pub mod utils;
+
+/// Validate files.
+pub mod validate;

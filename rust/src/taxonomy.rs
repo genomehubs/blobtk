@@ -4,41 +4,22 @@
 
 use anyhow;
 
-// use std::time::{Duration, Instant};
-
 use crate::cli;
 use crate::error;
 use crate::io;
 
-/// Functions for ncbi taxonomy processing.
-pub mod parse;
-
-/// Functions for name lookup.
-pub mod lookup;
-
 pub use cli::TaxonomyOptions;
 
-pub use lookup::{build_lookup, lookup_nodes};
+use crate::parse::lookup::{build_fast_lookup, lookup_nodes};
+use crate::parse::nodes::Nodes;
 
-use self::parse::{parse_ena_jsonl, parse_file, parse_gbif, parse_taxdump, write_taxdump, Nodes};
-
-// use std::error::Error;
-// use csv::Reader;
-
-// fn example() -> Result<(), Box<dyn Error>> {
-//     let mut rdr = Reader::from_path("foo.csv")?;
-//     for result in rdr.records() {
-//         let record = result?;
-//         println!("{:?}", record);
-//     }
-//     Ok(())
-// }
+use crate::parse::{parse_ena_jsonl, parse_file};
 
 fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, error::Error> {
     if let Some(config_file) = options.config_file.clone() {
         let reader = match io::file_reader(config_file.clone()) {
-            Some(r) => r,
-            None => {
+            Ok(r) => r,
+            Err(_) => {
                 return Err(error::Error::FileNotFound(format!(
                     "{}",
                     &config_file.to_str().unwrap()
@@ -98,7 +79,7 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
     Ok(options.clone())
 }
 
-fn taxdump_to_nodes(
+pub fn taxdump_to_nodes(
     options: &cli::TaxonomyOptions,
     existing: Option<&mut Nodes>,
 ) -> Result<Nodes, error::Error> {
@@ -106,15 +87,9 @@ fn taxdump_to_nodes(
     let nodes;
     if let Some(taxdump) = options.path.clone() {
         nodes = match options.taxonomy_format {
-            Some(cli::TaxonomyFormat::NCBI) => parse_taxdump(taxdump).unwrap(),
-            Some(cli::TaxonomyFormat::GBIF) => parse_gbif(taxdump).unwrap(),
+            Some(cli::TaxonomyFormat::GBIF) => Nodes::from_gbif(taxdump, &options).unwrap(),
             Some(cli::TaxonomyFormat::ENA) => parse_ena_jsonl(taxdump, existing).unwrap(),
-            None => {
-                return Err(error::Error::FileNotFound(format!(
-                    "{}",
-                    &taxdump.to_str().unwrap()
-                )))
-            }
+            _ => Nodes::from_taxdump(taxdump, options.xref_label.clone()).unwrap(),
         };
     } else {
         return Err(error::Error::NotDefined(format!("taxdump")));
@@ -125,21 +100,7 @@ fn taxdump_to_nodes(
 /// Execute the `taxonomy` subcommand from `blobtk`.
 pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     let options = load_options(&options)?;
-    let mut nodes = taxdump_to_nodes(&options, None).unwrap();
-    // if let Some(taxdump) = options.path.clone() {
-    //     nodes = match options.taxonomy_format {
-    //         Some(cli::TaxonomyFormat::NCBI) => parse_taxdump(taxdump)?,
-    //         Some(cli::TaxonomyFormat::GBIF) => parse_gbif(taxdump)?,
-    //         None => Nodes {
-    //             ..Default::default()
-    //         },
-    //     };
-    //     if let Some(taxdump_out) = options.out.clone() {
-    //         let root_taxon_ids = options.root_taxon_id.clone();
-    //         let base_taxon_id = options.base_taxon_id.clone();
-    //         write_taxdump(&nodes, root_taxon_ids, base_taxon_id, taxdump_out);
-    //     }
-    // }
+    let mut nodes = taxdump_to_nodes(&options, None)?;
 
     if let Some(taxonomies) = options.taxonomies.clone() {
         for taxonomy in taxonomies {
@@ -149,6 +110,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                 if matches!(taxonomy_format, cli::TaxonomyFormat::ENA) {
                     continue;
                 }
+
                 lookup_nodes(
                     &new_nodes,
                     &mut nodes,
@@ -162,17 +124,24 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     }
 
     if let Some(genomehubs_files) = options.genomehubs_files.clone() {
-        let table = build_lookup(&nodes, &options.name_classes, false);
+        let id_map = build_fast_lookup(&nodes, &options.name_classes);
+        dbg!(nodes.nodes.len());
         for genomehubs_file in genomehubs_files {
             // match taxa to nodes
-            let names = parse_file(genomehubs_file, &table).unwrap();
+            // todo: add support for multiple genomehubs files
+            let (new_nodes, new_names, source) = parse_file(genomehubs_file, &id_map, false)?;
+            // add new nodes to existing nodes
+            dbg!(new_nodes.nodes.len());
+            nodes.add_names(&new_names)?;
+            nodes.merge(&new_nodes)?;
         }
+        dbg!(nodes.nodes.len());
     }
 
     if let Some(taxdump_out) = options.out.clone() {
         let root_taxon_ids = options.root_taxon_id.clone();
         let base_taxon_id = options.base_taxon_id.clone();
-        write_taxdump(&nodes, root_taxon_ids, base_taxon_id, taxdump_out);
+        nodes.write_taxdump(root_taxon_ids, base_taxon_id, &taxdump_out, false);
     }
 
     // if let Some(gbif_backbone) = options.gbif_backbone.clone() {

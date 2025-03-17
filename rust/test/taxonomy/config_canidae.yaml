@@ -16,5 +16,5 @@ taxonomies:
   #   name_classes:
   #     - scientific name
   #   xref_label: gbif
-  - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
-    taxonomy_format: ena
+  # - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
+  #   taxonomy_format: ena
