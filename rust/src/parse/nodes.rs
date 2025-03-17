@@ -16,6 +16,7 @@ use nom::{
 
 use struct_iterable::Iterable;
 
+use crate::cli::TaxonomyOptions;
 use crate::io;
 
 /// A taxon name
@@ -484,7 +485,10 @@ impl Nodes {
         Ok(Nodes { nodes, children })
     }
 
-    pub fn from_gbif(gbif_backbone: PathBuf) -> Result<Nodes, anyhow::Error> {
+    pub fn from_gbif(
+        gbif_backbone: PathBuf,
+        options: &TaxonomyOptions,
+    ) -> Result<Nodes, anyhow::Error> {
         let mut nodes = HashMap::new();
         let mut children = HashMap::new();
 
@@ -534,9 +538,15 @@ impl Nodes {
             if parent_tax_id == "\\N" {
                 parent_tax_id = "root".to_string()
             }
+            let unique_name = if let Some(xref_label) = options.xref_label.clone() {
+                format!("{}:{}", xref_label, tax_id)
+            } else {
+                "".to_string()
+            };
             let name = Name {
                 tax_id: tax_id.clone(),
                 name: taxon_name.clone(),
+                unique_name,
                 class: Some(name_class.clone()),
                 ..Default::default()
             };

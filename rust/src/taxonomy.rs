@@ -87,7 +87,7 @@ pub fn taxdump_to_nodes(
     let nodes;
     if let Some(taxdump) = options.path.clone() {
         nodes = match options.taxonomy_format {
-            Some(cli::TaxonomyFormat::GBIF) => Nodes::from_gbif(taxdump).unwrap(),
+            Some(cli::TaxonomyFormat::GBIF) => Nodes::from_gbif(taxdump, &options).unwrap(),
             Some(cli::TaxonomyFormat::ENA) => parse_ena_jsonl(taxdump, existing).unwrap(),
             _ => Nodes::from_taxdump(taxdump, options.xref_label.clone()).unwrap(),
         };
