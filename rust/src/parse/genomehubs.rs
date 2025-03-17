@@ -811,7 +811,13 @@ impl GHubsConfig {
         if !file_path.exists() {
             panic!("File does not exist: {:?}", &file_path);
         }
-        let mut rdr = io::get_csv_reader(&Some(file_path.clone()), delimiter, file_config.header);
+        let mut rdr = io::get_csv_reader(
+            &Some(file_path.clone()),
+            delimiter,
+            file_config.header,
+            None,
+            0,
+        );
 
         if let Some(keys) = keys {
             if file_config.header {
@@ -892,7 +898,7 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(&Some(file_path), delimiter, true);
+        let mut rdr = io::get_csv_reader(&Some(file_path), delimiter, true, None, 0);
         let expected_headers = vec!["taxon_id", "input", "rank"];
         let headers = rdr.headers().unwrap().clone();
         for (i, header) in headers.iter().enumerate() {

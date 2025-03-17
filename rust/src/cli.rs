@@ -179,12 +179,31 @@ pub struct FilterOptions {
 #[derive(Parser, Debug)]
 // #[pyclass]
 pub struct IndexOptions {
+    /// Path to BlobDir directory containing files to index
+    #[arg(long, short = 'b')]
+    pub blobdir: Option<PathBuf>,
+    /// Window sizes for feature extraction.
+    /// Supported values depend on the BlobDir (typically 0.01, 0.1, 1, 100000, 1000000)
+    #[arg(long = "window-size", short = 'w', num_args(1..), default_values_t = [1.0], value_parser = window_size_parser, action = clap::ArgAction::Append)]
+    pub window_size: Vec<f64>,
+    /// Path to BUSCO directory containing files to index
+    /// Multiple BUSCO directories can be provided
+    #[arg(long, short = 'u', num_args(1..), action = clap::ArgAction::Append)]
+    pub busco: Option<Vec<PathBuf>>,
     /// Flag to generate JSON schema
     #[arg(long, short = 'g')]
     pub schema: bool,
     /// Output schema file name
     #[arg(long, short = 'O')]
     pub out: Option<PathBuf>,
+}
+
+fn window_size_parser(s: &str) -> Result<f64, String> {
+    let mut val = match s.parse::<f64>() {
+        Ok(v) => v,
+        Err(e) => panic!("{:?}", e),
+    };
+    Ok(val)
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]

@@ -140,13 +140,23 @@ pub fn get_csv_reader(
     file_path: &Option<PathBuf>,
     delimiter: u8,
     has_headers: bool,
+    comment_char: Option<u8>,
+    skip_lines: usize,
 ) -> csv::Reader<Box<dyn BufRead>> {
     let file_reader =
         file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
 
+    // Skip the first `skip_lines` lines
+    let mut file_reader = Box::new(file_reader);
+    for _ in 0..skip_lines {
+        let mut line = String::new();
+        file_reader.read_line(&mut line).unwrap();
+    }
+
     csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .has_headers(has_headers)
+        .comment(comment_char)
         .from_reader(file_reader)
 }
 
