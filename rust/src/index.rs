@@ -7,19 +7,32 @@ use std::io::BufRead;
 use std::path::PathBuf;
 
 use anyhow;
-use needletail::sequence;
 use schemars::schema_for;
 use serde_json::to_string_pretty;
 
 use crate::blobdir;
 use crate::cli;
 use crate::io::get_csv_reader;
+use crate::io::get_file_writer;
 use crate::io::get_writer;
 use crate::parse::genomehubs::GHubsConfig;
 
 pub use cli::IndexOptions;
 
 #[derive(Debug)]
+pub struct Analysis {
+    pub analysis_id: String,
+    pub assembly_id: String,
+    pub analysis_type: String,
+    pub name: String,
+    pub description: String,
+    pub taxon_id: String,
+    pub title: String,
+    pub date: String,
+    pub version: String,
+}
+
+#[derive(Debug, Default)]
 pub struct Feature {
     pub feature_id: String,
     pub sequence_id: String,
@@ -34,6 +47,10 @@ pub struct Feature {
     pub midpoint: usize,
     pub midpoint_proportion: f64,
     pub seq_proportion: f64,
+    pub name: Option<String>,
+    pub score: Option<f64>,
+    pub status: Option<String>,
+    pub busco_counts: Option<HashMap<String, usize>>,
 }
 
 impl Feature {
@@ -51,6 +68,10 @@ impl Feature {
         midpoint: usize,
         midpoint_proportion: f64,
         seq_proportion: f64,
+        name: Option<String>,
+        score: Option<f64>,
+        status: Option<String>,
+        busco_counts: Option<HashMap<String, usize>>,
     ) -> Self {
         Self {
             feature_id,
@@ -66,7 +87,57 @@ impl Feature {
             midpoint,
             midpoint_proportion,
             seq_proportion,
+            name,
+            score,
+            status,
+            busco_counts,
         }
+    }
+
+    pub fn to_string(&self) -> String {
+        let busco_counts_str = if let Some(busco_counts) = &self.busco_counts {
+            busco_counts
+                .iter()
+                .map(|(_, value)| format!("{}", value))
+                .collect::<Vec<String>>()
+                .join("\t")
+        } else {
+            "None".to_string()
+        };
+
+        format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            self.feature_id,
+            self.sequence_id,
+            self.feature_type,
+            self.start,
+            self.end,
+            self.strand,
+            self.length,
+            self.gc.unwrap_or(0.0),
+            self.coverage.unwrap_or(0.0),
+            self.masked.unwrap_or(0.0),
+            self.midpoint,
+            self.midpoint_proportion,
+            self.seq_proportion,
+            self.name.as_ref().unwrap_or(&"None".to_string()),
+            self.score.unwrap_or(0.0),
+            self.status.as_ref().unwrap_or(&"None".to_string()),
+            busco_counts_str
+        )
+    }
+
+    pub fn to_header(&self) -> String {
+        let mut header = "feature_id\tsequence_id\tfeature_type\tstart\tend\tstrand\tlength\tgc\tcoverage\tmasked\tmidpoint\tmidpoint_proportion\tseq_proportion\tname\tscore\tstatus".to_string();
+        if let Some(ref busco_counts) = self.busco_counts {
+            let keys = busco_counts.keys();
+            for key in keys {
+                header.push_str(&format!("\t{}", key));
+            }
+        } else {
+            header.push_str("\tbusco_counts");
+        }
+        header
     }
 }
 
@@ -86,18 +157,22 @@ impl Features {
 
     pub fn from_vecs(
         feature_type: String,
-        names: Vec<String>,
+        ids: Vec<String>,
         lengths: Vec<usize>,
         strands: Option<Vec<i8>>,
         gcs: Option<Vec<f64>>,
         coverages: Option<Vec<f64>>,
         maskeds: Option<Vec<f64>>,
+        names: Option<Vec<String>>,
+        scores: Option<Vec<f64>>,
+        statuses: Option<Vec<String>>,
+        busco_counts: Option<HashMap<String, Vec<usize>>>,
     ) -> Self {
         let mut features = Vec::new();
         let span = lengths.iter().sum::<usize>();
-        for (i, name) in names.iter().enumerate() {
-            let feature_id = format!("{}:{}", name, feature_type);
-            let sequence_id = name.clone();
+        for (i, id) in ids.iter().enumerate() {
+            let feature_id = format!("{}:{}", id, feature_type);
+            let sequence_id = id.clone();
             let feature_type = feature_type.clone();
             let start = 1;
             let end = lengths[i];
@@ -122,6 +197,31 @@ impl Features {
             } else {
                 None
             };
+            let name = if let Some(names) = &names {
+                Some(names[i].clone())
+            } else {
+                None
+            };
+            let score = if let Some(scores) = &scores {
+                Some(scores[i])
+            } else {
+                None
+            };
+            let status = if let Some(statuses) = &statuses {
+                Some(statuses[i].clone())
+            } else {
+                None
+            };
+            let feature_busco_counts = if let Some(all_busco_counts) = &busco_counts {
+                // make a hashmap of busco counts for this feature
+                let mut _busco_counts = HashMap::new();
+                for (busco, counts) in all_busco_counts {
+                    _busco_counts.insert(busco.clone(), counts[i]);
+                }
+                Some(_busco_counts)
+            } else {
+                None
+            };
             let midpoint = (start + end) / 2;
             let midpoint_proportion = midpoint as f64 / length as f64;
             let seq_proportion = length as f64 / span as f64;
@@ -139,6 +239,10 @@ impl Features {
                 midpoint,
                 midpoint_proportion,
                 seq_proportion,
+                name,
+                score,
+                status,
+                busco_counts: feature_busco_counts,
             });
         }
         Self::new(1.0, features)
@@ -147,22 +251,26 @@ impl Features {
     pub fn from_vec_of_vecs(
         window_size: f64,
         feature_type: String,
-        names: Vec<String>,
+        ids: Vec<String>,
         lengths: Vec<Vec<usize>>,
         strands: Option<Vec<Vec<i8>>>,
         gcs: Option<Vec<Vec<f64>>>,
         coverages: Option<Vec<Vec<f64>>>,
         maskeds: Option<Vec<Vec<f64>>>,
+        names: Option<Vec<Vec<String>>>,
+        scores: Option<Vec<Vec<f64>>>,
+        statuses: Option<Vec<Vec<String>>>,
+        busco_counts: Option<HashMap<String, Vec<Vec<usize>>>>,
     ) -> Self {
         let mut features = Vec::new();
-        for (i, name) in names.iter().enumerate() {
+        for (i, id) in ids.iter().enumerate() {
             let mut start = 1;
             let span = lengths[i].iter().sum::<usize>();
             for (j, length) in lengths[i].iter().enumerate() {
                 let length = length.clone();
                 let end = start + length - 1;
-                let feature_id = format!("{}:{}-{}:{}", name, start, end, feature_type);
-                let sequence_id = name.clone();
+                let feature_id = format!("{}:{}-{}:{}", id, start, end, feature_type);
+                let sequence_id = id.clone();
                 let feature_type = feature_type.clone();
                 let strand = if let Some(strands) = &strands {
                     strands[i][j]
@@ -184,6 +292,31 @@ impl Features {
                 } else {
                     None
                 };
+                let name = if let Some(names) = &names {
+                    Some(names[i][j].clone())
+                } else {
+                    None
+                };
+                let score = if let Some(scores) = &scores {
+                    Some(scores[i][j])
+                } else {
+                    None
+                };
+                let status = if let Some(statuses) = &statuses {
+                    Some(statuses[i][j].clone())
+                } else {
+                    None
+                };
+                let feature_busco_counts = if let Some(all_busco_counts) = &busco_counts {
+                    // make a hashmap of busco counts for this feature
+                    let mut _busco_counts = HashMap::new();
+                    for (busco, counts) in all_busco_counts {
+                        _busco_counts.insert(busco.clone(), counts[i][j]);
+                    }
+                    Some(_busco_counts)
+                } else {
+                    None
+                };
                 let midpoint = (start + end) / 2;
                 let midpoint_proportion = midpoint as f64 / length as f64;
                 let seq_proportion = length as f64 / span as f64;
@@ -201,11 +334,48 @@ impl Features {
                     midpoint,
                     midpoint_proportion,
                     seq_proportion,
+                    name,
+                    score,
+                    status,
+                    busco_counts: feature_busco_counts,
                 });
                 start += length;
             }
         }
         Self::new(window_size, features)
+    }
+
+    pub fn to_string(&self) -> String {
+        let mut output = Vec::new();
+        for feature in &self.features {
+            output.push(feature.to_string());
+        }
+        output.join("\n")
+    }
+
+    pub fn to_header(&self) -> String {
+        Feature::to_header(&self.features[0])
+    }
+
+    pub fn to_tsv(&self) -> String {
+        let mut output = Vec::new();
+        output.push(self.to_header());
+        output.push(self.to_string());
+        output.join("\n")
+    }
+
+    pub fn to_file(&self, file_path: &Option<PathBuf>) -> Result<(), anyhow::Error> {
+        let mut writer = get_writer(file_path);
+        writeln!(&mut writer, "{}", self.to_tsv())?;
+        Ok(())
+    }
+
+    pub fn append_to_file(&self, file_path: &Option<PathBuf>) -> Result<(), anyhow::Error> {
+        if let Some(file_path) = file_path {
+            let mut writer = get_file_writer(file_path, true);
+            writeln!(&mut writer, "{}", self.to_string())?;
+        }
+        Ok(())
     }
 }
 
@@ -223,6 +393,18 @@ fn per_contig_values(
         vec![0.0; length_values.len()]
     };
     let masked_values = blobdir::parse_field_float("masked".to_string(), &blobdir_path)?;
+    let busco_counts = if let Some(busco_list) = &meta.busco_list {
+        let mut _busco_counts = HashMap::new();
+        for busco in busco_list {
+            dbg!(&busco);
+            let field_id = format!("{}_count", busco.2);
+            let busco_values = blobdir::parse_field_int(field_id.clone(), &blobdir_path)?;
+            _busco_counts.insert(field_id.clone(), busco_values);
+        }
+        Some(_busco_counts)
+    } else {
+        None
+    };
     let features = Features::from_vecs(
         "chromosome".to_string(),
         identifiers,
@@ -231,6 +413,10 @@ fn per_contig_values(
         Some(gc_values),
         Some(coverage_values),
         Some(masked_values),
+        None,
+        None,
+        None,
+        busco_counts,
     );
     Ok(features)
 }
@@ -251,23 +437,6 @@ fn per_window_values(
     contig_values: &Features,
     window_size: &f64,
 ) -> Result<Features, anyhow::Error> {
-    let mut float_fields = vec!["gc".to_string(), "masked".to_string()];
-    match meta.plot.clone().y {
-        Some(coverage) => float_fields.push(coverage.clone()),
-        None => (),
-    }
-    let int_fields = vec!["position".to_string()];
-    for field in float_fields {
-        let window_id = get_window_id(&field, window_size);
-        let window_values = blobdir::parse_field_float_windows(window_id, &blobdir_path, None)?;
-        // dbg!(&window_values);
-    }
-    for field in int_fields {
-        let window_id = get_window_id(&field, window_size);
-        let window_values = blobdir::parse_field_int_windows(window_id, &blobdir_path, None)?;
-        dbg!(&window_values);
-    }
-
     let plot_meta = meta.plot.clone();
 
     let identifiers = blobdir::parse_field_identifiers("identifiers".to_string(), &blobdir_path)?;
@@ -295,6 +464,20 @@ fn per_window_values(
         &blobdir_path,
         None,
     )?;
+    let busco_counts = if let Some(busco_list) = &meta.busco_list {
+        let mut _busco_counts = HashMap::new();
+        for busco in busco_list {
+            dbg!(&busco);
+            let field_name = format!("{}_count", busco.2);
+            let field_id = get_window_id(&field_name, window_size);
+            let busco_values =
+                blobdir::parse_field_int_windows(field_id.clone(), &blobdir_path, None)?;
+            _busco_counts.insert(field_name, busco_values.0);
+        }
+        Some(_busco_counts)
+    } else {
+        None
+    };
     let features = Features::from_vec_of_vecs(
         *window_size,
         format!("window-{}", window_size),
@@ -304,6 +487,10 @@ fn per_window_values(
         Some(gc_values.0),
         coverage_values,
         Some(masked_values.0),
+        None,
+        None,
+        None,
+        busco_counts,
     );
     Ok(features)
 }
@@ -343,11 +530,69 @@ fn parse_full_table(
     })
 }
 
+fn busco_analysis(meta: &blobdir::Meta, busco: &(String, usize, String)) -> Analysis {
+    let assembly_id = meta.assembly.accession.clone();
+    let lineage = busco.2.clone();
+    let busco_version = "5"; // hard-coded for now
+    let analysis_id = format!("busco{}-{}_{}", busco_version, lineage, assembly_id);
+    let analysis_type = "busco".to_string();
+    let name = format!("BUSCO_{}", lineage);
+    let description = format!(
+        "BUSCO v{} analysis of {} using lineage {}",
+        busco_version, assembly_id, lineage
+    );
+    let taxon_id = meta.taxon.taxid.clone();
+    let title = format!("BUSCO v{} {} {}", busco_version, assembly_id, lineage);
+    let date = "1970-01-01".to_string(); // set to 1970-01-01 for now
+    let version = busco_version.to_string(); //set to busco version for now
+    Analysis {
+        analysis_id,
+        assembly_id,
+        analysis_type,
+        name,
+        description,
+        taxon_id,
+        title,
+        date,
+        version,
+    }
+}
+
+fn window_analysis(meta: &blobdir::Meta, window_size: &f64) -> Analysis {
+    let assembly_id = meta.assembly.accession.clone();
+    let analysis_id = format!("window-{}", window_size);
+    let analysis_type = "window".to_string();
+    let name = format!("window-{}", window_size);
+    let description = format!(
+        "Window analysis of {} using window size {}",
+        assembly_id, window_size
+    );
+    let taxon_id = meta.taxon.taxid.clone();
+    let title = format!(
+        "Window analysis of {} using window size {}",
+        assembly_id, window_size
+    );
+    let date = "1970-01-01".to_string(); // set to 1970-01-01 for now
+    let version = "1".to_string(); //set to 1 for now
+    Analysis {
+        analysis_id,
+        assembly_id,
+        analysis_type,
+        name,
+        description,
+        taxon_id,
+        title,
+        date,
+        version,
+    }
+}
+
 fn parse_busco(
     meta: &blobdir::Meta,
     busco_dir: &PathBuf,
     sequences: &HashMap<String, &Feature>,
-) -> Result<(), anyhow::Error> {
+) -> Result<Features, anyhow::Error> {
+    let mut features = Vec::new();
     if let Some(busco_list) = &meta.busco_list {
         let span = sequences.values().map(|f| f.length).sum::<usize>();
         for busco in busco_list {
@@ -360,6 +605,7 @@ fn parse_busco(
                 .unwrap()
                 .contains(&busco.2)
             {
+                let busco_analysis = busco_analysis(&meta, &busco);
                 let busco_count = busco.1;
                 // find the full_table.tsv file in the busco_dir
                 let full_table_reader = get_csv_reader(
@@ -371,36 +617,40 @@ fn parse_busco(
                 );
                 // parse the full_table.tsv file
                 for record in parse_full_table(full_table_reader) {
-                    let (id, status, score, sequence, start, end, strand, length) = record?;
-                    let seq_feature = sequences.get(&sequence).unwrap();
-                    let midpoint = (start + end) / 2;
-                    let midpoint_proportion = midpoint as f64 / seq_feature.length as f64;
-                    let seq_proportion = length as f64 / span as f64;
-                    let feature = Feature::new(
-                        id,
-                        sequence,
-                        "busco".to_string(),
-                        start,
-                        end,
-                        strand,
-                        length,
-                        None,
-                        None,
-                        None,
-                        midpoint,
-                        midpoint_proportion,
-                        seq_proportion,
-                    );
-                    dbg!(feature);
+                    if let Ok((id, status, score, sequence, start, end, strand, length)) = record {
+                        let seq_feature = sequences.get(&sequence).unwrap();
+                        let midpoint = (start + end) / 2;
+                        let midpoint_proportion = midpoint as f64 / seq_feature.length as f64;
+                        let seq_proportion = length as f64 / span as f64;
+                        let feature = Feature::new(
+                            format!("{}:{}-{}:{}", sequence, start, end, &id),
+                            sequence,
+                            "busco".to_string(),
+                            start,
+                            end,
+                            strand,
+                            length,
+                            None,
+                            None,
+                            None,
+                            midpoint,
+                            midpoint_proportion,
+                            seq_proportion,
+                            Some(id),
+                            Some(score),
+                            Some(status),
+                            None,
+                        );
+                        features.push(feature);
+                    }
                 }
-
-                // let busco_values = blobdir::parse_field_float("score".to_string(), busco_dir)?;
-                dbg!(busco_count);
             }
         }
     }
-    dbg!(busco_dir);
-    Ok(())
+    Ok(Features {
+        window_size: 1.0,
+        features,
+    })
 }
 
 /// Execute the `index` subcommand from `blobtk`.
@@ -420,17 +670,20 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
         for feature in &contig_values.features {
             sequences.insert(feature.sequence_id.clone(), feature);
         }
+        contig_values.to_file(&options.out)?;
 
-        // for window in &options.window_size {
-        //     if window == &1.0 {
-        //         continue;
-        //     }
-        //     let window_values = per_window_values(&meta, blobdir_path, &contig_values, window)?;
-        // }
+        for window in &options.window_size {
+            if window == &1.0 {
+                continue;
+            }
+            let window_values = per_window_values(&meta, blobdir_path, &contig_values, window)?;
+            let window_analysis = window_analysis(&meta, window);
+            window_values.append_to_file(&options.out)?;
+        }
         if let Some(busco_dirs) = &options.busco {
             for busco_dir in busco_dirs {
                 let busco_values = parse_busco(&meta, &busco_dir, &sequences)?;
-                dbg!(busco_values);
+                busco_values.append_to_file(&options.out)?;
             }
         }
     }
