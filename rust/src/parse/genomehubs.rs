@@ -796,6 +796,22 @@ impl GHubsConfig {
         }
     }
 
+    pub fn to_yaml(&self) -> Result<String, error::Error> {
+        let yaml = serde_yaml::to_string(&self)?;
+        Ok(yaml)
+    }
+
+    pub fn write_yaml(&self, output_file: &PathBuf) -> Result<(), error::Error> {
+        let yaml = self.to_yaml()?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_file)?;
+        file.write_all(yaml.as_bytes())?;
+        Ok(())
+    }
+
     pub fn init_csv_reader(&mut self, keys: Option<Vec<&str>>) -> csv::Reader<Box<dyn BufRead>> {
         if self.file.is_none() {
             // return an empty reader

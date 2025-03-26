@@ -4,18 +4,25 @@
 
 use std::collections::HashMap;
 use std::io::BufRead;
+use std::option;
 use std::path::PathBuf;
 
 use anyhow;
+use numfmt::Formatter;
+use numfmt::Precision;
 use schemars::schema_for;
 use serde_json::to_string_pretty;
 
 use crate::blobdir;
+use crate::blobdir::Field;
 use crate::cli;
 use crate::io::get_csv_reader;
 use crate::io::get_file_writer;
 use crate::io::get_writer;
+use crate::parse::genomehubs::FieldType;
 use crate::parse::genomehubs::GHubsConfig;
+use crate::parse::genomehubs::GHubsFieldConfig;
+use crate::parse::genomehubs::StringOrVec;
 
 pub use cli::IndexOptions;
 
@@ -94,16 +101,39 @@ impl Feature {
         }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, busco_count: Option<usize>) -> String {
         let busco_counts_str = if let Some(busco_counts) = &self.busco_counts {
             busco_counts
                 .iter()
                 .map(|(_, value)| format!("{}", value))
                 .collect::<Vec<String>>()
                 .join("\t")
+        } else if let Some(busco_count) = busco_count {
+            (0..busco_count)
+                .map(|_| "None".to_string())
+                .collect::<Vec<String>>()
+                .join("\t")
         } else {
             "None".to_string()
         };
+
+        let mut f = Formatter::new();
+        f = f.precision(Precision::Significance(4));
+
+        let gc_str = self
+            .gc
+            .map_or("None".to_string(), |v| f.fmt2(v).to_string());
+        let coverage_str = self
+            .coverage
+            .map_or("None".to_string(), |v| f.fmt2(v).to_string());
+        let masked_str = self
+            .masked
+            .map_or("None".to_string(), |v| f.fmt2(v).to_string());
+        let score_str = self
+            .score
+            .map_or("None".to_string(), |v| f.fmt2(v).to_string());
+        let midpoint_proportion_str = f.fmt2(self.midpoint_proportion).to_string();
+        let seq_proportion_str = f.fmt2(self.seq_proportion).to_string();
 
         format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -114,14 +144,14 @@ impl Feature {
             self.end,
             self.strand,
             self.length,
-            self.gc.unwrap_or(0.0),
-            self.coverage.unwrap_or(0.0),
-            self.masked.unwrap_or(0.0),
+            gc_str,
+            coverage_str,
+            masked_str,
             self.midpoint,
-            self.midpoint_proportion,
-            self.seq_proportion,
+            midpoint_proportion_str,
+            seq_proportion_str,
             self.name.as_ref().unwrap_or(&"None".to_string()),
-            self.score.unwrap_or(0.0),
+            score_str,
             self.status.as_ref().unwrap_or(&"None".to_string()),
             busco_counts_str
         )
@@ -144,14 +174,16 @@ impl Feature {
 #[derive(Debug)]
 pub struct Features {
     pub window_size: f64,
+    pub busco_count: Option<usize>,
     pub features: Vec<Feature>,
 }
 
 impl Features {
-    pub fn new(window_size: f64, features: Vec<Feature>) -> Self {
+    pub fn new(window_size: f64, features: Vec<Feature>, busco_count: Option<usize>) -> Self {
         Self {
             window_size,
             features,
+            busco_count,
         }
     }
 
@@ -245,7 +277,12 @@ impl Features {
                 busco_counts: feature_busco_counts,
             });
         }
-        Self::new(1.0, features)
+        let busco_count = if let Some(busco_counts) = &busco_counts {
+            Some(busco_counts.len())
+        } else {
+            None
+        };
+        Self::new(1.0, features, busco_count)
     }
 
     pub fn from_vec_of_vecs(
@@ -342,13 +379,18 @@ impl Features {
                 start += length;
             }
         }
-        Self::new(window_size, features)
+        let busco_count = if let Some(busco_counts) = &busco_counts {
+            Some(busco_counts.len())
+        } else {
+            None
+        };
+        Self::new(window_size, features, busco_count)
     }
 
     pub fn to_string(&self) -> String {
         let mut output = Vec::new();
         for feature in &self.features {
-            output.push(feature.to_string());
+            output.push(feature.to_string(self.busco_count));
         }
         output.join("\n")
     }
@@ -377,6 +419,50 @@ impl Features {
         }
         Ok(())
     }
+
+    pub fn to_ghubs_config(&self) -> GHubsConfig {
+        let mut attributes = HashMap::new();
+        let fields = vec![
+            ("feature_id", FieldType::Keyword, None),
+            ("feature_type", FieldType::Keyword, Some(",")),
+            ("name", FieldType::Keyword, Some(",")),
+            ("sequence_id", FieldType::Keyword, None),
+            ("sequence_name", FieldType::Keyword, Some(",")),
+            ("analysis_name", FieldType::Keyword, None),
+            ("start", FieldType::Long, None),
+            ("end", FieldType::Long, None),
+            ("strand", FieldType::Byte, None),
+            ("length", FieldType::Long, None),
+            ("gc", FieldType::ThreeDP, None),
+            ("coverage", FieldType::TwoDP, None),
+            ("masked", FieldType::ThreeDP, None),
+            ("midpoint", FieldType::Long, None),
+            ("midpoint_proportion", FieldType::Float, None),
+            ("seq_proportion", FieldType::Float, None),
+            ("score", FieldType::HalfFloat, None),
+            ("status", FieldType::Keyword, Some(",")),
+        ];
+        for (field, field_type, separator) in fields {
+            attributes.insert(
+                field.to_string(),
+                GHubsFieldConfig {
+                    header: Some(StringOrVec::Single(field.to_string())),
+                    separator: match separator {
+                        Some(s) => Some(StringOrVec::Single(s.to_string())),
+                        None => None,
+                    },
+                    field_type,
+                    ..Default::default()
+                },
+            );
+        }
+        let config = GHubsConfig {
+            attributes: Some(attributes),
+            ..Default::default()
+        };
+
+        config
+    }
 }
 
 fn per_contig_values(
@@ -396,7 +482,6 @@ fn per_contig_values(
     let busco_counts = if let Some(busco_list) = &meta.busco_list {
         let mut _busco_counts = HashMap::new();
         for busco in busco_list {
-            dbg!(&busco);
             let field_id = format!("{}_count", busco.2);
             let busco_values = blobdir::parse_field_int(field_id.clone(), &blobdir_path)?;
             _busco_counts.insert(field_id.clone(), busco_values);
@@ -467,7 +552,6 @@ fn per_window_values(
     let busco_counts = if let Some(busco_list) = &meta.busco_list {
         let mut _busco_counts = HashMap::new();
         for busco in busco_list {
-            dbg!(&busco);
             let field_name = format!("{}_count", busco.2);
             let field_id = get_window_id(&field_name, window_size);
             let busco_values =
@@ -591,6 +675,7 @@ fn parse_busco(
     meta: &blobdir::Meta,
     busco_dir: &PathBuf,
     sequences: &HashMap<String, &Feature>,
+    _busco_count: usize,
 ) -> Result<Features, anyhow::Error> {
     let mut features = Vec::new();
     if let Some(busco_list) = &meta.busco_list {
@@ -649,6 +734,7 @@ fn parse_busco(
     }
     Ok(Features {
         window_size: 1.0,
+        busco_count: Some(_busco_count),
         features,
     })
 }
@@ -656,7 +742,6 @@ fn parse_busco(
 /// Execute the `index` subcommand from `blobtk`.
 pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
     if options.schema {
-        dbg!("testing");
         let schema = schema_for!(GHubsConfig);
         let mut writer = get_writer(&options.out);
 
@@ -665,7 +750,8 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
     if let Some(blobdir_path) = &options.blobdir {
         let meta = blobdir::parse_blobdir(blobdir_path)?;
         let contig_values = per_contig_values(&meta, blobdir_path)?;
-        dbg!(&contig_values);
+        let yaml_path = options.out.as_ref().unwrap().with_extension("yaml");
+        contig_values.to_ghubs_config().write_yaml(&yaml_path)?;
         let mut sequences = HashMap::new();
         for feature in &contig_values.features {
             sequences.insert(feature.sequence_id.clone(), feature);
@@ -681,8 +767,9 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
             window_values.append_to_file(&options.out)?;
         }
         if let Some(busco_dirs) = &options.busco {
+            let busco_count = meta.busco_list.as_ref().unwrap().len();
             for busco_dir in busco_dirs {
-                let busco_values = parse_busco(&meta, &busco_dir, &sequences)?;
+                let busco_values = parse_busco(&meta, &busco_dir, &sequences, busco_count)?;
                 busco_values.append_to_file(&options.out)?;
             }
         }

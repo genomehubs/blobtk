@@ -243,6 +243,7 @@ dependencies = [
  "nom",
  "nucleo-matcher",
  "num-integer",
+ "numfmt",
  "pyo3",
  "pyo3-build-config",
  "regex",
@@ -715,6 +716,12 @@ dependencies = [
  "quote",
  "syn 2.0.89",
 ]
+
+[[package]]
+name = "dtoa"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6add3b8cff394282be81f3fc1a0605db594ed69890078ca6e2cab1c408bcf04"
 
 [[package]]
 name = "dyn-clone"
@@ -1666,6 +1673,16 @@ name = "number_prefix"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
+name = "numfmt"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db7467e47de9fb6ea5b3f47dc34c1cf0b86359f072a46f6278119544cdbd0021"
+dependencies = [
+ "dtoa",
+ "itoa",
+]
 
 [[package]]
 name = "object"
