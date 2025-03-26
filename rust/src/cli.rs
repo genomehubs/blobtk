@@ -405,6 +405,9 @@ pub struct TaxonomyOptions {
     /// Root taxon/taxa for filtered taxonomy
     #[arg(long = "root-id", short = 'r')]
     pub root_taxon_id: Option<Vec<String>>,
+    /// Leaf taxon/taxa for filtered taxonomy
+    #[arg(long = "leaf-id", short = 'l')]
+    pub leaf_taxon_id: Option<Vec<String>>,
     /// Base taxon for filtered taxonomy lineages
     #[arg(long = "base-id", short = 'b')]
     pub base_taxon_id: Option<String>,
