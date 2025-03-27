@@ -196,7 +196,7 @@ pub fn get_path(dir: &PathBuf, prefix: &str) -> Option<String> {
     None
 }
 
-pub fn remote_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
+pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
     let blobdir = dir.to_str().unwrap();
     if blobdir.starts_with("http") {
         let mut url = format!("{}", dir.to_str().unwrap());
@@ -228,7 +228,7 @@ pub fn remote_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead
     }
 }
 
-pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
+pub fn local_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
     let path = match get_path(dir, prefix) {
         Some(string) => string,
         None => return None,

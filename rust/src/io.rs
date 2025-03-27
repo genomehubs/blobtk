@@ -118,7 +118,47 @@ pub fn get_csv_writer(file_path: &Option<PathBuf>, delimiter: u8) -> csv::Writer
 
 /// Return a BufRead object for a given file path.
 /// If the file path has a `.gz` extension, the file is decompressed on the fly.
+pub fn local_file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
+    let file = File::open(&path)?;
+
+    if path.extension() == Some(OsStr::new("gz")) {
+        Ok(Box::new(BufReader::new(GzDecoder::new(file))))
+    } else {
+        Ok(Box::new(BufReader::new(file)))
+    }
+}
+
+/// Return a BufRead object for a given URL path.
+/// The file will be fetched.
+pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
+    // let response = reqwest::blocking::get(path)?;
+    // let reader = response.bytes()?;
+    // Ok(Box::new(BufReader::new(reader.as_ref()))
+
+    let response = reqwest::blocking::get(url.to_string()).expect("Failed to fetch file");
+    if response.status().is_success() {
+        return Ok(Box::new(BufReader::new(response)));
+    } else {
+        let response = reqwest::blocking::get(url.to_string().replace(".gz", ""))
+            .expect(format!("Failed to fetch file: {}", url).as_str());
+        if response.status().is_success() {
+            return Ok(Box::new(BufReader::new(response)));
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to fetch file: {}", response.status()),
+            ));
+        }
+    }
+}
+
+/// Return a BufRead object for a given file path.
+/// If the path is a URL the file will be fetched.
 pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
+    if path.to_string_lossy().starts_with("http") {
+        return remote_file_reader(&path.to_string_lossy());
+    }
+
     let file = File::open(&path)?;
 
     if path.extension() == Some(OsStr::new("gz")) {
@@ -145,7 +185,6 @@ pub fn get_csv_reader(
 ) -> csv::Reader<Box<dyn BufRead>> {
     let file_reader =
         file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
-
     // Skip the first `skip_lines` lines
     let mut file_reader = Box::new(file_reader);
     for _ in 0..skip_lines {

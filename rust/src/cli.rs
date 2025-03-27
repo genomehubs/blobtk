@@ -186,6 +186,9 @@ pub struct IndexOptions {
     /// Supported values depend on the BlobDir (typically 0.01, 0.1, 1, 100000, 1000000)
     #[arg(long = "window-size", short = 'w', num_args(1..), default_values_t = [1.0], value_parser = window_size_parser, action = clap::ArgAction::Append)]
     pub window_size: Vec<f64>,
+    /// Assembly accession to fetch sequence report from NCBI datasets
+    #[arg(long = "accession", short = 'a')]
+    pub datasets_accession: Option<String>,
     /// Path to BUSCO directory containing files to index
     /// Multiple BUSCO directories can be provided
     #[arg(long, short = 'u', num_args(1..), action = clap::ArgAction::Append)]
@@ -199,7 +202,7 @@ pub struct IndexOptions {
 }
 
 fn window_size_parser(s: &str) -> Result<f64, String> {
-    let mut val = match s.parse::<f64>() {
+    let val = match s.parse::<f64>() {
         Ok(v) => v,
         Err(e) => panic!("{:?}", e),
     };
