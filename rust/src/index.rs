@@ -101,7 +101,12 @@ impl Feature {
         }
     }
 
-    pub fn to_string(&self, busco_count: Option<usize>) -> String {
+    pub fn to_string(
+        &self,
+        taxon_id: &String,
+        assembly_id: &String,
+        busco_count: Option<usize>,
+    ) -> String {
         let busco_counts_str = if let Some(busco_counts) = &self.busco_counts {
             busco_counts
                 .iter()
@@ -136,8 +141,10 @@ impl Feature {
         let seq_proportion_str = f.fmt2(self.seq_proportion).to_string();
 
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             self.feature_id,
+            taxon_id,
+            assembly_id,
             self.sequence_id,
             self.feature_type,
             self.start,
@@ -158,7 +165,7 @@ impl Feature {
     }
 
     pub fn to_header(&self) -> String {
-        let mut header = "feature_id\tsequence_id\tfeature_type\tstart\tend\tstrand\tlength\tgc\tcoverage\tmasked\tmidpoint\tmidpoint_proportion\tseq_proportion\tname\tscore\tstatus".to_string();
+        let mut header = "feature_id\ttaxon_id\tassembly_id\tsequence_id\tfeature_type\tstart\tend\tstrand\tlength\tgc\tcoverage\tmasked\tmidpoint\tmidpoint_proportion\tseq_proportion\tname\tscore\tstatus".to_string();
         if let Some(ref busco_counts) = self.busco_counts {
             let keys = busco_counts.keys();
             for key in keys {
@@ -173,14 +180,24 @@ impl Feature {
 
 #[derive(Debug, Default)]
 pub struct Features {
+    pub taxon_id: String,
+    pub assembly_id: String,
     pub window_size: f64,
     pub busco_count: Option<usize>,
     pub features: Vec<Feature>,
 }
 
 impl Features {
-    pub fn new(window_size: f64, features: Vec<Feature>, busco_count: Option<usize>) -> Self {
+    pub fn new(
+        taxon_id: String,
+        assembly_id: String,
+        window_size: f64,
+        features: Vec<Feature>,
+        busco_count: Option<usize>,
+    ) -> Self {
         Self {
+            taxon_id,
+            assembly_id,
             window_size,
             features,
             busco_count,
@@ -188,6 +205,8 @@ impl Features {
     }
 
     pub fn from_vecs(
+        taxon_id: String,
+        assembly_id: String,
         feature_type: String,
         ids: Vec<String>,
         lengths: Vec<usize>,
@@ -282,10 +301,12 @@ impl Features {
         } else {
             None
         };
-        Self::new(1.0, features, busco_count)
+        Self::new(taxon_id, assembly_id, 1.0, features, busco_count)
     }
 
     pub fn from_vec_of_vecs(
+        taxon_id: String,
+        assembly_id: String,
         window_size: f64,
         feature_type: String,
         ids: Vec<String>,
@@ -306,7 +327,13 @@ impl Features {
             for (j, length) in lengths[i].iter().enumerate() {
                 let length = length.clone();
                 let end = start + length - 1;
-                let feature_id = format!("{}:{}-{}:{}", id, start, end, feature_type);
+                let feature_id = format!(
+                    "{}:{}-{}:{}",
+                    id,
+                    start,
+                    end,
+                    feature_type.split(',').next().unwrap_or(&feature_type)
+                );
                 let sequence_id = id.clone();
                 let feature_type = feature_type.clone();
                 let strand = if let Some(strands) = &strands {
@@ -384,13 +411,13 @@ impl Features {
         } else {
             None
         };
-        Self::new(window_size, features, busco_count)
+        Self::new(taxon_id, assembly_id, window_size, features, busco_count)
     }
 
     pub fn to_string(&self) -> String {
         let mut output = Vec::new();
         for feature in &self.features {
-            output.push(feature.to_string(self.busco_count));
+            output.push(feature.to_string(&self.taxon_id, &self.assembly_id, self.busco_count));
         }
         output.join("\n")
     }
@@ -429,6 +456,8 @@ impl Features {
             ("sequence_id", FieldType::Keyword, None),
             ("sequence_name", FieldType::Keyword, Some(",")),
             ("analysis_name", FieldType::Keyword, None),
+            ("taxon_id", FieldType::Keyword, None),
+            ("assembly_id", FieldType::Keyword, None),
             ("start", FieldType::Long, None),
             ("end", FieldType::Long, None),
             ("strand", FieldType::Byte, None),
@@ -469,6 +498,8 @@ fn per_contig_values(
     meta: &blobdir::Meta,
     blobdir_path: &PathBuf,
 ) -> Result<Features, anyhow::Error> {
+    let taxon_id = meta.taxon.taxid.clone();
+    let assembly_id = meta.assembly.accession.clone();
     let plot_meta = meta.plot.clone();
     let identifiers = blobdir::parse_field_identifiers("identifiers".to_string(), &blobdir_path)?;
     let gc_values = blobdir::parse_field_float("gc".to_string(), &blobdir_path)?;
@@ -494,6 +525,8 @@ fn per_contig_values(
         None
     };
     let features = Features::from_vecs(
+        taxon_id,
+        assembly_id,
         "chromosome".to_string(),
         identifiers,
         length_values,
@@ -526,6 +559,8 @@ fn per_window_values(
     window_size: &f64,
 ) -> Result<Features, anyhow::Error> {
     let plot_meta = meta.plot.clone();
+    let taxon_id = meta.taxon.taxid.clone();
+    let assembly_id = meta.assembly.accession.clone();
 
     let identifiers = blobdir::parse_field_identifiers("identifiers".to_string(), &blobdir_path)?;
     let gc_values =
@@ -569,6 +604,8 @@ fn per_window_values(
         None
     };
     let features = Features::from_vec_of_vecs(
+        taxon_id,
+        assembly_id,
         *window_size,
         format!("window-{},window", window_size),
         identifiers,
@@ -678,6 +715,8 @@ fn window_analysis(meta: &blobdir::Meta, window_size: &f64) -> Analysis {
 }
 
 fn parse_busco(
+    taxon_id: String,
+    assembly_id: String,
     busco_dir: &PathBuf,
     sequences: &HashMap<String, &Feature>,
     busco_count: Option<usize>,
@@ -736,6 +775,8 @@ fn parse_busco(
     }
 
     Ok(Features {
+        taxon_id,
+        assembly_id,
         window_size: 1.0,
         busco_count: busco_count,
         features,
@@ -821,7 +862,10 @@ impl DatasetsSequenceReport {
     }
 }
 
-fn parse_datasets_sequence_report(accession: &str) -> Result<Features, anyhow::Error> {
+fn parse_datasets_sequence_report(
+    accession: &str,
+    taxon_id: Option<String>,
+) -> Result<Features, anyhow::Error> {
     if Command::new("datasets").output().is_err() {
         return Err(anyhow::anyhow!("datasets is not installed"));
     }
@@ -855,10 +899,138 @@ fn parse_datasets_sequence_report(accession: &str) -> Result<Features, anyhow::E
     }
 
     Ok(Features {
+        taxon_id: taxon_id.unwrap_or("None".to_string()),
+        assembly_id: accession.to_string(),
         window_size: 1.0,
         busco_count: None,
         features,
     })
+}
+
+#[derive(Debug, Deserialize)]
+struct BlobToolKitSearch {
+    // accession: String,
+    // alias: String,
+    // bioproject: String,
+    // biosample: String,
+    // prefix: String,
+    // class: String,
+    // family: String,
+    // genus: String,
+    // kingdom: String,
+    // name: String,
+    // order: String,
+    // phylum: String,
+    // superkingdom: String,
+    // taxid: String,
+    // taxon_name: String,
+    // revision: u8,
+    id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct BlobToolKitSearchResults {
+    results: Vec<BlobToolKitSearch>,
+}
+
+fn find_blobtoolkit_url(accession: &str) -> Option<PathBuf> {
+    let blobtoolkit_url = format!(
+        "https://blobtoolkit.genomehubs.org/api/v1/search/{}",
+        accession
+    );
+    dbg!(&blobtoolkit_url);
+    // fetch the blobtoolkit url and parse the json
+    if let Some(output) = Command::new("curl")
+        .args(&["-s", &blobtoolkit_url])
+        .output()
+        .ok()
+    {
+        if !output.status.success() {
+            return None;
+        }
+
+        if let Some(json) = String::from_utf8(output.stdout).ok() {
+            let wrapped_json = format!("{{\"results\":{}}}", json);
+            if let Ok(search_results) =
+                serde_json::from_str::<BlobToolKitSearchResults>(&wrapped_json)
+            {
+                if search_results.results.len() == 0 {
+                    return None;
+                }
+                let blobtoolkit_id = &search_results.results[0].id;
+                let blobtoolkit_path = PathBuf::from(format!(
+                    "https://blobtoolkit.genomehubs.org/api/v1/dataset/id/{}",
+                    blobtoolkit_id
+                ));
+                return Some(blobtoolkit_path);
+            } else {
+                return None;
+            }
+        };
+    }
+    None
+}
+
+fn lookup_goat_lineages(taxon_id: String) -> Result<Vec<String>, anyhow::Error> {
+    // use curl to fetch directly from the API
+    let url = format!(
+        "https://goat.genomehubs.org/api/v2/search?query=tax_lineage%28{}%29&result=taxon&fields=odb10_lineage&includeEstimates=true&taxonomy=ncbi",
+        taxon_id
+    );
+    let output = Command::new("curl").args(&["-s", &url]).output()?;
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "Error fetching lineages: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let lineages = String::from_utf8(output.stdout)?;
+    let lineages: serde_json::Value = serde_json::from_str(&lineages)?;
+    dbg!(&lineages["results"][0]["result"]["fields"]["odb10_lineage"]["value"]);
+    let lineages = lineages["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|result| {
+            result["result"]["fields"]["odb10_lineage"]["value"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect::<Vec<String>>();
+
+    Ok(lineages)
+}
+
+fn process_busco_dirs(
+    busco_dirs: &Vec<PathBuf>,
+    taxon_id: String,
+) -> Result<Vec<PathBuf>, anyhow::Error> {
+    let mut processed_busco_dirs = Vec::new();
+    // if only one busco dir is provided and it does not end with \w+_odb\d+,
+    // assume it is a directory containing multiple busco results
+    // lookup the set of relevant lineages using goat and add to busco_dirs
+    if busco_dirs.len() == 1 {
+        let busco_dir = &busco_dirs[0];
+        if let Some(busco_dir_name) = busco_dir.file_name() {
+            let regex = regex::Regex::new(r"(\w+_odb\d+)").unwrap();
+            if !regex.is_match(busco_dir_name.to_str().unwrap()) {
+                let lineages = lookup_goat_lineages(taxon_id)?;
+                for lineage in lineages {
+                    let lineage_dir = busco_dir.join(lineage);
+                    // if lineage_dir.exists() {
+                    processed_busco_dirs.push(lineage_dir);
+                    // }
+                }
+            } else {
+                processed_busco_dirs.push(busco_dir.clone());
+            }
+        }
+    } else {
+        processed_busco_dirs = busco_dirs.clone();
+    }
+    Ok(processed_busco_dirs)
 }
 
 /// Execute the `index` subcommand from `blobtk`.
@@ -874,15 +1046,44 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
         ..Default::default()
     };
     let mut busco_count = None;
-    if let Some(datasets_accession) = &options.datasets_accession {
-        contig_values = parse_datasets_sequence_report(datasets_accession)?;
-        contig_values.to_file(&options.out)?;
+    let mut accession = options.datasets_accession.clone();
+    let mut optional_blobdir_path = options.blobdir.clone();
+    if let Some(datasets_accession) = &accession {
+        if optional_blobdir_path.is_none() {
+            optional_blobdir_path = find_blobtoolkit_url(datasets_accession);
+        }
+        if optional_blobdir_path.is_none() && options.taxon_id.is_none() {
+            return Err(anyhow::anyhow!(
+                "No BlobToolKit URL found for {}. Please provide a taxon_id",
+                datasets_accession
+            ));
+        }
+        contig_values =
+            parse_datasets_sequence_report(datasets_accession, options.taxon_id.clone())?;
     }
-    if let Some(blobdir_path) = &options.blobdir {
-        let meta = blobdir::parse_blobdir(blobdir_path)?;
+    dbg!(&optional_blobdir_path);
+    if let Some(blobdir_path) = optional_blobdir_path {
+        let meta = blobdir::parse_blobdir(&blobdir_path)?;
+        if accession.is_none() {
+            accession = Some(meta.assembly.accession.clone());
+        }
         if contig_values.features.is_empty() {
-            contig_values = per_contig_values(&meta, blobdir_path)?;
+            contig_values = per_contig_values(&meta, &blobdir_path)?;
             contig_values.to_file(&options.out)?;
+        } else {
+            let btk_contig_values = per_contig_values(&meta, &blobdir_path)?;
+            // add busco counts from btk_contig_values to contig_values
+            // match on sequence_id
+            for feature in &mut contig_values.features {
+                if let Some(btk_feature) = btk_contig_values
+                    .features
+                    .iter()
+                    .find(|f| f.sequence_id == feature.sequence_id)
+                {
+                    feature.busco_counts = btk_feature.busco_counts.clone();
+                }
+            }
+            contig_values.taxon_id = btk_contig_values.taxon_id;
             contig_values.to_file(&options.out)?;
         }
 
@@ -890,7 +1091,7 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
             if window == &1.0 {
                 continue;
             }
-            let window_values = per_window_values(&meta, blobdir_path, &contig_values, window)?;
+            let window_values = per_window_values(&meta, &blobdir_path, &contig_values, window)?;
             let window_analysis = window_analysis(&meta, window);
             window_values.append_to_file(&options.out)?;
         }
@@ -906,10 +1107,21 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
         for feature in &contig_values.features {
             sequences.insert(feature.sequence_id.clone(), feature);
         }
+        let accession = accession.unwrap_or("None".to_string());
+        let taxon_id = contig_values.taxon_id.clone();
 
         if let Some(busco_dirs) = &options.busco {
-            for busco_dir in busco_dirs {
-                let busco_values = parse_busco(&busco_dir, &sequences, busco_count)?;
+            let processed_busco_dirs = process_busco_dirs(busco_dirs, taxon_id.clone())?;
+
+            for busco_dir in processed_busco_dirs {
+                dbg!(&busco_dir);
+                let busco_values = parse_busco(
+                    taxon_id.clone(),
+                    accession.clone(),
+                    &busco_dir,
+                    &sequences,
+                    busco_count,
+                )?;
                 busco_values.append_to_file(&options.out)?;
             }
         }

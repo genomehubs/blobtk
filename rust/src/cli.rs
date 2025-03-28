@@ -186,6 +186,9 @@ pub struct IndexOptions {
     /// Supported values depend on the BlobDir (typically 0.01, 0.1, 1, 100000, 1000000)
     #[arg(long = "window-size", short = 'w', num_args(1..), default_values_t = [1.0], value_parser = window_size_parser, action = clap::ArgAction::Append)]
     pub window_size: Vec<f64>,
+    /// Taxon ID for the assembly
+    #[arg(long = "taxon-id", short = 't')]
+    pub taxon_id: Option<String>,
     /// Assembly accession to fetch sequence report from NCBI datasets
     #[arg(long = "accession", short = 'a')]
     pub datasets_accession: Option<String>,
