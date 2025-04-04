@@ -182,6 +182,7 @@ pub fn get_csv_reader(
     has_headers: bool,
     comment_char: Option<u8>,
     skip_lines: usize,
+    flexible: bool,
 ) -> csv::Reader<Box<dyn BufRead>> {
     let file_reader =
         file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
@@ -196,6 +197,7 @@ pub fn get_csv_reader(
         .delimiter(delimiter)
         .has_headers(has_headers)
         .comment(comment_char)
+        .flexible(flexible) // Allow incomplete rows
         .from_reader(file_reader)
 }
 

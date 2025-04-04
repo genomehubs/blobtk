@@ -524,7 +524,7 @@ impl Nodes {
             },
         );
 
-        let mut rdr = io::get_csv_reader(&Some(gbif_backbone), b'\t', false, None, 0);
+        let mut rdr = io::get_csv_reader(&Some(gbif_backbone), b'\t', false, None, 0, false);
 
         // Status can be:
         // ACCEPTED
