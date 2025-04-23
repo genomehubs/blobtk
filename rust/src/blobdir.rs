@@ -1022,7 +1022,13 @@ pub fn get_window_values(
     let mut axis_limits = HashMap::new();
     let mut cat_values = vec![];
     let field_list = meta.field_list.clone().unwrap();
-    for (axis, id) in plot_map {
+    let axes = vec!["x", "y", "z", "cat"];
+    for axis in axes {
+        let default_id = "_".to_string();
+        let id = plot_map.get(axis).unwrap_or(&default_id);
+        if id == "_" {
+            continue;
+        }
         let window_id = match window_size {
             Some(ref size) if size != "0.1" => format!("{}_windows_{}", id, size),
             _ => format!("{}_windows", id),
@@ -1040,8 +1046,8 @@ pub fn get_window_values(
                             blobdir,
                             Some(wanted_indices),
                         )?;
-                        plot_values.insert(axis.clone(), values);
-                        axis_limits.insert(axis.clone(), [min_value, max_value]);
+                        plot_values.insert(axis.to_string(), values);
+                        axis_limits.insert(axis.to_string(), [min_value, max_value]);
                     }
                     Some(Datatype::String) => {
                         cat_values = parse_field_cat_windows(
@@ -1076,6 +1082,26 @@ pub fn get_window_values(
                 }
             }
         };
+        if axis == "cat" && (cat_values.is_empty() || cat_values[0].is_empty()) {
+            let window_counts = plot_values
+                .get("x")
+                .unwrap()
+                .iter()
+                .map(|x| x.len())
+                .collect::<Vec<usize>>();
+            let _single_cat_values = parse_field_cat(id.clone(), blobdir)?;
+            let mut single_cat_values: Vec<(String, usize)> = vec![];
+            for i in wanted_indices {
+                single_cat_values.push(_single_cat_values[*i].clone());
+            }
+            for (i, window_count) in window_counts.iter().enumerate() {
+                if *window_count > 0 {
+                    cat_values.push(vec![Some(single_cat_values[i].clone()); *window_count]);
+                } else {
+                    cat_values.push(vec![None; *window_count]);
+                }
+            }
+        }
     }
     Ok((plot_values, cat_values, axis_limits))
 }

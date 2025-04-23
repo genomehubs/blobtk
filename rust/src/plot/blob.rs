@@ -345,6 +345,16 @@ pub fn blob_points(
     match options.shape {
         Some(Shape::Grid) => {
             for (i, x) in x_scaled.iter().enumerate() {
+                if blob_data.cat.len() <= i || blob_data.cat[i].is_none() {
+                    points.push(ScatterPoint {
+                        x: *x,
+                        y: y_scaled[i],
+                        z: z_scaled[i] * 1.5,
+                        data_index: i,
+                        ..Default::default()
+                    });
+                    continue;
+                }
                 if let Some(cat_index) = blob_data.cat[i] {
                     if blob_data.cat_order.len() < cat_index + 1 {
                         continue;
@@ -361,14 +371,6 @@ pub fn blob_points(
                     };
                     points.push(point.clone());
                     fg_points.push(point.clone());
-                } else {
-                    points.push(ScatterPoint {
-                        x: *x,
-                        y: y_scaled[i],
-                        z: z_scaled[i] * 1.5,
-                        data_index: i,
-                        ..Default::default()
-                    })
                 }
             }
             points.extend(fg_points);

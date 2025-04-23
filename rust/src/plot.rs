@@ -438,13 +438,17 @@ fn set_grid_data(
             x: x.clone(),
             y: window_values["y"][i].clone(),
             z: window_values["z"][i].clone(),
-            cat: window_cat_values[i]
-                .iter()
-                .map(|c| match c {
-                    Some((_, idx)) => Some(idx.to_owned() + 1),
-                    None => None,
-                })
-                .collect(),
+            cat: if let Some(cat_values) = window_cat_values.get(i) {
+                cat_values
+                    .iter()
+                    .map(|c| match c {
+                        Some((_, idx)) => Some(idx.to_owned() + 1),
+                        None => None,
+                    })
+                    .collect()
+            } else {
+                vec![]
+            },
             cat_order: cat_order.clone(),
             title: Some(filtered_identifiers[i].clone()),
         })
@@ -597,7 +601,10 @@ pub fn plot_grid(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(),
         ..Default::default()
     };
     let mut ratios = None;
-    if Some("position".to_string()) == options.x_field && options.x_limit.is_none() {
+    if Some("position".to_string()) == options.x_field
+        && options.x_limit.is_none()
+        && grid_data.len() > 0
+    {
         let (_, num_rows) = calculate_grid_size(grid_data.len());
         let max_values = grid_data
             .chunks(num_rows)
