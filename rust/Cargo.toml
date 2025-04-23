@@ -54,7 +54,7 @@ num-integer = "0.1.45"
 numfmt = "1.1.1"
 pyo3 = { version = "0.18.1", features = ["extension-module"] }
 regex = "1.7.0"
-reqwest = { version = "0.11", features = ["blocking"] }
+reqwest = { version = "0.11", features = ["blocking", "rustls-tls"], default-features = false }
 resvg = "0.31.0"
 rust-htslib = "0.40.2"
 rust_decimal = "1.29.1"
