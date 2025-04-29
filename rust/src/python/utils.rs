@@ -180,18 +180,6 @@ pub fn extract_to_view(py: Python<'_>, map: &HashMap<String, PyObject>, key: &st
     value
 }
 
-pub fn extract_to_shape(py: Python<'_>, map: &HashMap<String, PyObject>, key: &str) -> Shape {
-    let hash_key = String::from(key);
-    let value: Shape = match map.get(&hash_key) {
-        Some(value) => match value.extract::<String>(py).unwrap().parse() {
-            Ok(view) => view,
-            _ => Shape::Circle,
-        },
-        _ => Shape::Circle,
-    };
-    value
-}
-
 pub fn extract_to_option_shape(
     py: Python<'_>,
     map: &HashMap<String, PyObject>,

@@ -315,21 +315,44 @@ pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOption
 pub fn composition_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
     let precision = options.precision;
-    let gc_prop = format_si(&(snail_stats.gc_proportion as f64 * 100.0), precision);
-    let at_prop = format_si(&(snail_stats.at_proportion as f64 * 100.0), precision);
-    let n_prop = format_si(&(snail_stats.n_proportion as f64 * 100.0), precision);
+    let show_numbers = options.show_numbers;
+    let suff = if show_numbers { "" } else { "%" };
+    let gc_prop = if show_numbers {
+        format_si(
+            &(snail_stats.gc_proportion as f64 * snail_stats.span as f64),
+            precision,
+        )
+    } else {
+        format_si(&(snail_stats.gc_proportion as f64 * 100.0), precision)
+    };
+    let at_prop = if show_numbers {
+        format_si(
+            &(snail_stats.at_proportion as f64 * snail_stats.span as f64),
+            precision,
+        )
+    } else {
+        format_si(&(snail_stats.at_proportion as f64 * 100.0), precision)
+    };
+    let n_prop = if show_numbers {
+        format_si(
+            &(snail_stats.n_proportion as f64 * snail_stats.span as f64),
+            precision,
+        )
+    } else {
+        format_si(&(snail_stats.n_proportion as f64 * 100.0), precision)
+    };
     entries.push(LegendEntry {
-        title: format!("GC ({}%)", gc_prop),
+        title: format!("GC ({}{})", gc_prop, suff),
         color: "#1f78b4".to_string(),
         ..Default::default()
     });
     entries.push(LegendEntry {
-        title: format!("AT ({}%)", at_prop),
+        title: format!("AT ({}{})", at_prop, suff),
         color: "#a6cee3".to_string(),
         ..Default::default()
     });
     entries.push(LegendEntry {
-        title: format!("N ({}%)", n_prop),
+        title: format!("N ({}{})", n_prop, suff),
         color: "#ffffff".to_string(),
         ..Default::default()
     });
@@ -378,46 +401,64 @@ pub fn dataset_name_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) -> Gr
 pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
     let precision = options.precision;
-    let comp_prop = format_si(
-        &(snail_stats.busco_complete as f64 / snail_stats.busco_total as f64 * 100.0),
-        precision,
-    );
-    let dup_prop = format_si(
-        &(snail_stats.busco_duplicated as f64 / snail_stats.busco_total as f64 * 100.0),
-        precision,
-    );
-    let frag_prop = format_si(
-        &(snail_stats.busco_fragmented as f64 / snail_stats.busco_total as f64 * 100.0),
-        precision,
-    );
-    let missing_prop = format_si(
-        &((snail_stats.busco_total - snail_stats.busco_complete) as f64
-            / snail_stats.busco_total as f64
-            * 100.0),
-        precision,
-    );
+    let show_numbers = options.show_numbers;
+    let suff = if show_numbers { "" } else { "%" };
+    let comp_prop = if show_numbers {
+        snail_stats.busco_complete.to_string()
+    } else {
+        format_si(
+            &(snail_stats.busco_complete as f64 / snail_stats.busco_total as f64 * 100.0),
+            precision,
+        )
+    };
+    let dup_prop = if show_numbers {
+        snail_stats.busco_duplicated.to_string()
+    } else {
+        format_si(
+            &(snail_stats.busco_duplicated as f64 / snail_stats.busco_total as f64 * 100.0),
+            precision,
+        )
+    };
+    let frag_prop = if show_numbers {
+        snail_stats.busco_fragmented.to_string()
+    } else {
+        format_si(
+            &(snail_stats.busco_fragmented as f64 / snail_stats.busco_total as f64 * 100.0),
+            precision,
+        )
+    };
+    let missing_prop = if show_numbers {
+        (snail_stats.busco_total - snail_stats.busco_complete).to_string()
+    } else {
+        format_si(
+            &((snail_stats.busco_total - snail_stats.busco_complete) as f64
+                / snail_stats.busco_total as f64
+                * 100.0),
+            precision,
+        )
+    };
     let subtitle = format!(
         "{} ({})",
         snail_stats.busco_lineage,
         snail_stats.busco_total()
     );
     entries.push(LegendEntry {
-        title: format!("Comp. ({}%)", comp_prop),
+        title: format!("Comp. ({}{})", comp_prop, suff),
         color: "#33a02c".to_string(),
         ..Default::default()
     });
     entries.push(LegendEntry {
-        title: format!("Dupl. ({}%)", dup_prop),
+        title: format!("Dupl. ({}{})", dup_prop, suff),
         color: "#20641b".to_string(),
         ..Default::default()
     });
     entries.push(LegendEntry {
-        title: format!("Frag. ({}%)", frag_prop),
+        title: format!("Frag. ({}{})", frag_prop, suff),
         color: "#a3e27f".to_string(),
         ..Default::default()
     });
     entries.push(LegendEntry {
-        title: format!("Missing ({}%)", missing_prop),
+        title: format!("Missing ({}{})", missing_prop, suff),
         color: "#ffffff".to_string(),
         ..Default::default()
     });

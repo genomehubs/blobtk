@@ -4,7 +4,7 @@ use crate::blobdir::parse_blobdir;
 use crate::cli::{self, PlotOptions, View};
 use crate::plot::{plot_blob, plot_cumulative, plot_legend, plot_snail};
 use crate::python::utils::{
-    extract_to_option_f64, extract_to_option_origin, extract_to_option_palette,
+    extract_to_bool, extract_to_option_f64, extract_to_option_origin, extract_to_option_palette,
     extract_to_option_reducer, extract_to_option_scale, extract_to_option_shape,
     extract_to_option_showlegend, extract_to_option_string, extract_to_option_usize,
     extract_to_option_vec_string, extract_to_pathbuf, extract_to_view,
@@ -49,6 +49,7 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
     let precision = extract_to_option_usize(py, &map, "precision");
     let cat_count = extract_to_option_usize(py, &map, "cat_count");
     let show_legend = extract_to_option_showlegend(py, &map, "show_legend");
+    let show_numbers = extract_to_bool(py, &map, "show_numbers");
     let cat_order = extract_to_option_string(py, &map, "cat_order");
     let origin = extract_to_option_origin(py, &map, "origin");
     let palette = extract_to_option_palette(py, &map, "palette");
@@ -78,6 +79,7 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         precision: precision.unwrap_or(3) as u32,
         cat_count: cat_count.unwrap_or(10),
         show_legend: show_legend.unwrap_or_default(),
+        show_numbers,
         cat_order,
         origin,
         palette,

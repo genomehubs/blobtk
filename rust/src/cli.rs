@@ -366,9 +366,6 @@ pub struct PlotOptions {
     /// Y-axis limits for blob/cumulative plot (<min>,<max>)
     #[arg(long = "y-limit")]
     pub y_limit: Option<String>,
-    /// Numerical precision when rounding for display
-    #[arg(long = "precision", default_value_t = 3)]
-    pub precision: u32,
     /// Maximum number of categories for blob/cumulative plot
     #[arg(long = "cat-count", default_value_t = 10)]
     pub cat_count: usize,
@@ -387,6 +384,12 @@ pub struct PlotOptions {
     /// Individual colours to modify palette (<index>=<hexcode>)
     #[arg(long)]
     pub color: Option<Vec<String>>,
+    /// [experimental] Numerical precision when rounding for display
+    #[arg(long = "precision", default_value_t = 3)]
+    pub precision: u32,
+    /// [experimental] Flag to show numbers instead of percentages in snail plot legend
+    #[arg(long = "show-numbers", default_value_t = false)]
+    pub show_numbers: bool,
 }
 
 /// Valid taxonomy formats
