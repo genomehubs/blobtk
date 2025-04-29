@@ -366,6 +366,9 @@ pub struct PlotOptions {
     /// Y-axis limits for blob/cumulative plot (<min>,<max>)
     #[arg(long = "y-limit")]
     pub y_limit: Option<String>,
+    /// Numerical precision when rounding for display
+    #[arg(long = "precision", default_value_t = 3)]
+    pub precision: u32,
     /// Maximum number of categories for blob/cumulative plot
     #[arg(long = "cat-count", default_value_t = 10)]
     pub cat_count: usize,

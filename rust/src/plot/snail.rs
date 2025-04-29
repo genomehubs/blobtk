@@ -267,13 +267,20 @@ pub fn snail_stats(
 
 pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
-    let scaffold_count = format_si(&(snail_stats.scaffold_count() as f64), 3);
-    let scaffold_length = format_si(&(snail_stats.span() as f64), 3);
-    let longest_scaffold = format_si(&(snail_stats.scaffolds()[0] as f64), 3);
+    let precision = options.precision;
+    let scaffold_count = format_si(&(snail_stats.scaffold_count() as f64), precision);
+    let scaffold_length = format_si(&(snail_stats.span() as f64), precision);
+    let longest_scaffold = format_si(&(snail_stats.scaffolds()[0] as f64), precision);
     let n50_bin = (options.segments / 2) - 1;
     let n90_bin = (options.segments * 9 / 10) - 1;
-    let n50_length = format_si(&(snail_stats.binned_scaffold_lengths()[n50_bin] as f64), 3);
-    let n90_length = format_si(&(snail_stats.binned_scaffold_lengths()[n90_bin] as f64), 3);
+    let n50_length = format_si(
+        &(snail_stats.binned_scaffold_lengths()[n50_bin] as f64),
+        precision,
+    );
+    let n90_length = format_si(
+        &(snail_stats.binned_scaffold_lengths()[n90_bin] as f64),
+        precision,
+    );
     let record = snail_stats.record_type();
     entries.push(LegendEntry {
         title: format!("Log10 {} count (total {})", record, scaffold_count),
@@ -305,11 +312,12 @@ pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOption
     legend_group(title, entries, None, 1)
 }
 
-pub fn composition_stats_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) -> Group {
+pub fn composition_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
-    let gc_prop = format_si(&(snail_stats.gc_proportion as f64 * 100.0), 3);
-    let at_prop = format_si(&(snail_stats.at_proportion as f64 * 100.0), 3);
-    let n_prop = format_si(&(snail_stats.n_proportion as f64 * 100.0), 3);
+    let precision = options.precision;
+    let gc_prop = format_si(&(snail_stats.gc_proportion as f64 * 100.0), precision);
+    let at_prop = format_si(&(snail_stats.at_proportion as f64 * 100.0), precision);
+    let n_prop = format_si(&(snail_stats.n_proportion as f64 * 100.0), precision);
     entries.push(LegendEntry {
         title: format!("GC ({}%)", gc_prop),
         color: "#1f78b4".to_string(),
@@ -332,6 +340,7 @@ pub fn composition_stats_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) 
 
 pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
+    let precision = options.precision;
     let max_span = match options.max_span {
         Some(span) => span,
         None => snail_stats.span(),
@@ -340,8 +349,8 @@ pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
         Some(scaffold_length) => scaffold_length,
         None => snail_stats.scaffolds()[0],
     };
-    let circ_prop = format_si(&(max_span as f64), 3);
-    let rad_prop = format_si(&(max_scaffold as f64), 3);
+    let circ_prop = format_si(&(max_span as f64), precision);
+    let rad_prop = format_si(&(max_scaffold as f64), precision);
     entries.push(LegendEntry {
         title: format!("{}", circ_prop),
         color: "#ffffff".to_string(),
@@ -366,25 +375,26 @@ pub fn dataset_name_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) -> Gr
     legend_group(title, entries, None, 1)
 }
 
-pub fn busco_stats_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) -> Group {
+pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
+    let precision = options.precision;
     let comp_prop = format_si(
         &(snail_stats.busco_complete as f64 / snail_stats.busco_total as f64 * 100.0),
-        3,
+        precision,
     );
     let dup_prop = format_si(
         &(snail_stats.busco_duplicated as f64 / snail_stats.busco_total as f64 * 100.0),
-        3,
+        precision,
     );
     let frag_prop = format_si(
         &(snail_stats.busco_fragmented as f64 / snail_stats.busco_total as f64 * 100.0),
-        3,
+        precision,
     );
     let missing_prop = format_si(
         &((snail_stats.busco_total - snail_stats.busco_complete) as f64
             / snail_stats.busco_total as f64
             * 100.0),
-        3,
+        precision,
     );
     let subtitle = format!(
         "{} ({})",
