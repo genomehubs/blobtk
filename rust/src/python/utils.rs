@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 
 use crate::cli::Origin;
 use crate::cli::Palette;
+use crate::cli::RoundingStrategyWrapper;
 use crate::cli::Shape;
 use crate::cli::View;
 use crate::plot::axis::Scale;
@@ -255,6 +256,19 @@ pub fn extract_to_option_palette(
             Ok(palette) => Some(palette),
             _ => None,
         },
+        _ => None,
+    };
+    option
+}
+
+pub fn extract_to_option_rounding_strategy(
+    py: Python<'_>,
+    map: &HashMap<String, PyObject>,
+    key: &str,
+) -> Option<RoundingStrategyWrapper> {
+    let hash_key = String::from(key);
+    let option: Option<RoundingStrategyWrapper> = match map.get(&hash_key) {
+        Some(value) => value.extract::<RoundingStrategyWrapper>(py).ok(),
         _ => None,
     };
     option

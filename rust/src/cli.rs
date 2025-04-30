@@ -7,6 +7,7 @@ use std::str::FromStr;
 use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use clap_num::number_range;
 use pyo3::pyclass;
+use rust_decimal::RoundingStrategy;
 use serde;
 use serde::{Deserialize, Serialize};
 
@@ -387,9 +388,63 @@ pub struct PlotOptions {
     /// [experimental] Numerical precision when rounding for display
     #[arg(long = "precision", default_value_t = 3)]
     pub precision: u32,
+    // [experimental] Flag to choose the rounding method
+    #[arg(long = "rounding", value_enum)]
+    pub rounding: Option<RoundingStrategyWrapper>,
     /// [experimental] Flag to show numbers instead of percentages in snail plot legend
     #[arg(long = "show-numbers", default_value_t = false)]
     pub show_numbers: bool,
+    /// [experimental] Flag to show busco numbers instead of percentages in snail plot legend
+    #[arg(long = "busco-numbers", default_value_t = false)]
+    pub busco_numbers: bool,
+}
+
+#[derive(ValueEnum, Clone, Debug, Default)]
+#[pyclass]
+pub enum RoundingStrategyWrapper {
+    #[default]
+    #[clap(name = "round")]
+    MidpointAwayFromZero,
+    #[clap(name = "down")]
+    ToZero,
+    #[clap(name = "up")]
+    AwayFromZero,
+}
+
+impl From<RoundingStrategyWrapper> for RoundingStrategy {
+    fn from(wrapper: RoundingStrategyWrapper) -> Self {
+        match wrapper {
+            RoundingStrategyWrapper::MidpointAwayFromZero => RoundingStrategy::MidpointAwayFromZero,
+            RoundingStrategyWrapper::ToZero => RoundingStrategy::ToZero,
+            RoundingStrategyWrapper::AwayFromZero => RoundingStrategy::AwayFromZero,
+        }
+    }
+}
+
+impl From<RoundingStrategy> for RoundingStrategyWrapper {
+    fn from(strategy: RoundingStrategy) -> Self {
+        match strategy {
+            RoundingStrategy::MidpointAwayFromZero => RoundingStrategyWrapper::MidpointAwayFromZero,
+            RoundingStrategy::ToZero => RoundingStrategyWrapper::ToZero,
+            RoundingStrategy::AwayFromZero => RoundingStrategyWrapper::AwayFromZero,
+            _ => RoundingStrategyWrapper::MidpointAwayFromZero,
+        }
+    }
+}
+
+impl RoundingStrategyWrapper {
+    pub fn from_str(input: &str) -> Result<RoundingStrategy, ()> {
+        match input {
+            "round" => Ok(RoundingStrategy::MidpointAwayFromZero),
+            "down" => Ok(RoundingStrategy::ToZero),
+            "up" => Ok(RoundingStrategy::AwayFromZero),
+            _ => Err(()),
+        }
+    }
+
+    pub fn default() -> RoundingStrategy {
+        RoundingStrategy::MidpointAwayFromZero
+    }
 }
 
 /// Valid taxonomy formats

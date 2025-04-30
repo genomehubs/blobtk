@@ -268,18 +268,29 @@ pub fn snail_stats(
 pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
     let precision = options.precision;
-    let scaffold_count = format_si(&(snail_stats.scaffold_count() as f64), precision);
-    let scaffold_length = format_si(&(snail_stats.span() as f64), precision);
-    let longest_scaffold = format_si(&(snail_stats.scaffolds()[0] as f64), precision);
+    let rounding = options.rounding.clone();
+    let scaffold_count = format_si(
+        &(snail_stats.scaffold_count() as f64),
+        precision,
+        rounding.clone(),
+    );
+    let scaffold_length = format_si(&(snail_stats.span() as f64), precision, rounding.clone());
+    let longest_scaffold = format_si(
+        &(snail_stats.scaffolds()[0] as f64),
+        precision,
+        rounding.clone(),
+    );
     let n50_bin = (options.segments / 2) - 1;
     let n90_bin = (options.segments * 9 / 10) - 1;
     let n50_length = format_si(
         &(snail_stats.binned_scaffold_lengths()[n50_bin] as f64),
         precision,
+        rounding.clone(),
     );
     let n90_length = format_si(
         &(snail_stats.binned_scaffold_lengths()[n90_bin] as f64),
         precision,
+        rounding.clone(),
     );
     let record = snail_stats.record_type();
     entries.push(LegendEntry {
@@ -315,31 +326,47 @@ pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOption
 pub fn composition_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
     let precision = options.precision;
+    let rounding = options.rounding.clone();
     let show_numbers = options.show_numbers;
     let suff = if show_numbers { "" } else { "%" };
     let gc_prop = if show_numbers {
         format_si(
             &(snail_stats.gc_proportion as f64 * snail_stats.span as f64),
             precision,
+            rounding.clone(),
         )
     } else {
-        format_si(&(snail_stats.gc_proportion as f64 * 100.0), precision)
+        format_si(
+            &(snail_stats.gc_proportion as f64 * 100.0),
+            precision,
+            rounding.clone(),
+        )
     };
     let at_prop = if show_numbers {
         format_si(
             &(snail_stats.at_proportion as f64 * snail_stats.span as f64),
             precision,
+            rounding.clone(),
         )
     } else {
-        format_si(&(snail_stats.at_proportion as f64 * 100.0), precision)
+        format_si(
+            &(snail_stats.at_proportion as f64 * 100.0),
+            precision,
+            rounding.clone(),
+        )
     };
     let n_prop = if show_numbers {
         format_si(
             &(snail_stats.n_proportion as f64 * snail_stats.span as f64),
             precision,
+            rounding.clone(),
         )
     } else {
-        format_si(&(snail_stats.n_proportion as f64 * 100.0), precision)
+        format_si(
+            &(snail_stats.n_proportion as f64 * 100.0),
+            precision,
+            rounding.clone(),
+        )
     };
     entries.push(LegendEntry {
         title: format!("GC ({}{})", gc_prop, suff),
@@ -364,6 +391,7 @@ pub fn composition_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOpt
 pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
     let precision = options.precision;
+    let rounding = options.rounding.clone();
     let max_span = match options.max_span {
         Some(span) => span,
         None => snail_stats.span(),
@@ -372,8 +400,8 @@ pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
         Some(scaffold_length) => scaffold_length,
         None => snail_stats.scaffolds()[0],
     };
-    let circ_prop = format_si(&(max_span as f64), precision);
-    let rad_prop = format_si(&(max_scaffold as f64), precision);
+    let circ_prop = format_si(&(max_span as f64), precision, rounding.clone());
+    let rad_prop = format_si(&(max_scaffold as f64), precision, rounding.clone());
     entries.push(LegendEntry {
         title: format!("{}", circ_prop),
         color: "#ffffff".to_string(),
@@ -401,7 +429,8 @@ pub fn dataset_name_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) -> Gr
 pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
     let mut entries = vec![];
     let precision = options.precision;
-    let show_numbers = options.show_numbers;
+    let rounding = options.rounding.clone();
+    let show_numbers = options.show_numbers || options.busco_numbers;
     let suff = if show_numbers { "" } else { "%" };
     let comp_prop = if show_numbers {
         snail_stats.busco_complete.to_string()
@@ -409,6 +438,7 @@ pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
         format_si(
             &(snail_stats.busco_complete as f64 / snail_stats.busco_total as f64 * 100.0),
             precision,
+            rounding.clone(),
         )
     };
     let dup_prop = if show_numbers {
@@ -417,6 +447,7 @@ pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
         format_si(
             &(snail_stats.busco_duplicated as f64 / snail_stats.busco_total as f64 * 100.0),
             precision,
+            rounding.clone(),
         )
     };
     let frag_prop = if show_numbers {
@@ -425,6 +456,7 @@ pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
         format_si(
             &(snail_stats.busco_fragmented as f64 / snail_stats.busco_total as f64 * 100.0),
             precision,
+            rounding.clone(),
         )
     };
     let missing_prop = if show_numbers {
@@ -435,6 +467,7 @@ pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
                 / snail_stats.busco_total as f64
                 * 100.0),
             precision,
+            rounding.clone(),
         )
     };
     let subtitle = format!(

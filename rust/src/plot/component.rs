@@ -497,7 +497,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                     }
                     while i <= domain[1].clone() {
                         let label = if i >= min_value.clone() {
-                            format_si(&i, 3)
+                            format_si(&i, 3, None)
                         } else {
                             String::new()
                         };
@@ -523,7 +523,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                         let mut j = i * 2.0;
                         while j < i * 10.0 && j <= domain[1].clone() {
                             let label = if j >= min_value.clone() {
-                                format_si(&j, 3)
+                                format_si(&j, 3, None)
                             } else {
                                 String::new()
                             };
@@ -570,7 +570,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                     let mut i = step * (min_value / step).ceil();
                     while i <= domain[1].clone() {
                         let label = if i >= min_value.clone() {
-                            format_si(&i, 3)
+                            format_si(&i, 3, None)
                         } else {
                             String::new()
                         };
@@ -631,7 +631,7 @@ pub fn set_axis_ticks(
             }
             while i <= max_value.clone() {
                 let label = if i > min_value.clone() {
-                    format_si(&i, 3)
+                    format_si(&i, 3, None)
                 } else {
                     String::new()
                 };
@@ -826,7 +826,11 @@ pub fn set_axis_ticks_circular(
         // }
         for i in (divisor..bin_count + 1).step_by(divisor) {
             let label = format!("{}", ((i) as f64 / bin_count as f64 * 100.0) as u64);
-            let outer_label = format_si(&(span as f64 / tick_count as f64 * ticks.len() as f64), 3);
+            let outer_label = format_si(
+                &(span as f64 / tick_count as f64 * ticks.len() as f64),
+                3,
+                None,
+            );
             ticks.push(set_tick_circular(
                 i,
                 0.0,
@@ -864,7 +868,11 @@ pub fn set_axis_ticks_circular(
             let adj_sum = sum + 0.001;
             let index = adj_sum.floor() as usize;
             let label = format!("{}", (sum / bin_count as f64 * 100.0).round() as u64);
-            let outer_label = format_si(&(span as f64 / tick_count as f64 * ticks.len() as f64), 3);
+            let outer_label = format_si(
+                &(span as f64 / tick_count as f64 * ticks.len() as f64),
+                3,
+                None,
+            );
             ticks.push(set_tick_circular(
                 index,
                 ((sum - index as f64).abs() * 1000.0).round() / 1000.0,
