@@ -152,11 +152,59 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
     }
 }
 
+pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
+    // Remove protocol from path
+    let path = path.replace("ssh://", "");
+    // Split the path into host and file
+    let parts: Vec<&str> = path.split(':').collect();
+    if parts.len() != 2 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Invalid SSH path format. Expected ssh://host:path",
+        ));
+    }
+    let host = parts[0];
+    let path = parts[1];
+    // Use SSH to read the file
+    let command = if path.ends_with(".gz") {
+        format!(
+            "ssh {} 'if [ -f {} ]; then cat {}; else cat {}; fi'",
+            host,
+            path,
+            path,
+            path.trim_end_matches(".gz")
+        )
+    } else {
+        format!("ssh {} cat {}", host, path)
+    };
+
+    let process = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to start SSH command");
+
+    let stdout = process.stdout.expect("Failed to capture stdout");
+    let mut buffer = [0u8; 2];
+    let mut stdout_reader = BufReader::new(stdout);
+    io::Read::read_exact(&mut stdout_reader, &mut buffer).unwrap();
+    let is_gzipped = buffer == [0x1F, 0x8B];
+    let stdout = io::Read::chain(std::io::Cursor::new(buffer), stdout_reader);
+    if is_gzipped {
+        Ok(Box::new(BufReader::new(GzDecoder::new(stdout))))
+    } else {
+        Ok(Box::new(BufReader::new(stdout)))
+    }
+}
+
 /// Return a BufRead object for a given file path.
 /// If the path is a URL the file will be fetched.
 pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
     if path.to_string_lossy().starts_with("http") {
         return remote_file_reader(&path.to_string_lossy());
+    } else if path.to_string_lossy().starts_with("ssh") {
+        return ssh_file_reader(&path.to_string_lossy());
     }
 
     let file = File::open(&path)?;

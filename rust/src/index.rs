@@ -1325,6 +1325,8 @@ fn parse_busco_full_table(
     // parse the full_table.tsv file
     for record in parse_full_table(full_table_reader) {
         if let Ok((id, status, score, sequence, start, end, strand, length)) = record {
+            // if sequence ends with :\d+-\d+ then remove it
+            let sequence = sequence.split(':').next().unwrap_or(&sequence).to_string();
             let seq_feature = sequences.get(&sequence).unwrap();
             let midpoint = (start + end) / 2;
             let midpoint_proportion = midpoint as f64 / seq_feature.length as f64;
