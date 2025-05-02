@@ -385,9 +385,12 @@ pub struct PlotOptions {
     /// Individual colours to modify palette (<index>=<hexcode>)
     #[arg(long)]
     pub color: Option<Vec<String>>,
-    /// [experimental] Numerical precision when rounding for display
-    #[arg(long = "precision", default_value_t = 3)]
-    pub precision: u32,
+    /// [experimental] Significant digits to use when rounding numbers for display
+    #[arg(long = "significant-digits", default_value_t = 3)]
+    pub significant_digits: u32,
+    /// [experimental] Decimal precision (number of decimal places) to use when percentages for display
+    #[arg(long = "decimal-precision", default_value_t = 2)]
+    pub decimal_precision: u32,
     // [experimental] Flag to choose the rounding method
     #[arg(long = "rounding", value_enum)]
     pub rounding: Option<RoundingStrategyWrapper>,

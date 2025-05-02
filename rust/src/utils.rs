@@ -93,6 +93,22 @@ pub fn format_si(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrap
     format!("{}{}", rounded, suffix)
 }
 
+pub fn format_pct(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrapper>) -> String {
+    let mut rounded = Decimal::from_f64_retain(*value).unwrap();
+    let rounding_strategy = match rounding {
+        Some(RoundingStrategyWrapper::MidpointAwayFromZero) => {
+            RoundingStrategy::MidpointAwayFromZero
+        }
+        Some(RoundingStrategyWrapper::ToZero) => RoundingStrategy::ToZero,
+        Some(RoundingStrategyWrapper::AwayFromZero) => RoundingStrategy::AwayFromZero,
+        _ => RoundingStrategy::MidpointAwayFromZero,
+    };
+    rounded = rounded
+        .round_dp_with_strategy(digits, rounding_strategy)
+        .normalize();
+    format!("{}%", rounded)
+}
+
 pub fn indexed_sort<T: Ord>(list: &[T]) -> Vec<usize> {
     let mut indices = (0..list.len()).collect::<Vec<_>>();
     indices.sort_by_key(|&i| &list[i]);

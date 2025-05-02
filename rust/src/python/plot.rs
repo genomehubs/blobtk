@@ -46,7 +46,8 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
     let scale_factor = extract_to_option_f64(py, &map, "scale_factor");
     let x_limit = extract_to_option_string(py, &map, "x_limit");
     let y_limit = extract_to_option_string(py, &map, "y_limit");
-    let precision = extract_to_option_usize(py, &map, "precision");
+    let significant_digits = extract_to_option_usize(py, &map, "significant_digits");
+    let decimal_precision = extract_to_option_usize(py, &map, "decimal_precision");
     let cat_count = extract_to_option_usize(py, &map, "cat_count");
     let show_legend = extract_to_option_showlegend(py, &map, "show_legend");
     let show_numbers = extract_to_bool(py, &map, "show_numbers");
@@ -78,7 +79,8 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         scale_factor: scale_factor.unwrap_or(1.0),
         x_limit,
         y_limit,
-        precision: precision.unwrap_or(3) as u32,
+        significant_digits: significant_digits.unwrap_or(3) as u32,
+        decimal_precision: decimal_precision.unwrap_or(2) as u32,
         cat_count: cat_count.unwrap_or(10),
         show_legend: show_legend.unwrap_or_default(),
         show_numbers,
