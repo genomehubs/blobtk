@@ -460,10 +460,12 @@ pub fn busco_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
         )
     };
     let missing_prop = if show_numbers {
-        (snail_stats.busco_total - snail_stats.busco_complete).to_string()
+        (snail_stats.busco_total - snail_stats.busco_complete - snail_stats.busco_fragmented)
+            .to_string()
     } else {
         format_pct(
-            &((snail_stats.busco_total - snail_stats.busco_complete) as f64
+            &((snail_stats.busco_total - snail_stats.busco_complete - snail_stats.busco_fragmented)
+                as f64
                 / snail_stats.busco_total as f64
                 * 100.0),
             precision,
