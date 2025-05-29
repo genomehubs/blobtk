@@ -9,6 +9,7 @@ use svg::Document;
 use titlecase::titlecase;
 
 use crate::blobdir::{self, BuscoGene};
+use crate::plot::axis::Scale;
 
 use super::axis::{TickOptions, TickStatus};
 use super::component::{
@@ -552,26 +553,36 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
             ..Default::default()
         },
     );
+    let length_scale = match options.scale_function {
+        Scale::LINEAR => "scaleLinear".to_string(),
+        Scale::SQRT => "scaleSqrt".to_string(),
+        Scale::LOG => "scaleLog".to_string(),
+    };
+    let length_scale_function = match options.scale_function {
+        Scale::LINEAR => linear_scale,
+        Scale::SQRT => sqrt_scale,
+        Scale::LOG => log_scale,
+    };
     let major_length_ticks = set_axis_ticks(
         &(max_scaffold as f64),
         &(min_value as f64),
         &TickStatus::Major,
         &radius,
-        &"scaleSqrt".to_string(),
+        &length_scale,
     );
     let minor_length_ticks = set_axis_ticks(
         &(max_scaffold as f64),
         &(min_value as f64),
         &TickStatus::Minor,
         &radius,
-        &"scaleSqrt".to_string(),
+        &length_scale,
     );
-    let scaled_n50 = sqrt_scale(
+    let scaled_n50 = length_scale_function(
         snail_stats.binned_scaffold_lengths()[n50_index],
         &[min_value, max_scaffold],
         &[radius, 0.0],
     );
-    let scaled_n90 = sqrt_scale(
+    let scaled_n90 = length_scale_function(
         snail_stats.binned_scaffold_lengths()[n90_index],
         &[min_value, max_scaffold],
         &[radius, 0.0],
@@ -600,7 +611,7 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
 
         // scaffold lengths
         let scaf_length_polar: Vec<f64> = vec![
-            sqrt_scale(
+            length_scale_function(
                 snail_stats.binned_scaffold_lengths()[i],
                 &[min_value, max_scaffold],
                 &[radius, 0.0],
@@ -775,12 +786,18 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
 
     for (i, tick) in major_length_ticks.iter().enumerate() {
         let tick = tick.clone();
-        let label = if i < cmp::max(major_length_ticks.len(), 3) - 3 {
+        let label = if !matches!(options.scale_function, Scale::LINEAR)
+            && i < cmp::max(major_length_ticks.len(), 3) - 3
+        {
             Text::new()
         } else {
             tick.label
         };
         major_length_tick_group = major_length_tick_group.add(tick.path).add(label);
+        // skip last gridline if scale is linear
+        if matches!(options.scale_function, Scale::LINEAR) && i == major_length_ticks.len() - 1 {
+            continue;
+        }
         let arc_data = arc_path(
             -1.0 * tick.position,
             None,

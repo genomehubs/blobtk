@@ -355,7 +355,7 @@ pub struct PlotOptions {
     /// Reducer function for blob plot
     #[arg(long, value_enum, default_value_t = Reducer::Sum)]
     pub reducer_function: Reducer,
-    /// Scale function for blob plot
+    /// Scale function for blob/snail plot
     #[arg(long, value_enum, default_value_t = Scale::SQRT)]
     pub scale_function: Scale,
     /// Scale factor for blob plot (0.2 - 5.0)

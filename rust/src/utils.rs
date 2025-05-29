@@ -162,7 +162,7 @@ pub fn linear_scale_float(value: f64, domain: &[f64; 2], range: &[f64; 2]) -> f6
 
 pub fn log_scale(value: usize, domain: &[usize; 2], range: &[f64; 2]) -> f64 {
     let proportion = ((value as f64).log10() - (domain[0] as f64).log10())
-        / ((domain[1] as f64).log10() - (domain[0] as f64).sqrt());
+        / ((domain[1] as f64).log10() - (domain[0] as f64).log10());
     (range[1] - range[0]) * proportion + range[0]
 }
 
