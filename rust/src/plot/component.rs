@@ -497,7 +497,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                     }
                     while i <= domain[1].clone() {
                         let label = if i >= min_value.clone() {
-                            format_si(&i, 3)
+                            format_si(&i, 3, None)
                         } else {
                             String::new()
                         };
@@ -523,7 +523,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                         let mut j = i * 2.0;
                         while j < i * 10.0 && j <= domain[1].clone() {
                             let label = if j >= min_value.clone() {
-                                format_si(&j, 3)
+                                format_si(&j, 3, None)
                             } else {
                                 String::new()
                             };
@@ -570,7 +570,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                     let mut i = step * (min_value / step).ceil();
                     while i <= domain[1].clone() {
                         let label = if i >= min_value.clone() {
-                            format_si(&i, 3)
+                            format_si(&i, 3, None)
                         } else {
                             String::new()
                         };
@@ -620,47 +620,142 @@ pub fn set_axis_ticks(
     }
 
     let mut ticks: Vec<Tick> = vec![];
-    match status {
-        TickStatus::Major => {
-            let mut i = 10u32.pow(power.abs() as u32) as f64;
-            if power < 0 {
-                i = 1.0 / i;
+    match scale.as_str() {
+        "scaleLinear" => {
+            // Distribute ticks on nice round numbers for linear scale
+            let tick_count = 6; // You can make this configurable if needed
+            set_linear_ticks(
+                max_value, min_value, status, scale, range, domain, &mut ticks, tick_count,
+            );
+        }
+        "scaleLog" | "scaleSqrt" => match status {
+            TickStatus::Major => {
+                let mut i = 10u32.pow(power.abs() as u32) as f64;
+                if power < 0 {
+                    i = 1.0 / i;
+                }
+                if min_value.clone() < 0.0 {
+                    i = -i
+                }
+                while i <= max_value.clone() {
+                    let label = if i > min_value.clone() {
+                        format_si(&i, 3, None)
+                    } else {
+                        String::new()
+                    };
+                    ticks.push(set_tick(i, label, &domain, &range, &status, &scale));
+                    i = i * 10.0;
+                }
             }
-            if min_value.clone() < 0.0 {
-                i = -i
+            TickStatus::Minor => {
+                let mut i = 10u32.pow((max(0, power.abs() - 1)) as u32) as f64;
+                if power < 0 {
+                    i = 1.0 / i;
+                }
+                if min_value.clone() < 0.0 {
+                    i = -i
+                }
+                while i <= max_value.clone() {
+                    let mut j = i * 2.0;
+                    while j < i * 10.0 && j <= max_value.clone() {
+                        if &(j as f64) >= min_value {
+                            ticks.push(set_tick(
+                                j,
+                                String::new(),
+                                &domain,
+                                &range,
+                                &status,
+                                &scale,
+                            ));
+                        }
+                        j = j + i;
+                    }
+                    ticks.push(set_tick(i, String::new(), &domain, &range, &status, &scale));
+                    i = i * 10.0;
+                }
             }
-            while i <= max_value.clone() {
-                let label = if i > min_value.clone() {
-                    format_si(&i, 3)
-                } else {
-                    String::new()
-                };
-                ticks.push(set_tick(i, label, &domain, &range, &status, &scale));
-                i = i * 10.0;
+        },
+        _ => {}
+    }
+    ticks
+}
+
+fn set_linear_ticks(
+    max_value: &f64,
+    min_value: &f64,
+    status: &TickStatus,
+    scale: &String,
+    range: [f64; 2],
+    domain: [f64; 2],
+    ticks: &mut Vec<Tick>,
+    tick_count: i32,
+) {
+    let diff = max_value - min_value;
+    if diff == 0.0 {
+        // Edge case: no range
+        match status {
+            TickStatus::Major => {
+                ticks.push(set_tick(
+                    *min_value,
+                    format_si(min_value, 3, None),
+                    &domain,
+                    &range,
+                    &status,
+                    &scale,
+                ));
+            }
+            TickStatus::Minor => {}
+        }
+    } else {
+        // Find a "nice" step size
+        let raw_step = diff / tick_count as f64;
+        let magnitude = 10f64.powf(raw_step.abs().log10().floor());
+        let nice_steps = [1.0, 2.0, 2.5, 5.0, 10.0];
+        let mut step = nice_steps[0] * magnitude;
+        for s in &nice_steps {
+            let candidate = s * magnitude;
+            if diff / candidate <= tick_count as f64 {
+                step = candidate;
+                break;
             }
         }
-        TickStatus::Minor => {
-            let mut i = 10u32.pow((max(0, power.abs() - 1)) as u32) as f64;
-            if power < 0 {
-                i = 1.0 / i;
-            }
-            if min_value.clone() < 0.0 {
-                i = -i
-            }
-            while i <= max_value.clone() {
-                let mut j = i * 2.0;
-                while j < i * 10.0 && j <= max_value.clone() {
-                    if &(j as f64) >= min_value {
-                        ticks.push(set_tick(j, String::new(), &domain, &range, &status, &scale));
-                    }
-                    j = j + i;
+        // Find the first tick >= min_value that is a multiple of step
+        let first_tick = (min_value / step).ceil() * step;
+        match status {
+            TickStatus::Major => {
+                let mut value = first_tick;
+                while value <= *max_value + step * 0.5 {
+                    let label = format_si(&value, 3, None);
+                    ticks.push(set_tick(value, label, &domain, &range, &status, &scale));
+                    value += step;
                 }
-                ticks.push(set_tick(i, String::new(), &domain, &range, &status, &scale));
-                i = i * 10.0;
+            }
+            TickStatus::Minor => {
+                // Optionally add minor ticks between major ticks
+                let minor_tick_count = 4;
+                let minor_step = step / (minor_tick_count as f64 + 1.0);
+                let mut value = first_tick - step;
+                while value <= *max_value - step {
+                    for j in 1..=minor_tick_count {
+                        let minor_value = value + j as f64 * minor_step;
+                        if minor_value > *min_value - step * 0.5
+                            && minor_value < *max_value + step * 0.5
+                        {
+                            ticks.push(set_tick(
+                                minor_value,
+                                String::new(),
+                                &domain,
+                                &range,
+                                &status,
+                                &scale,
+                            ));
+                        }
+                    }
+                    value += step;
+                }
             }
         }
     }
-    ticks
 }
 
 pub fn set_tick_circular(
@@ -826,7 +921,11 @@ pub fn set_axis_ticks_circular(
         // }
         for i in (divisor..bin_count + 1).step_by(divisor) {
             let label = format!("{}", ((i) as f64 / bin_count as f64 * 100.0) as u64);
-            let outer_label = format_si(&(span as f64 / tick_count as f64 * ticks.len() as f64), 3);
+            let outer_label = format_si(
+                &(span as f64 / tick_count as f64 * ticks.len() as f64),
+                3,
+                None,
+            );
             ticks.push(set_tick_circular(
                 i,
                 0.0,
@@ -864,7 +963,11 @@ pub fn set_axis_ticks_circular(
             let adj_sum = sum + 0.001;
             let index = adj_sum.floor() as usize;
             let label = format!("{}", (sum / bin_count as f64 * 100.0).round() as u64);
-            let outer_label = format_si(&(span as f64 / tick_count as f64 * ticks.len() as f64), 3);
+            let outer_label = format_si(
+                &(span as f64 / tick_count as f64 * ticks.len() as f64),
+                3,
+                None,
+            );
             ticks.push(set_tick_circular(
                 index,
                 ((sum - index as f64).abs() * 1000.0).round() / 1000.0,

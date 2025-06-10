@@ -118,7 +118,95 @@ pub fn get_csv_writer(file_path: &Option<PathBuf>, delimiter: u8) -> csv::Writer
 
 /// Return a BufRead object for a given file path.
 /// If the file path has a `.gz` extension, the file is decompressed on the fly.
+pub fn local_file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
+    let file = File::open(&path)?;
+
+    if path.extension() == Some(OsStr::new("gz")) {
+        Ok(Box::new(BufReader::new(GzDecoder::new(file))))
+    } else {
+        Ok(Box::new(BufReader::new(file)))
+    }
+}
+
+/// Return a BufRead object for a given URL path.
+/// The file will be fetched.
+pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
+    // let response = reqwest::blocking::get(path)?;
+    // let reader = response.bytes()?;
+    // Ok(Box::new(BufReader::new(reader.as_ref()))
+
+    let response = reqwest::blocking::get(url.to_string()).expect("Failed to fetch file");
+    if response.status().is_success() {
+        return Ok(Box::new(BufReader::new(response)));
+    } else {
+        let response = reqwest::blocking::get(url.to_string().replace(".gz", ""))
+            .expect(format!("Failed to fetch file: {}", url).as_str());
+        if response.status().is_success() {
+            return Ok(Box::new(BufReader::new(response)));
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to fetch file: {}", response.status()),
+            ));
+        }
+    }
+}
+
+pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
+    // Remove protocol from path
+    let path = path.replace("ssh://", "");
+    // Split the path into host and file
+    let parts: Vec<&str> = path.split(':').collect();
+    if parts.len() != 2 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Invalid SSH path format. Expected ssh://host:path",
+        ));
+    }
+    let host = parts[0];
+    let path = parts[1];
+    // Use SSH to read the file
+    let command = if path.ends_with(".gz") {
+        format!(
+            "ssh {} 'if [ -f {} ]; then cat {}; else cat {}; fi'",
+            host,
+            path,
+            path,
+            path.trim_end_matches(".gz")
+        )
+    } else {
+        format!("ssh {} cat {}", host, path)
+    };
+
+    let process = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to start SSH command");
+
+    let stdout = process.stdout.expect("Failed to capture stdout");
+    let mut buffer = [0u8; 2];
+    let mut stdout_reader = BufReader::new(stdout);
+    io::Read::read_exact(&mut stdout_reader, &mut buffer).unwrap();
+    let is_gzipped = buffer == [0x1F, 0x8B];
+    let stdout = io::Read::chain(std::io::Cursor::new(buffer), stdout_reader);
+    if is_gzipped {
+        Ok(Box::new(BufReader::new(GzDecoder::new(stdout))))
+    } else {
+        Ok(Box::new(BufReader::new(stdout)))
+    }
+}
+
+/// Return a BufRead object for a given file path.
+/// If the path is a URL the file will be fetched.
 pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
+    if path.to_string_lossy().starts_with("http") {
+        return remote_file_reader(&path.to_string_lossy());
+    } else if path.to_string_lossy().starts_with("ssh") {
+        return ssh_file_reader(&path.to_string_lossy());
+    }
+
     let file = File::open(&path)?;
 
     if path.extension() == Some(OsStr::new("gz")) {
@@ -140,13 +228,24 @@ pub fn get_csv_reader(
     file_path: &Option<PathBuf>,
     delimiter: u8,
     has_headers: bool,
+    comment_char: Option<u8>,
+    skip_lines: usize,
+    flexible: bool,
 ) -> csv::Reader<Box<dyn BufRead>> {
     let file_reader =
         file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
+    // Skip the first `skip_lines` lines
+    let mut file_reader = Box::new(file_reader);
+    for _ in 0..skip_lines {
+        let mut line = String::new();
+        file_reader.read_line(&mut line).unwrap();
+    }
 
     csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .has_headers(has_headers)
+        .comment(comment_char)
+        .flexible(flexible) // Allow incomplete rows
         .from_reader(file_reader)
 }
 

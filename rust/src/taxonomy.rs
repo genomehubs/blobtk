@@ -2,6 +2,8 @@
 //! Invoked by calling:
 //! `blobtk taxonomy <args>`
 
+use std::collections::HashSet;
+
 use anyhow;
 
 use crate::cli;
@@ -48,6 +50,10 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
             root_taxon_id: match taxonomy_options.root_taxon_id {
                 Some(root_taxon_id) => Some(root_taxon_id),
                 None => options.root_taxon_id.clone(),
+            },
+            leaf_taxon_id: match taxonomy_options.leaf_taxon_id {
+                Some(leaf_taxon_id) => Some(leaf_taxon_id),
+                None => options.leaf_taxon_id.clone(),
             },
             base_taxon_id: match taxonomy_options.base_taxon_id {
                 Some(base_taxon_id) => Some(base_taxon_id),
@@ -140,8 +146,18 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
 
     if let Some(taxdump_out) = options.out.clone() {
         let root_taxon_ids = options.root_taxon_id.clone();
+        let leaf_taxon_ids = options
+            .leaf_taxon_id
+            .clone()
+            .map(|ids| ids.into_iter().collect::<HashSet<_>>());
         let base_taxon_id = options.base_taxon_id.clone();
-        nodes.write_taxdump(root_taxon_ids, base_taxon_id, &taxdump_out, false);
+        nodes.write_taxdump(
+            root_taxon_ids,
+            leaf_taxon_ids,
+            base_taxon_id,
+            &taxdump_out,
+            false,
+        );
     }
 
     // if let Some(gbif_backbone) = options.gbif_backbone.clone() {

@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::OpenOptions;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
@@ -49,6 +50,15 @@ impl FromStr for GHubsFileFormat {
 pub enum StringOrVec {
     Single(String),
     Multiple(Vec<String>),
+}
+
+impl fmt::Display for StringOrVec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StringOrVec::Single(s) => write!(f, "{}", s),
+            StringOrVec::Multiple(v) => write!(f, "{:?}", v),
+        }
+    }
 }
 
 // Value may be u32 or Vec of u32
@@ -197,6 +207,24 @@ impl GHubsFileConfig {
     }
 }
 
+/// GenomeHubs analysis configuration options
+#[derive(Default, Serialize, Deserialize, Clone, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GHubsAnalysisConfig {
+    // Unique analysis ID
+    pub analysis_id: String,
+    // Assembly ID
+    pub assembly_id: Option<StringOrVec>,
+    // Taxon ID
+    pub taxon_id: Option<StringOrVec>,
+    // Description
+    pub description: Option<String>,
+    // Analysis name
+    pub name: String,
+    // Analysis title
+    pub title: Option<String>,
+}
+
 /// GenomeHubs field constraint configuration options
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -210,7 +238,7 @@ pub struct ConstraintConfig {
     )]
     pub enum_values: Option<Vec<String>>,
     // Value length
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "len", skip_serializing_if = "Option::is_none")]
     pub len: Option<usize>,
     // Maximum value
     #[serde(
@@ -257,6 +285,9 @@ pub enum SummaryFunction {
     // Highest ranked value from an ordered list
     #[serde(rename = "enum")]
     Enum,
+    // Length of list of values
+    #[serde(rename = "length")]
+    Length,
     // List of values
     #[default]
     #[serde(rename = "list")]
@@ -291,6 +322,9 @@ pub enum SummaryFunction {
     // Mode with both values listed if there are two modes
     #[serde(rename = "mode_list")]
     ModeList,
+    // List based on ordered priority of related list keys
+    #[serde(rename = "ordered_list")]
+    OrderedList,
     // No summary function
     #[serde(rename = "false")]
     None,
@@ -490,6 +524,9 @@ pub struct GHubsFieldConfig {
     // Attribute key
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
+    // List key for ordered values
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub list_key: Option<String>,
     // Long description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub long_description: Option<String>,
@@ -499,12 +536,19 @@ pub struct GHubsFieldConfig {
     // Attribute name
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    // Ordered list of keys
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<Vec<String>>,
     // Organelle type
     #[serde(skip_serializing_if = "Option::is_none")]
     pub organelle: Option<Organelle>,
     // Path to data value in raw input file
     #[serde(skip_serializing)]
     pub path: Option<String>,
+    // Type to return from API if not specified
+    // Default: keyword
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<SummaryFunction>,
     // Value separator
     #[serde(skip_serializing_if = "Option::is_none")]
     pub separator: Option<StringOrVec>,
@@ -614,11 +658,14 @@ impl GHubsFieldConfig {
             is_primary_value: self.is_primary_value.or(other.is_primary_value),
             join: self.join.or(other.join),
             key: self.key.or(other.key),
+            list_key: self.list_key.or(other.list_key),
             long_description: self.long_description.or(other.long_description),
             metadata: self.metadata.or(other.metadata),
             name: self.name.or(other.name),
+            order: self.order.or(other.order),
             organelle: self.organelle.or(other.organelle),
             path: self.path.or(other.path),
+            return_type: self.return_type.or(other.return_type),
             separator: self.separator.or(other.separator),
             status: self.status.or(other.status),
             summary: self.summary.or(other.summary),
@@ -690,9 +737,15 @@ pub struct GHubsConfig {
     /// File configuration options
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<GHubsFileConfig>,
+    /// Analysis configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analysis: Option<GHubsAnalysisConfig>,
     /// Attribute fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, GHubsFieldConfig>>,
+    /// Identifier fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifiers: Option<HashMap<String, GHubsFieldConfig>>,
     /// Metadata fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<GHubsFieldConfig>,
@@ -702,6 +755,9 @@ pub struct GHubsConfig {
     /// Taxonomy fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxonomy: Option<HashMap<String, GHubsFieldConfig>>,
+    /// Feature fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub features: Option<HashMap<String, GHubsFieldConfig>>,
     /// Path to config file
     #[serde(skip)]
     pub file_path: PathBuf,
@@ -796,6 +852,22 @@ impl GHubsConfig {
         }
     }
 
+    pub fn to_yaml(&self) -> Result<String, error::Error> {
+        let yaml = serde_yaml::to_string(&self)?;
+        Ok(yaml)
+    }
+
+    pub fn write_yaml(&self, output_file: &PathBuf) -> Result<(), error::Error> {
+        let yaml = self.to_yaml()?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_file)?;
+        file.write_all(yaml.as_bytes())?;
+        Ok(())
+    }
+
     pub fn init_csv_reader(&mut self, keys: Option<Vec<&str>>) -> csv::Reader<Box<dyn BufRead>> {
         if self.file.is_none() {
             // return an empty reader
@@ -811,7 +883,14 @@ impl GHubsConfig {
         if !file_path.exists() {
             panic!("File does not exist: {:?}", &file_path);
         }
-        let mut rdr = io::get_csv_reader(&Some(file_path.clone()), delimiter, file_config.header);
+        let mut rdr = io::get_csv_reader(
+            &Some(file_path.clone()),
+            delimiter,
+            file_config.header,
+            None,
+            0,
+            false,
+        );
 
         if let Some(keys) = keys {
             if file_config.header {
@@ -892,7 +971,7 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(&Some(file_path), delimiter, true);
+        let mut rdr = io::get_csv_reader(&Some(file_path), delimiter, true, None, 0, false);
         let expected_headers = vec!["taxon_id", "input", "rank"];
         let headers = rdr.headers().unwrap().clone();
         for (i, header) in headers.iter().enumerate() {

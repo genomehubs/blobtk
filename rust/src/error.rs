@@ -23,6 +23,8 @@ pub enum Error {
     SerdeError(String),
     #[error("Unable to process JSON: {0} {1}: unknown field `{2}`")]
     UnknownField(String, String, String),
+    #[error("YAML error: {0}")]
+    YamlError(String),
 }
 
 impl From<std::io::Error> for Error {
@@ -40,5 +42,11 @@ impl From<csv::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Error::SerdeError(err.to_string())
+    }
+}
+
+impl From<serde_yaml::Error> for Error {
+    fn from(err: serde_yaml::Error) -> Error {
+        Error::YamlError(err.to_string())
     }
 }

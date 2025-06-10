@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::f64::{INFINITY, NEG_INFINITY};
 use std::fs::File;
@@ -195,7 +196,7 @@ pub fn get_path(dir: &PathBuf, prefix: &str) -> Option<String> {
     None
 }
 
-pub fn remote_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
+pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
     let blobdir = dir.to_str().unwrap();
     if blobdir.starts_with("http") {
         let mut url = format!("{}", dir.to_str().unwrap());
@@ -227,7 +228,7 @@ pub fn remote_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead
     }
 }
 
-pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
+pub fn local_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
     let path = match get_path(dir, prefix) {
         Some(string) => string,
         None => return None,
@@ -526,7 +527,7 @@ pub fn parse_field_float(id: String, blobdir: &PathBuf) -> Result<Vec<f64>, erro
 pub fn parse_field_float_windows(
     id: String,
     blobdir: &PathBuf,
-    wanted_indices: &Vec<usize>,
+    wanted_indices: Option<&Vec<usize>>,
 ) -> Result<(Vec<Vec<f64>>, f64, f64), error::Error> {
     let reader = match file_reader(blobdir, &format!("{}.json", &id)) {
         Some(reader) => reader,
@@ -541,7 +542,10 @@ pub fn parse_field_float_windows(
     let field: Field<Vec<Vec<f64>>> =
         serde_json::from_reader(reader).expect("unable to parse json");
     let mut values = vec![];
-    let indices: HashSet<&usize> = HashSet::from_iter(wanted_indices);
+    let indices: HashSet<usize> = match wanted_indices {
+        Some(i) => HashSet::from_iter(i.iter().cloned()),
+        None => HashSet::from_iter(0..field.values().len()),
+    };
     let mut min_value = INFINITY;
     let mut max_value = NEG_INFINITY;
     for (i, seq) in field.values().iter().enumerate() {
@@ -573,6 +577,45 @@ pub fn parse_field_int(id: String, blobdir: &PathBuf) -> Result<Vec<usize>, erro
     let field: Field<usize> = serde_json::from_reader(reader).expect("unable to parse json");
     let values = field.values().clone();
     Ok(values)
+}
+
+pub fn parse_field_int_windows(
+    id: String,
+    blobdir: &PathBuf,
+    wanted_indices: Option<&Vec<usize>>,
+) -> Result<(Vec<Vec<usize>>, usize, usize), error::Error> {
+    let reader = match file_reader(blobdir, &format!("{}.json", &id)) {
+        Some(reader) => reader,
+        None => {
+            return Err(error::Error::FileNotFound(format!(
+                "{}/{}.json",
+                &blobdir.to_str().unwrap(),
+                &id
+            )))
+        }
+    };
+    let field: Field<Vec<Vec<usize>>> =
+        serde_json::from_reader(reader).expect("unable to parse json");
+    let mut values = vec![];
+    let indices: HashSet<usize> = match wanted_indices {
+        Some(i) => HashSet::from_iter(i.iter().cloned()),
+        None => HashSet::from_iter(0..field.values().len()),
+    };
+    let mut min_value = INFINITY as usize;
+    let mut max_value = NEG_INFINITY as usize;
+    for (i, seq) in field.values().iter().enumerate() {
+        if !indices.contains(&i) {
+            continue;
+        }
+        let mut windows = vec![];
+        for arr in seq {
+            windows.push(arr[0]);
+            min_value = min(min_value, arr[0]);
+            max_value = max(max_value, arr[0]);
+        }
+        values.push(windows);
+    }
+    Ok((values, min_value, max_value))
 }
 
 pub fn parse_field_string(
@@ -979,7 +1022,13 @@ pub fn get_window_values(
     let mut axis_limits = HashMap::new();
     let mut cat_values = vec![];
     let field_list = meta.field_list.clone().unwrap();
-    for (axis, id) in plot_map {
+    let axes = vec!["x", "y", "z", "cat"];
+    for axis in axes {
+        let default_id = "_".to_string();
+        let id = plot_map.get(axis).unwrap_or(&default_id);
+        if id == "_" {
+            continue;
+        }
         let window_id = match window_size {
             Some(ref size) if size != "0.1" => format!("{}_windows_{}", id, size),
             _ => format!("{}_windows", id),
@@ -995,10 +1044,10 @@ pub fn get_window_values(
                         let (values, min_value, max_value) = parse_field_float_windows(
                             field_meta.id.clone(),
                             blobdir,
-                            wanted_indices,
+                            Some(wanted_indices),
                         )?;
-                        plot_values.insert(axis.clone(), values);
-                        axis_limits.insert(axis.clone(), [min_value, max_value]);
+                        plot_values.insert(axis.to_string(), values);
+                        axis_limits.insert(axis.to_string(), [min_value, max_value]);
                     }
                     Some(Datatype::String) => {
                         cat_values = parse_field_cat_windows(
@@ -1033,6 +1082,26 @@ pub fn get_window_values(
                 }
             }
         };
+        if axis == "cat" && (cat_values.is_empty() || cat_values[0].is_empty()) {
+            let window_counts = plot_values
+                .get("x")
+                .unwrap()
+                .iter()
+                .map(|x| x.len())
+                .collect::<Vec<usize>>();
+            let _single_cat_values = parse_field_cat(id.clone(), blobdir)?;
+            let mut single_cat_values: Vec<(String, usize)> = vec![];
+            for i in wanted_indices {
+                single_cat_values.push(_single_cat_values[*i].clone());
+            }
+            for (i, window_count) in window_counts.iter().enumerate() {
+                if *window_count > 0 {
+                    cat_values.push(vec![Some(single_cat_values[i].clone()); *window_count]);
+                } else {
+                    cat_values.push(vec![None; *window_count]);
+                }
+            }
+        }
     }
     Ok((plot_values, cat_values, axis_limits))
 }

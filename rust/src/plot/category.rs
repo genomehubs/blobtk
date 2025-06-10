@@ -34,13 +34,13 @@ impl Category {
     pub fn subtitle(self) -> String {
         let mut parts = vec![];
         if self.count.is_some() {
-            parts.push(format_si(&(self.count.unwrap() as f64), 3))
+            parts.push(format_si(&(self.count.unwrap() as f64), 3, None))
         }
         if self.span.is_some() {
-            parts.push(format_si(&(self.span.unwrap() as f64), 3))
+            parts.push(format_si(&(self.span.unwrap() as f64), 3, None))
         }
         if self.n50.is_some() {
-            parts.push(format_si(&(self.n50.unwrap() as f64), 3))
+            parts.push(format_si(&(self.n50.unwrap() as f64), 3, None))
         }
         if !parts.is_empty() {
             return format!("[{}]", parts.join("; "));

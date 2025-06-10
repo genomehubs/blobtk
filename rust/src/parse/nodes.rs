@@ -269,6 +269,7 @@ impl Nodes {
     pub fn write_taxdump(
         &self,
         root_taxon_ids: Option<Vec<String>>,
+        leaf_taxon_ids: Option<HashSet<String>>,
         base_id: Option<String>,
         taxdump_path: &PathBuf,
         append: bool,
@@ -324,9 +325,28 @@ impl Nodes {
                         names_writer.flush().unwrap();
                     }
                 }
+                let mut is_leaf = false;
+                if let Some(ref leaf_ids) = leaf_taxon_ids {
+                    if leaf_ids.contains(&root_id) {
+                        is_leaf = true;
+                    }
+                }
                 if let Some(children) = self.children.get(&root_id) {
                     for child in children {
-                        self.write_taxdump(Some(vec![child.clone()]), None, taxdump_path, true);
+                        if is_leaf {
+                            if let Some(ref leaf_ids) = leaf_taxon_ids {
+                                if !leaf_ids.contains(child) {
+                                    continue;
+                                }
+                            }
+                        }
+                        self.write_taxdump(
+                            Some(vec![child.clone()]),
+                            leaf_taxon_ids.clone(),
+                            None,
+                            taxdump_path,
+                            true,
+                        );
                     }
                 }
             }
@@ -504,7 +524,7 @@ impl Nodes {
             },
         );
 
-        let mut rdr = io::get_csv_reader(&Some(gbif_backbone), b'\t', false);
+        let mut rdr = io::get_csv_reader(&Some(gbif_backbone), b'\t', false, None, 0, false);
 
         // Status can be:
         // ACCEPTED

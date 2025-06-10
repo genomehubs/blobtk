@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 
 use crate::cli::Origin;
 use crate::cli::Palette;
+use crate::cli::RoundingStrategyWrapper;
 use crate::cli::Shape;
 use crate::cli::View;
 use crate::plot::axis::Scale;
@@ -180,18 +181,6 @@ pub fn extract_to_view(py: Python<'_>, map: &HashMap<String, PyObject>, key: &st
     value
 }
 
-pub fn extract_to_shape(py: Python<'_>, map: &HashMap<String, PyObject>, key: &str) -> Shape {
-    let hash_key = String::from(key);
-    let value: Shape = match map.get(&hash_key) {
-        Some(value) => match value.extract::<String>(py).unwrap().parse() {
-            Ok(view) => view,
-            _ => Shape::Circle,
-        },
-        _ => Shape::Circle,
-    };
-    value
-}
-
 pub fn extract_to_option_shape(
     py: Python<'_>,
     map: &HashMap<String, PyObject>,
@@ -267,6 +256,19 @@ pub fn extract_to_option_palette(
             Ok(palette) => Some(palette),
             _ => None,
         },
+        _ => None,
+    };
+    option
+}
+
+pub fn extract_to_option_rounding_strategy(
+    py: Python<'_>,
+    map: &HashMap<String, PyObject>,
+    key: &str,
+) -> Option<RoundingStrategyWrapper> {
+    let hash_key = String::from(key);
+    let option: Option<RoundingStrategyWrapper> = match map.get(&hash_key) {
+        Some(value) => value.extract::<RoundingStrategyWrapper>(py).ok(),
         _ => None,
     };
     option

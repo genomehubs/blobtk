@@ -4,10 +4,10 @@ use crate::blobdir::parse_blobdir;
 use crate::cli::{self, PlotOptions, View};
 use crate::plot::{plot_blob, plot_cumulative, plot_legend, plot_snail};
 use crate::python::utils::{
-    extract_to_option_f64, extract_to_option_origin, extract_to_option_palette,
-    extract_to_option_reducer, extract_to_option_scale, extract_to_option_shape,
-    extract_to_option_showlegend, extract_to_option_string, extract_to_option_usize,
-    extract_to_option_vec_string, extract_to_pathbuf, extract_to_view,
+    extract_to_bool, extract_to_option_f64, extract_to_option_origin, extract_to_option_palette,
+    extract_to_option_reducer, extract_to_option_rounding_strategy, extract_to_option_scale,
+    extract_to_option_shape, extract_to_option_showlegend, extract_to_option_string,
+    extract_to_option_usize, extract_to_option_vec_string, extract_to_pathbuf, extract_to_view,
 };
 use pyo3::prelude::*;
 
@@ -46,12 +46,17 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
     let scale_factor = extract_to_option_f64(py, &map, "scale_factor");
     let x_limit = extract_to_option_string(py, &map, "x_limit");
     let y_limit = extract_to_option_string(py, &map, "y_limit");
+    let significant_digits = extract_to_option_usize(py, &map, "significant_digits");
+    let decimal_precision = extract_to_option_usize(py, &map, "decimal_precision");
     let cat_count = extract_to_option_usize(py, &map, "cat_count");
     let show_legend = extract_to_option_showlegend(py, &map, "show_legend");
+    let show_numbers = extract_to_bool(py, &map, "show_numbers");
+    let busco_numbers = extract_to_bool(py, &map, "busco_numbers");
     let cat_order = extract_to_option_string(py, &map, "cat_order");
     let origin = extract_to_option_origin(py, &map, "origin");
     let palette = extract_to_option_palette(py, &map, "palette");
     let color = extract_to_option_vec_string(py, &map, "color");
+    let rounding = extract_to_option_rounding_strategy(py, &map, "rounding");
     PlotOptions {
         blobdir,
         view,
@@ -74,12 +79,17 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         scale_factor: scale_factor.unwrap_or(1.0),
         x_limit,
         y_limit,
+        significant_digits: significant_digits.unwrap_or(3) as u32,
+        decimal_precision: decimal_precision.unwrap_or(2) as u32,
         cat_count: cat_count.unwrap_or(10),
         show_legend: show_legend.unwrap_or_default(),
+        show_numbers,
+        busco_numbers,
         cat_order,
         origin,
         palette,
         color,
+        rounding,
     }
 }
 

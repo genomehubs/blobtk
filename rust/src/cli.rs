@@ -7,6 +7,7 @@ use std::str::FromStr;
 use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use clap_num::number_range;
 use pyo3::pyclass;
+use rust_decimal::RoundingStrategy;
 use serde;
 use serde::{Deserialize, Serialize};
 
@@ -179,12 +180,37 @@ pub struct FilterOptions {
 #[derive(Parser, Debug)]
 // #[pyclass]
 pub struct IndexOptions {
+    /// Path to BlobDir directory containing files to index
+    #[arg(long, short = 'b')]
+    pub blobdir: Option<PathBuf>,
+    /// Window sizes for feature extraction.
+    /// Supported values depend on the BlobDir (typically 0.01, 0.1, 1, 100000, 1000000)
+    #[arg(long = "window-size", short = 'w', num_args(1..), default_values_t = [1.0], value_parser = window_size_parser, action = clap::ArgAction::Append)]
+    pub window_size: Vec<f64>,
+    /// Taxon ID for the assembly
+    #[arg(long = "taxon-id", short = 't')]
+    pub taxon_id: Option<String>,
+    /// Assembly accession to fetch sequence report from NCBI datasets
+    #[arg(long = "accession", short = 'a')]
+    pub datasets_accession: Option<String>,
+    /// Path to BUSCO directory containing files to index
+    /// Multiple BUSCO directories can be provided
+    #[arg(long, short = 'u', num_args(1..), action = clap::ArgAction::Append)]
+    pub busco: Option<Vec<PathBuf>>,
     /// Flag to generate JSON schema
     #[arg(long, short = 'g')]
     pub schema: bool,
     /// Output schema file name
     #[arg(long, short = 'O')]
     pub out: Option<PathBuf>,
+}
+
+fn window_size_parser(s: &str) -> Result<f64, String> {
+    let val = match s.parse::<f64>() {
+        Ok(v) => v,
+        Err(e) => panic!("{:?}", e),
+    };
+    Ok(val)
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
@@ -329,7 +355,7 @@ pub struct PlotOptions {
     /// Reducer function for blob plot
     #[arg(long, value_enum, default_value_t = Reducer::Sum)]
     pub reducer_function: Reducer,
-    /// Scale function for blob plot
+    /// Scale function for blob/snail plot
     #[arg(long, value_enum, default_value_t = Scale::SQRT)]
     pub scale_function: Scale,
     /// Scale factor for blob plot (0.2 - 5.0)
@@ -359,6 +385,69 @@ pub struct PlotOptions {
     /// Individual colours to modify palette (<index>=<hexcode>)
     #[arg(long)]
     pub color: Option<Vec<String>>,
+    /// [experimental] Significant digits to use when rounding numbers for display
+    #[arg(long = "significant-digits", default_value_t = 3)]
+    pub significant_digits: u32,
+    /// [experimental] Decimal precision (number of decimal places) to use when percentages for display
+    #[arg(long = "decimal-precision", default_value_t = 2)]
+    pub decimal_precision: u32,
+    // [experimental] Flag to choose the rounding method
+    #[arg(long = "rounding", value_enum)]
+    pub rounding: Option<RoundingStrategyWrapper>,
+    /// [experimental] Flag to show numbers instead of percentages in snail plot legend
+    #[arg(long = "show-numbers", default_value_t = false)]
+    pub show_numbers: bool,
+    /// [experimental] Flag to show busco numbers instead of percentages in snail plot legend
+    #[arg(long = "busco-numbers", default_value_t = false)]
+    pub busco_numbers: bool,
+}
+
+#[derive(ValueEnum, Clone, Debug, Default)]
+#[pyclass]
+pub enum RoundingStrategyWrapper {
+    #[default]
+    #[clap(name = "round")]
+    MidpointAwayFromZero,
+    #[clap(name = "down")]
+    ToZero,
+    #[clap(name = "up")]
+    AwayFromZero,
+}
+
+impl From<RoundingStrategyWrapper> for RoundingStrategy {
+    fn from(wrapper: RoundingStrategyWrapper) -> Self {
+        match wrapper {
+            RoundingStrategyWrapper::MidpointAwayFromZero => RoundingStrategy::MidpointAwayFromZero,
+            RoundingStrategyWrapper::ToZero => RoundingStrategy::ToZero,
+            RoundingStrategyWrapper::AwayFromZero => RoundingStrategy::AwayFromZero,
+        }
+    }
+}
+
+impl From<RoundingStrategy> for RoundingStrategyWrapper {
+    fn from(strategy: RoundingStrategy) -> Self {
+        match strategy {
+            RoundingStrategy::MidpointAwayFromZero => RoundingStrategyWrapper::MidpointAwayFromZero,
+            RoundingStrategy::ToZero => RoundingStrategyWrapper::ToZero,
+            RoundingStrategy::AwayFromZero => RoundingStrategyWrapper::AwayFromZero,
+            _ => RoundingStrategyWrapper::MidpointAwayFromZero,
+        }
+    }
+}
+
+impl RoundingStrategyWrapper {
+    pub fn from_str(input: &str) -> Result<RoundingStrategy, ()> {
+        match input {
+            "round" => Ok(RoundingStrategy::MidpointAwayFromZero),
+            "down" => Ok(RoundingStrategy::ToZero),
+            "up" => Ok(RoundingStrategy::AwayFromZero),
+            _ => Err(()),
+        }
+    }
+
+    pub fn default() -> RoundingStrategy {
+        RoundingStrategy::MidpointAwayFromZero
+    }
 }
 
 /// Valid taxonomy formats
@@ -386,6 +475,9 @@ pub struct TaxonomyOptions {
     /// Root taxon/taxa for filtered taxonomy
     #[arg(long = "root-id", short = 'r')]
     pub root_taxon_id: Option<Vec<String>>,
+    /// Leaf taxon/taxa for filtered taxonomy
+    #[arg(long = "leaf-id", short = 'l')]
+    pub leaf_taxon_id: Option<Vec<String>>,
     /// Base taxon for filtered taxonomy lineages
     #[arg(long = "base-id", short = 'b')]
     pub base_taxon_id: Option<String>,
