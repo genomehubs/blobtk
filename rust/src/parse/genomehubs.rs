@@ -207,6 +207,24 @@ impl GHubsFileConfig {
     }
 }
 
+/// GenomeHubs analysis configuration options
+#[derive(Default, Serialize, Deserialize, Clone, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GHubsAnalysisConfig {
+    // Unique analysis ID
+    pub analysis_id: String,
+    // Assembly ID
+    pub assembly_id: Option<StringOrVec>,
+    // Taxon ID
+    pub taxon_id: Option<StringOrVec>,
+    // Description
+    pub description: Option<String>,
+    // Analysis name
+    pub name: String,
+    // Analysis title
+    pub title: Option<String>,
+}
+
 /// GenomeHubs field constraint configuration options
 #[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -719,6 +737,9 @@ pub struct GHubsConfig {
     /// File configuration options
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<GHubsFileConfig>,
+    /// Analysis configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analysis: Option<GHubsAnalysisConfig>,
     /// Attribute fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, GHubsFieldConfig>>,
@@ -734,6 +755,9 @@ pub struct GHubsConfig {
     /// Taxonomy fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxonomy: Option<HashMap<String, GHubsFieldConfig>>,
+    /// Feature fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub features: Option<HashMap<String, GHubsFieldConfig>>,
     /// Path to config file
     #[serde(skip)]
     pub file_path: PathBuf,

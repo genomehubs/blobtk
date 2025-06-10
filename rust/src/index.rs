@@ -24,10 +24,12 @@ use crate::io::get_file_writer;
 use crate::io::get_writer;
 use crate::parse::genomehubs::ConstraintConfig;
 use crate::parse::genomehubs::FieldType;
+use crate::parse::genomehubs::GHubsAnalysisConfig;
 use crate::parse::genomehubs::GHubsConfig;
 use crate::parse::genomehubs::GHubsFieldConfig;
 use crate::parse::genomehubs::GHubsFileConfig;
 use crate::parse::genomehubs::GHubsFileFormat;
+use crate::parse::genomehubs::PathBufOrVec;
 use crate::parse::genomehubs::StringOrVec;
 use crate::parse::genomehubs::SummaryFunction;
 use crate::parse::genomehubs::SummaryFunctionOrVec;
@@ -65,6 +67,7 @@ pub struct Feature {
     pub midpoint_proportion: f64,
     pub seq_proportion: f64,
     pub name: Option<String>,
+    pub sequence_name: Option<String>,
     pub score: Option<f64>,
     pub status: Option<String>,
     pub busco_counts: Option<HashMap<String, usize>>,
@@ -86,6 +89,7 @@ impl Feature {
         midpoint_proportion: f64,
         seq_proportion: f64,
         name: Option<String>,
+        sequence_name: Option<String>,
         score: Option<f64>,
         status: Option<String>,
         busco_counts: Option<HashMap<String, usize>>,
@@ -105,6 +109,7 @@ impl Feature {
             midpoint_proportion,
             seq_proportion,
             name,
+            sequence_name,
             score,
             status,
             busco_counts,
@@ -151,7 +156,7 @@ impl Feature {
         let seq_proportion_str = f.fmt2(self.seq_proportion).to_string();
 
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             self.feature_id,
             taxon_id,
             assembly_id,
@@ -168,6 +173,7 @@ impl Feature {
             midpoint_proportion_str,
             seq_proportion_str,
             self.name.as_ref().unwrap_or(&"None".to_string()),
+            self.sequence_name.as_ref().unwrap_or(&"None".to_string()),
             score_str,
             self.status.as_ref().unwrap_or(&"None".to_string()),
             busco_counts_str
@@ -175,7 +181,7 @@ impl Feature {
     }
 
     pub fn to_header(&self) -> String {
-        let mut header = "feature_id\ttaxon_id\tassembly_id\tsequence_id\tfeature_type\tstart\tend\tstrand\tlength\tgc\tcoverage\tmasked\tmidpoint\tmidpoint_proportion\tseq_proportion\tname\tscore\tstatus".to_string();
+        let mut header = "feature_id\ttaxon_id\tassembly_id\tsequence_id\tfeature_type\tstart\tend\tstrand\tlength\tgc\tcoverage\tmasked\tmidpoint\tmidpoint_proportion\tseq_proportion\tname\tsequence_name\tscore\tstatus".to_string();
         if let Some(ref busco_counts) = self.busco_counts {
             let keys = busco_counts.keys();
             for key in keys {
@@ -225,6 +231,7 @@ impl Features {
         coverages: Option<Vec<f64>>,
         maskeds: Option<Vec<f64>>,
         names: Option<Vec<String>>,
+        sequence_names: Option<Vec<String>>,
         scores: Option<Vec<f64>>,
         statuses: Option<Vec<String>>,
         busco_counts: Option<HashMap<String, Vec<usize>>>,
@@ -260,6 +267,11 @@ impl Features {
             };
             let name = if let Some(names) = &names {
                 Some(names[i].clone())
+            } else {
+                None
+            };
+            let sequence_name = if let Some(sequence_names) = &sequence_names {
+                Some(sequence_names[i].clone())
             } else {
                 None
             };
@@ -301,6 +313,7 @@ impl Features {
                 midpoint_proportion,
                 seq_proportion,
                 name,
+                sequence_name,
                 score,
                 status,
                 busco_counts: feature_busco_counts,
@@ -326,9 +339,11 @@ impl Features {
         coverages: Option<Vec<Vec<f64>>>,
         maskeds: Option<Vec<Vec<f64>>>,
         names: Option<Vec<Vec<String>>>,
+        sequence_names: Option<Vec<Vec<String>>>,
         scores: Option<Vec<Vec<f64>>>,
         statuses: Option<Vec<Vec<String>>>,
         busco_counts: Option<HashMap<String, Vec<Vec<usize>>>>,
+        sequences: &HashMap<String, &Feature>,
     ) -> Self {
         let mut features = Vec::new();
         for (i, id) in ids.iter().enumerate() {
@@ -345,6 +360,7 @@ impl Features {
                     feature_type.split(',').next().unwrap_or(&feature_type)
                 );
                 let sequence_id = id.clone();
+                let seq_feature = sequences.get(id).unwrap();
                 let feature_type = feature_type.clone();
                 let strand = if let Some(strands) = &strands {
                     strands[i][j]
@@ -371,6 +387,11 @@ impl Features {
                 } else {
                     None
                 };
+                let sequence_name = if let Some(sequence_names) = &sequence_names {
+                    Some(sequence_names[i][j].clone())
+                } else {
+                    None
+                };
                 let score = if let Some(scores) = &scores {
                     Some(scores[i][j])
                 } else {
@@ -392,7 +413,7 @@ impl Features {
                     None
                 };
                 let midpoint = (start + end) / 2;
-                let midpoint_proportion = midpoint as f64 / length as f64;
+                let midpoint_proportion = midpoint as f64 / seq_feature.length as f64;
                 let seq_proportion = length as f64 / span as f64;
                 features.push(Feature {
                     feature_id,
@@ -409,6 +430,7 @@ impl Features {
                     midpoint_proportion,
                     seq_proportion,
                     name,
+                    sequence_name,
                     score,
                     status,
                     busco_counts: feature_busco_counts,
@@ -457,7 +479,11 @@ impl Features {
         Ok(())
     }
 
-    pub fn to_ghubs_config(&self) -> GHubsConfig {
+    pub fn to_ghubs_config(
+        &self,
+        file: Option<PathBuf>,
+        analysis: Option<GHubsAnalysisConfig>,
+    ) -> GHubsConfig {
         let mut attributes = HashMap::new();
         let fields = vec![
             ("feature_id", FieldType::Keyword, None),
@@ -465,7 +491,7 @@ impl Features {
             ("name", FieldType::Keyword, Some(",")),
             ("sequence_id", FieldType::Keyword, None),
             ("sequence_name", FieldType::Keyword, Some(",")),
-            ("analysis_name", FieldType::Keyword, None),
+            // ("analysis_name", FieldType::Keyword, None),
             ("taxon_id", FieldType::Keyword, None),
             ("assembly_id", FieldType::Keyword, None),
             ("start", FieldType::Long, None),
@@ -495,8 +521,46 @@ impl Features {
                 },
             );
         }
+        let mut taxonomy = HashMap::new();
+        taxonomy.insert(
+            "taxon_id".to_string(),
+            GHubsFieldConfig {
+                header: Some(StringOrVec::Single("taxon_id".to_string())),
+                ..Default::default()
+            },
+        );
+        let mut features = HashMap::new();
+        features.insert(
+            "feature_id".to_string(),
+            GHubsFieldConfig {
+                header: Some(StringOrVec::Single("feature_id".to_string())),
+                ..Default::default()
+            },
+        );
+        features.insert(
+            "assembly_id".to_string(),
+            GHubsFieldConfig {
+                header: Some(StringOrVec::Single("assembly_id".to_string())),
+                ..Default::default()
+            },
+        );
         let config = GHubsConfig {
+            file: match file {
+                Some(f) => Some(GHubsFileConfig {
+                    format: GHubsFileFormat::TSV,
+                    header: true,
+                    name: PathBuf::from(f.file_name().unwrap()),
+                    needs: Some(PathBufOrVec::Single(PathBuf::from(
+                        "ATTR_feature.types.yaml".to_string(),
+                    ))),
+                    ..Default::default()
+                }),
+                None => None,
+            },
             attributes: Some(attributes),
+            taxonomy: Some(taxonomy),
+            features: Some(features),
+            analysis,
             ..Default::default()
         };
 
@@ -537,13 +601,14 @@ fn per_contig_values(
     let features = Features::from_vecs(
         taxon_id,
         assembly_id,
-        "chromosome".to_string(),
+        "topLevel".to_string(),
         identifiers,
         length_values,
         None,
         Some(gc_values),
         Some(coverage_values),
         masked_values,
+        None,
         None,
         None,
         None,
@@ -565,7 +630,7 @@ fn get_window_id(id: &str, window_size: &f64) -> String {
 fn per_window_values(
     meta: &blobdir::Meta,
     blobdir_path: &PathBuf,
-    _contig_values: &Features,
+    sequences: &HashMap<String, &Feature>,
     window_size: &f64,
 ) -> Result<Features, anyhow::Error> {
     let plot_meta = meta.plot.clone();
@@ -627,7 +692,9 @@ fn per_window_values(
         None,
         None,
         None,
+        None,
         busco_counts,
+        sequences,
     );
     Ok(features)
 }
@@ -792,15 +859,15 @@ fn window_analysis(meta: &blobdir::Meta, window_size: &f64) -> Analysis {
 
 #[derive(Debug, Deserialize)]
 struct BuscoResults {
-    #[serde(alias = "Complete")]
+    #[serde(alias = "Complete", rename = "Complete percentage")]
     complete: f64,
-    #[serde(alias = "Single copy")]
+    #[serde(alias = "Single copy", rename = "Single copy percentage")]
     single_copy: f64,
-    #[serde(alias = "Multi copy")]
+    #[serde(alias = "Multi copy", rename = "Multi copy percentage")]
     multi_copy: f64,
-    #[serde(alias = "Fragmented")]
+    #[serde(alias = "Fragmented", rename = "Fragmented percentage")]
     fragmented: f64,
-    #[serde(alias = "Missing")]
+    #[serde(alias = "Missing", rename = "Missing percentage")]
     missing: f64,
     n_markers: usize,
     domain: String,
@@ -1351,6 +1418,7 @@ fn parse_busco_full_table(
                 midpoint_proportion,
                 seq_proportion,
                 Some(id.clone()),
+                seq_feature.name.clone(),
                 Some(score),
                 Some(status.clone()),
                 None,
@@ -1417,7 +1485,7 @@ impl DatasetsSequenceReport {
             "unlocalized-contig" => "contig".to_string(),
             _ => "contig".to_string(),
         };
-        feature_type.push_str(",sequence");
+        feature_type.push_str(",sequence,toplevel");
         let start = 1;
         let end = self.length;
         let strand = 1;
@@ -1460,7 +1528,8 @@ impl DatasetsSequenceReport {
             midpoint,
             midpoint_proportion,
             seq_proportion,
-            name,
+            name: name.clone(),
+            sequence_name: name,
             score,
             status,
             busco_counts,
@@ -1651,6 +1720,7 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
     };
     let mut busco_count = None;
     let mut accession = options.datasets_accession.clone();
+    let mut taxon_id = options.taxon_id.clone();
     let mut optional_blobdir_path = options.blobdir.clone();
     if let Some(datasets_accession) = &accession {
         if optional_blobdir_path.is_none() {
@@ -1677,6 +1747,9 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
         if accession.is_none() {
             accession = Some(meta.assembly.accession.clone());
         }
+        if taxon_id.is_none() {
+            taxon_id = Some(meta.taxon.taxid.clone());
+        }
         if contig_values.features.is_empty() {
             contig_values = per_contig_values(&meta, &blobdir_path)?;
             contig_values.to_file(&options.out)?;
@@ -1697,6 +1770,10 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
             contig_values.to_file(&options.out)?;
         }
 
+        for feature in &contig_values.features {
+            sequences.insert(feature.sequence_id.clone(), feature);
+        }
+
         for window in &options.window_size {
             if window == &1.0 {
                 continue;
@@ -1704,7 +1781,7 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
             // log Parsing window
             log::info!("Parsing window");
             log::info!("Window size: {:?}", window);
-            let window_values = per_window_values(&meta, &blobdir_path, &contig_values, window)?;
+            let window_values = per_window_values(&meta, &blobdir_path, &sequences, window)?;
             let _window_analysis = window_analysis(&meta, window);
             window_values.append_to_file(&options.out)?;
         }
@@ -1715,11 +1792,37 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
     }
     if !contig_values.features.is_empty() {
         let yaml_path = options.out.as_ref().unwrap().with_extension("types.yaml");
-        let feature_config = contig_values.to_ghubs_config();
+        let analysis = GHubsAnalysisConfig {
+            analysis_id: format!(
+                "assembly-{}",
+                accession.clone().unwrap_or("None".to_string())
+            ),
+            assembly_id: match accession {
+                Some(ref acc) => Some(StringOrVec::Single(acc.clone())),
+                None => None,
+            },
+            taxon_id: match taxon_id {
+                Some(ref taxid) => Some(StringOrVec::Single(taxid.clone())),
+                None => None,
+            },
+            description: Some(format!(
+                "Public assembly {}",
+                accession.clone().unwrap_or("None".to_string())
+            )),
+            name: "assembly".to_string(),
+            title: Some(format!(
+                "Public assembly {}",
+                accession.clone().unwrap_or("None".to_string())
+            )),
+        };
+        let file = options.out.clone();
+        let feature_config = contig_values.to_ghubs_config(file, Some(analysis));
         feature_config.write_yaml(&yaml_path)?;
 
-        for feature in &contig_values.features {
-            sequences.insert(feature.sequence_id.clone(), feature);
+        if sequences.is_empty() {
+            for feature in &contig_values.features {
+                sequences.insert(feature.sequence_id.clone(), feature);
+            }
         }
         let accession = accession.unwrap_or("None".to_string());
         let taxon_id = contig_values.taxon_id.clone();
