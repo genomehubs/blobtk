@@ -364,16 +364,16 @@ impl Nodes {
     }
 
     pub fn merge(&mut self, new_nodes: &Nodes) -> Result<(), anyhow::Error> {
+        println!(
+            "[DEBUG] merge: before: {}, merging: {}",
+            self.nodes.len(),
+            new_nodes.nodes.len()
+        );
         let nodes = &mut self.nodes;
         let children = &mut self.children;
         for node in new_nodes.nodes.iter() {
-            if let Some(existing_node) = nodes.get(&node.1.tax_id) {
-                if existing_node.rank == "no rank" {
-                    nodes.insert(node.1.tax_id.clone(), node.1.clone());
-                }
-            } else {
-                nodes.insert(node.1.tax_id.clone(), node.1.clone());
-            }
+            // Always insert/replace the node
+            nodes.insert(node.1.tax_id.clone(), node.1.clone());
             let parent = node.1.parent_tax_id.clone();
             let child = node.1.tax_id.clone();
             if parent != child {
@@ -387,6 +387,7 @@ impl Nodes {
                 }
             }
         }
+        println!("[DEBUG] merge: after: {}", self.nodes.len());
         Ok(())
     }
 
@@ -508,10 +509,17 @@ impl Nodes {
     pub fn from_gbif(
         gbif_backbone: PathBuf,
         options: &TaxonomyOptions,
+        existing: Option<&mut Nodes>,
     ) -> Result<Nodes, anyhow::Error> {
-        let mut nodes = HashMap::new();
-        let mut children = HashMap::new();
-
+        let mut nodes;
+        let mut children;
+        if let Some(existing_nodes) = existing {
+            nodes = existing_nodes.nodes.clone();
+            children = existing_nodes.children.clone();
+        } else {
+            nodes = HashMap::new();
+            children = HashMap::new();
+        }
         nodes.insert(
             "root".to_string(),
             Node {
@@ -523,17 +531,7 @@ impl Nodes {
                 ..Default::default()
             },
         );
-
         let mut rdr = io::get_csv_reader(&Some(gbif_backbone), b'\t', false, None, 0, false);
-
-        // Status can be:
-        // ACCEPTED
-        // DOUBTFUL
-        // HETEROTYPIC_SYNONYM
-        // HOMOTYPIC_SYNONYM
-        // MISAPPLIED
-        // PROPARTE_SYNONYM
-        // SYNONYM
         let mut ignore = HashSet::new();
         ignore.insert("DOUBTFUL");
         ignore.insert("MISAPPLIED");
@@ -547,7 +545,6 @@ impl Nodes {
             if ignore.contains(status) {
                 continue;
             }
-
             let tax_id = record.get(0).unwrap().to_string();
             let name_class = match status {
                 "ACCEPTED" => "scientific name".to_string(),
@@ -596,7 +593,6 @@ impl Nodes {
                             }
                         }
                     }
-
                     e.insert(node);
                 }
                 Entry::Occupied(mut e) => {
@@ -608,16 +604,107 @@ impl Nodes {
                     }
                 }
             }
-
-            // println!("{:?}", record.get(0));
-            // let node = Node {
-            //     tax_id,
-            //     parent_tax_id: record.get(1).unwrap().to_string(),
-            //     rank: record.get(5).unwrap().to_case(Case::Lower),
-            //     scientific_name: Some(record.get(19).unwrap().to_string()),
-            //     ..Default::default()
-            // };
         }
+        Ok(Nodes { nodes, children })
+    }
+
+    pub fn from_jsonl(
+        jsonl_path: PathBuf,
+        options: &TaxonomyOptions,
+        existing: Option<&mut Nodes>,
+    ) -> Result<Nodes, anyhow::Error> {
+        use convert_case::Case;
+        use convert_case::Casing;
+        use serde_json::Value;
+        use std::collections::hash_map::Entry;
+        use std::fs::File;
+        use std::io::{BufRead, BufReader};
+        let xref_label = options
+            .xref_label
+            .clone()
+            .unwrap_or_else(|| "ena".to_string());
+        let name_classes = vec!["scientific name".to_string()];
+        let mut nodes = HashMap::new();
+        let mut children = HashMap::new();
+        if let Some(existing_nodes) = existing {
+            let table = crate::parse::lookup::build_lookup(existing_nodes, &name_classes, false);
+            let file = File::open(jsonl_path)?;
+            let reader = BufReader::new(file);
+            for line in reader.lines() {
+                let line = line?;
+                let v: Value = serde_json::from_str(&line)?;
+                let tax_id = v["taxId"].as_str().unwrap_or("").to_string();
+                let rank = v["rank"].as_str().unwrap_or("").to_string();
+                let scientific_name = v["scientificName"].as_str().unwrap_or("").to_string();
+                // Parse lineage as Vec<String>
+                let lineage: Vec<String> = if let Some(lin) = v.get("lineage") {
+                    if lin.is_string() {
+                        lin.as_str()
+                            .unwrap()
+                            .split(';')
+                            .map(|s| s.trim().to_string())
+                            .collect()
+                    } else if lin.is_array() {
+                        lin.as_array()
+                            .unwrap()
+                            .iter()
+                            .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                            .collect()
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                };
+                // Walk lineage windows to find parent
+                for names in lineage
+                    .iter()
+                    .rev()
+                    .cloned()
+                    .collect::<Vec<String>>()
+                    .windows(2)
+                {
+                    let key = format!(
+                        "{}:{}",
+                        names[0].to_case(Case::Lower),
+                        names[1].to_case(Case::Lower)
+                    );
+                    if let Some(parent_tax_ids) = table.get(&key) {
+                        if parent_tax_ids.len() == 1 {
+                            let node = Node {
+                                tax_id: tax_id.clone(),
+                                parent_tax_id: parent_tax_ids[0].clone(),
+                                rank: rank.clone(),
+                                scientific_name: Some(scientific_name.clone()),
+                                names: Some(vec![Name {
+                                    tax_id: tax_id.clone(),
+                                    name: scientific_name.clone(),
+                                    class: Some("scientific name".to_string()),
+                                    unique_name: format!(
+                                        "{}:{}",
+                                        xref_label,
+                                        scientific_name.to_case(Case::Lower)
+                                    ),
+                                    ..Default::default()
+                                }]),
+                                ..Default::default()
+                            };
+                            existing_nodes.nodes.insert(tax_id.clone(), node);
+                            match existing_nodes.children.entry(parent_tax_ids[0].clone()) {
+                                Entry::Vacant(e) => {
+                                    e.insert(vec![tax_id.clone()]);
+                                }
+                                Entry::Occupied(mut e) => {
+                                    e.get_mut().push(tax_id.clone());
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // Always return empty, as ENA nodes are only attached via lookup
         Ok(Nodes { nodes, children })
     }
 }

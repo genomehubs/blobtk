@@ -8,18 +8,19 @@
 33511	|	deuterostomes	|		|	common name	|
 33511	|	Deuterostomia	|		|	scientific name	|
 7711	|	Chordata	|		|	scientific name	|
-7711	|	chordates	|		|	blast name	|
-7711	|	chordates	|		|	genbank common name	|
-89593	|	Craniata	|		|	scientific name	|
+7711	|	chordates	|	chordates <blast name>	|	blast name	|
+7711	|	chordates	|	chordates <genbank common name>	|	genbank common name	|
+89593	|	Craniata	|	Craniata <chordates>	|	scientific name	|
 7742	|	Vertebrata Cuvier, 1812	|		|	authority	|
-7742	|	Vertebrata	|		|	scientific name	|
-7742	|	vertebrates	|		|	blast name	|
-7742	|	vertebrates	|		|	genbank common name	|
-7776	|	Gnathostomata	|		|	scientific name	|
+7742	|	Vertebrata	|	Vertebrata <vertebrates>	|	scientific name	|
+7742	|	vertebrates	|	vertebrates <blast name>	|	blast name	|
+7742	|	vertebrates	|	vertebrates <genbank common name>	|	genbank common name	|
+7776	|	Gnathostomata	|	Gnathostomata <vertebrates>	|	scientific name	|
 7776	|	jawed vertebrates	|		|	genbank common name	|
 117570	|	Teleostomi	|		|	scientific name	|
 117571	|	bony vertebrates	|		|	genbank common name	|
 117571	|	Euteleostomi	|		|	scientific name	|
+117571	|	40673	|		|	merged taxon id	|
 8287	|	Sarcopterygii	|		|	scientific name	|
 1338369	|	Dipnotetrapodomorpha	|		|	scientific name	|
 32523	|	Tetrapoda	|		|	scientific name	|
@@ -27,22 +28,22 @@
 32524	|	Amniota	|		|	scientific name	|
 32524	|	amniotes	|		|	genbank common name	|
 40674	|	Mammalia	|		|	scientific name	|
-40674	|	mammals	|		|	blast name	|
-40674	|	mammals	|		|	genbank common name	|
+40674	|	mammals	|	mammals <blast name>	|	blast name	|
+40674	|	mammals	|	mammals <genbank common name>	|	genbank common name	|
 32525	|	Theria Parker & Haswell, 1897	|		|	authority	|
-32525	|	Theria	|		|	scientific name	|
+32525	|	Theria	|	Theria <mammals>	|	scientific name	|
 9347	|	eutherian mammals	|		|	common name	|
 9347	|	Eutheria	|		|	scientific name	|
 9347	|	Placentalia	|		|	synonym	|
 9347	|	placental mammals	|		|	common name	|
-9347	|	placentals	|		|	blast name	|
-9347	|	placentals	|		|	genbank common name	|
+9347	|	placentals	|	placentals <blast name>	|	blast name	|
+9347	|	placentals	|	placentals <genbank common name>	|	genbank common name	|
 1437010	|	Boreoeutheria	|		|	scientific name	|
 1437010	|	Boreotheria	|		|	synonym	|
 314145	|	Laurasiatheria	|		|	scientific name	|
 33554	|	Carnivora	|		|	scientific name	|
-33554	|	carnivores	|		|	blast name	|
-33554	|	carnivores	|		|	genbank common name	|
+33554	|	carnivores	|	carnivores <blast name>	|	blast name	|
+33554	|	carnivores	|	carnivores <genbank common name>	|	genbank common name	|
 379584	|	Caniformia	|		|	scientific name	|
 9608	|	Canidae	|		|	scientific name	|
 9608	|	dog, coyote, wolf, fox	|		|	genbank common name	|
@@ -164,7 +165,7 @@
 242525	|	Canis lupus himalayensis Aggarwal, Ramadevi & Singh, 2003	|		|	authority	|
 242525	|	Canis lupus himalayensis	|		|	synonym	|
 242525	|	Himalayan wolf	|		|	genbank common name	|
-1002243	|	environmental samples	|		|	scientific name	|
+1002243	|	environmental samples	|	environmental samples <carnivores,genus Canis>	|	scientific name	|
 1002244	|	Canis environmental sample	|		|	scientific name	|
 1707807	|	African golden wolf	|		|	genbank common name	|
 1707807	|	African wolf	|		|	common name	|
@@ -180,6 +181,7 @@
 1707807	|	Canis senegalensis	|		|	synonym	|
 1707807	|	Egyptian jackal	|		|	common name	|
 1707807	|	thoa	|		|	common name	|
+1707807	|	1001911	|		|	merged taxon id	|
 2562269	|	Canis dirus Leidy, 1858	|		|	authority	|
 2562269	|	Canis dirus	|		|	scientific name	|
 2562269	|	dire wolf	|		|	genbank common name	|
@@ -204,3 +206,11 @@
 2769327	|	Canis sp. CM0006548	|		|	scientific name	|
 2769328	|	Canis sp. UMMZ91100	|		|	scientific name	|
 2769329	|	Canis sp. CM038379	|		|	scientific name	|
+3040042	|	Canis latrans x Canis lupus	|	ena:canis latrans x canis lupus	|	scientific name	|
+2957508	|	Canis aureus aureus	|	ena:canis aureus aureus	|	scientific name	|
+728234	|	Canis lupus hallstromi	|	ena:canis lupus hallstromi	|	scientific name	|
+3069387	|	Canidae intergeneric hybrids	|	ena:canidae intergeneric hybrids	|	scientific name	|
+3069388	|	Canis lupus familiaris x Lycalopex gymnocercus	|	ena:canis lupus familiaris x lycalopex gymnocercus	|	scientific name	|
+68735	|	Pseudalopex	|	ena:pseudalopex	|	scientific name	|
+2879912	|	Vulpes macrotis macrotis	|	ena:vulpes macrotis macrotis	|	scientific name	|
+1504800	|	Vulpes vulpes fulvus	|	ena:vulpes vulpes fulvus	|	scientific name	|

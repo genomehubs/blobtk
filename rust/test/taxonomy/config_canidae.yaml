@@ -8,6 +8,9 @@ name_classes:
   - scientific name
   - synonym
 taxonomies:
+  - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
+    taxonomy_format: ena
+    xref_label: ena
   # - path: test/taxonomy/canidae/gbif
   #   taxonomy_format: ncbi
   #   root_taxon_id:
@@ -16,5 +19,3 @@ taxonomies:
   #   name_classes:
   #     - scientific name
   #   xref_label: gbif
-  # - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
-  #   taxonomy_format: ena
