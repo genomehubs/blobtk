@@ -122,6 +122,10 @@ pub fn lookup_nodes(
             };
             if let Some(new_names) = node.names.clone() {
                 for name in new_names.iter() {
+                    if label.starts_with(&format!("{}:gbif", label)) {
+                        dbg!(&label);
+                    }
+
                     names.push(Name {
                         tax_id: tax_id.clone(),
                         unique_name: format!("{}:{}", &label, name.name.clone()),
