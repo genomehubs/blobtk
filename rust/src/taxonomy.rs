@@ -12,7 +12,7 @@ use crate::io;
 
 pub use cli::TaxonomyOptions;
 
-use crate::parse::lookup::{build_fast_lookup, lookup_nodes};
+use crate::parse::lookup::{build_fast_lookup, lookup_nodes, lookup_nodes_by_id};
 use crate::parse::nodes::Nodes;
 
 use crate::parse::parse_file;
@@ -99,6 +99,7 @@ pub fn taxdump_to_nodes(
             Some(cli::TaxonomyFormat::ENA) => {
                 Nodes::from_jsonl(taxdump, &options, existing).unwrap()
             }
+            Some(cli::TaxonomyFormat::OTT) => Nodes::from_ott(taxdump, &options, existing).unwrap(),
             _ => Nodes::from_taxdump(taxdump, options.xref_label.clone()).unwrap(),
         };
     } else {
@@ -117,11 +118,49 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     if let Some(taxonomies) = options.taxonomies.clone() {
         for taxonomy in taxonomies {
             let new_nodes = taxdump_to_nodes(&taxonomy, Some(&mut nodes)).unwrap();
-            // Only run lookup_nodes for non-ENA taxonomies
-            if let Some(taxonomy_format) = taxonomy.taxonomy_format {
-                if !matches!(taxonomy_format, cli::TaxonomyFormat::ENA) {
+            let taxonomy_format = taxonomy.taxonomy_format;
+            let mut filtered_new_nodes = new_nodes.clone();
+            // Filter new_nodes by root_taxon_id and base_taxon_id if specified
+            if let Some(root_ids) = taxonomy.root_taxon_id.clone() {
+                let mut keep = std::collections::HashSet::new();
+                for root_id in root_ids {
+                    // Collect all descendants of root_id
+                    let mut stack = vec![root_id.clone()];
+                    while let Some(tid) = stack.pop() {
+                        if keep.insert(tid.clone()) {
+                            if let Some(children) = filtered_new_nodes.children.get(&tid) {
+                                for child in children {
+                                    stack.push(child.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                filtered_new_nodes.nodes.retain(|k, _| keep.contains(k));
+                filtered_new_nodes.children.retain(|k, _| keep.contains(k));
+            }
+            // Optionally filter by base_taxon_id (if you want to restrict further)
+            if let Some(base_id) = taxonomy.base_taxon_id.clone() {
+                if filtered_new_nodes.nodes.contains_key(&base_id) {
+                    let mut keep = std::collections::HashSet::new();
+                    let mut stack = vec![base_id.clone()];
+                    while let Some(tid) = stack.pop() {
+                        if keep.insert(tid.clone()) {
+                            if let Some(children) = filtered_new_nodes.children.get(&tid) {
+                                for child in children {
+                                    stack.push(child.clone());
+                                }
+                            }
+                        }
+                    }
+                    filtered_new_nodes.nodes.retain(|k, _| keep.contains(k));
+                    filtered_new_nodes.children.retain(|k, _| keep.contains(k));
+                }
+            }
+            match taxonomy_format {
+                Some(cli::TaxonomyFormat::GBIF) => {
                     lookup_nodes(
-                        &new_nodes,
+                        &filtered_new_nodes,
                         &mut nodes,
                         &taxonomy.name_classes,
                         &options.name_classes,
@@ -129,8 +168,20 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                         taxonomy.create_taxa,
                     );
                 }
+                Some(cli::TaxonomyFormat::OTT) => {
+                    lookup_nodes_by_id(
+                        &filtered_new_nodes,
+                        &mut nodes,
+                        &"ncbi",
+                        taxonomy.xref_label.clone(),
+                        taxonomy.create_taxa,
+                    );
+                }
+                _ => {
+                    // skip lookup
+                }
             }
-            nodes.merge(&new_nodes)?;
+            nodes.merge(&filtered_new_nodes)?;
         }
     }
 

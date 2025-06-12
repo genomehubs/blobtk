@@ -288,6 +288,7 @@ impl Nodes {
             io::get_writer(&Some(names_path.clone()))
         };
 
+        // Find all root nodes if not specified
         let mut root_ids = vec![];
         match root_taxon_ids {
             Some(ids) => {
@@ -295,7 +296,15 @@ impl Nodes {
                     root_ids.push(id)
                 }
             }
-            None => root_ids.push("1".to_string()),
+            None => {
+                // Find all nodes whose parent_tax_id is not present in the map or is empty
+                let all_tax_ids: std::collections::HashSet<_> = self.nodes.keys().cloned().collect();
+                for (tax_id, node) in self.nodes.iter() {
+                    if node.parent_tax_id.is_empty() || !all_tax_ids.contains(&node.parent_tax_id) || node.parent_tax_id == *tax_id {
+                        root_ids.push(tax_id.clone());
+                    }
+                }
+            }
         };
 
         let mut ancestors = HashSet::new();
@@ -506,6 +515,153 @@ impl Nodes {
         Ok(Nodes { nodes, children })
     }
 
+    pub fn from_ott(
+        ott_path: PathBuf,
+        options: &TaxonomyOptions,
+        existing: Option<&mut Nodes>,
+    ) -> Result<Nodes, anyhow::Error> {
+        use std::collections::hash_map::Entry;
+        use std::fs::File;
+        use std::io::{BufRead, BufReader};
+        let (mut nodes, mut children) = if let Some(existing_nodes) = existing {
+            (existing_nodes.nodes.clone(), existing_nodes.children.clone())
+        } else {
+            (HashMap::new(), HashMap::new())
+        };
+        // Map xref label -> tax_id for synonym lookup
+        let mut xref_to_taxid: HashMap<String, String> = HashMap::new();
+        // Parse taxonomy.tsv with correct OTT separator (\t|\t)
+        let mut taxonomy_file = ott_path.clone();
+        taxonomy_file.push("taxonomy.tsv");
+        let file = File::open(&taxonomy_file)?;
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            let line = line?;
+            if line.starts_with("uid\t") { continue; }
+            let fields: Vec<&str> = line.split("\t|\t").collect();
+            if fields.len() < 5 { continue; }
+            let tax_id = fields[0].trim().to_string();
+            let parent_tax_id = if fields[1].trim().is_empty() { "root".to_string() } else { fields[1].trim().to_string() };
+            let name = fields[2].trim().to_string();
+            let rank = fields[3].trim().to_string();
+            let xrefs = fields[4];
+            // Build names: main scientific name
+            let mut names = vec![Name {
+                tax_id: tax_id.clone(),
+                name: name.clone(),
+                unique_name: format!("ott:{}", tax_id),
+                class: Some("scientific name".to_string()),
+                ..Default::default()
+            }];
+            // Add xrefs as Name with class xref, and build xref->taxid map
+            for xref in xrefs.split(',') {
+                let xref = xref.trim();
+                if !xref.is_empty() {
+                    xref_to_taxid.insert(xref.to_string(), tax_id.clone());
+                    names.push(Name {
+                        tax_id: tax_id.clone(),
+                        name: xref.to_string(),
+                        unique_name: xref.to_string(),
+                        class: Some("xref".to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
+            let node = Node {
+                tax_id: tax_id.clone(),
+                parent_tax_id: parent_tax_id.clone(),
+                rank: rank.to_case(Case::Lower),
+                scientific_name: Some(name.clone()),
+                names: Some(names),
+                ..Default::default()
+            };
+            let parent = node.parent_tax_id.clone();
+            let child = node.tax_id.clone();
+            if parent != child {
+                match children.entry(parent) {
+                    Entry::Vacant(e) => { e.insert(vec![child.clone()]); },
+                    Entry::Occupied(mut e) => { e.get_mut().push(child.clone()); }
+                }
+            }
+            nodes.insert(child, node);
+        }
+        // Parse synonyms.tsv and add as synonym names to the correct node
+        let mut synonyms_file = ott_path.clone();
+        synonyms_file.push("synonyms.tsv");
+        if synonyms_file.exists() {
+            let file = File::open(&synonyms_file)?;
+            let reader = BufReader::new(file);
+            for line in reader.lines() {
+                let line = line?;
+                if line.starts_with("synonym\t") { continue; }
+                let fields: Vec<&str> = line.split("\t|\t").collect();
+                if fields.len() < 2 { continue; }
+                let synonym = fields[0].trim();
+                let tax_id = fields[1].trim();
+                let sourceinfo = if fields.len() > 4 { fields[4].trim() } else { "" };
+                // Build unique_name as <prefix>:<synonym> if sourceinfo contains a prefix
+                let unique_name = if let Some((prefix, _)) = sourceinfo.split_once(':') {
+                    format!("{}:{}", prefix, synonym)
+                } else {
+                    synonym.to_string()
+                };
+                if let Some(node) = nodes.get_mut(tax_id) {
+                    let mut found = false;
+                    if let Some(ref mut node_names) = node.names {
+                        for n in node_names.iter() {
+                            if n.name == synonym && n.class.as_deref() == Some("synonym") {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            node_names.push(Name {
+                                tax_id: tax_id.to_string(),
+                                name: synonym.to_string(),
+                                unique_name,
+                                class: Some("synonym".to_string()),
+                                ..Default::default()
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        // ...existing forwards.tsv logic unchanged...
+        let mut forwards_file = ott_path.clone();
+        forwards_file.push("forwards.tsv");
+        if forwards_file.exists() {
+            let file = File::open(&forwards_file)?;
+            let reader = BufReader::new(file);
+            for line in reader.lines() {
+                let line = line?;
+                if line.starts_with("id\t") { continue; }
+                let fields: Vec<&str> = line.split('\t').collect();
+                if fields.len() < 2 { continue; }
+                let merged_id = fields[0];
+                let replacement_id = fields[1];
+                if let Some(node) = nodes.get_mut(replacement_id) {
+                    let mut found = false;
+                    if let Some(ref mut node_names) = node.names {
+                        for n in node_names.iter() {
+                            if n.name == merged_id { found = true; break; }
+                        }
+                        if !found {
+                            node_names.push(Name {
+                                tax_id: replacement_id.to_string(),
+                                name: merged_id.to_string(),
+                                unique_name: merged_id.to_string(),
+                                class: Some("merged taxon id".to_string()),
+                                ..Default::default()
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        Ok(Nodes { nodes, children })
+    }
+
     pub fn from_gbif(
         gbif_backbone: PathBuf,
         options: &TaxonomyOptions,
@@ -586,10 +742,10 @@ impl Nodes {
                     if parent != child {
                         match children.entry(parent) {
                             Entry::Vacant(e) => {
-                                e.insert(vec![child]);
+                                e.insert(vec![child.clone()]);
                             }
                             Entry::Occupied(mut e) => {
-                                e.get_mut().push(child);
+                                e.get_mut().push(child.clone());
                             }
                         }
                     }

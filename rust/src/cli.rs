@@ -460,6 +460,8 @@ pub enum TaxonomyFormat {
     GBIF,
     /// ENA taxonomy record formatted as JSONL
     ENA,
+    /// OTT (Open Tree of Life) taxonomy containing taxonomy.tsv, synonyms.tsv and forwards.tsv
+    OTT,
 }
 
 /// Options to pass to `blobtk taxonomy`
