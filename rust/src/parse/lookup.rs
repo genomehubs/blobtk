@@ -122,10 +122,6 @@ pub fn lookup_nodes(
             };
             if let Some(new_names) = node.names.clone() {
                 for name in new_names.iter() {
-                    if label.starts_with(&format!("{}:gbif", label)) {
-                        dbg!(&label);
-                    }
-
                     names.push(Name {
                         tax_id: tax_id.clone(),
                         unique_name: format!("{}:{}", &label, name.name.clone()),
@@ -133,13 +129,19 @@ pub fn lookup_nodes(
                     });
                 }
             }
-            names.push(Name {
-                tax_id: tax_id.clone(),
-                name: node.tax_id(),
-                unique_name: format!("{}:{}", &label, node.tax_id()),
-                class: Some("xref".to_string()),
-                //class: xref_label.clone(),
-            });
+            // Add the new node's tax_id as an xref
+            let prefixed_name = format!("{}:{}", &label, new_tax_id);
+            if !names
+                .iter()
+                .any(|n| n.name == new_tax_id && n.class.as_deref() == Some("xref"))
+            {
+                names.push(Name {
+                    tax_id: tax_id.clone(),
+                    name: prefixed_name.clone(),
+                    unique_name: prefixed_name,
+                    class: Some("xref".to_string()),
+                });
+            }
         }
     }
     progress_bar.finish();
@@ -447,13 +449,19 @@ pub fn lookup_nodes_by_id(
                         // Add all names from new_node to target_node, with xref_label
                         add_names_to_node(target_node, new_names, &label);
                         // Also add an xref name for the new_node's tax_id
-                        if !target_node.names.as_ref().unwrap().iter().any(|n| {
-                            n.name == new_node.tax_id() && n.class.as_deref() == Some("xref")
-                        }) {
+                        let prefixed_name = format!("{}:{}", &label, new_node.tax_id());
+
+                        if !target_node
+                            .names
+                            .as_ref()
+                            .unwrap()
+                            .iter()
+                            .any(|n| n.name == prefixed_name && n.class.as_deref() == Some("xref"))
+                        {
                             target_node.names.as_mut().unwrap().push(Name {
                                 tax_id: id.to_string(),
-                                name: new_node.tax_id(),
-                                unique_name: format!("{}:{}", &label, new_node.tax_id()),
+                                name: prefixed_name.clone(),
+                                unique_name: prefixed_name,
                                 class: Some("xref".to_string()),
                                 ..Default::default()
                             });

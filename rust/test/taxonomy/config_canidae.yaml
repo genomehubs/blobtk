@@ -20,7 +20,6 @@ taxonomies:
     name_classes:
       - scientific name
     xref_label: gbif
-
   - path: test/taxonomy/ott
     taxonomy_format: ott
     root_taxon_id:

@@ -168,6 +168,16 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                         taxonomy.create_taxa,
                     );
                 }
+                Some(cli::TaxonomyFormat::NCBI) => {
+                    lookup_nodes(
+                        &filtered_new_nodes,
+                        &mut nodes,
+                        &taxonomy.name_classes,
+                        &options.name_classes,
+                        taxonomy.xref_label.clone(),
+                        taxonomy.create_taxa,
+                    );
+                }
                 Some(cli::TaxonomyFormat::OTT) => {
                     lookup_nodes_by_id(
                         &filtered_new_nodes,
