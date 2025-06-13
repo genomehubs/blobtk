@@ -337,10 +337,6 @@ impl Nodes {
 
         let mut ancestors = HashSet::new();
         for root_id in root_ids {
-            if visited.contains(&root_id) {
-                eprintln!("[WARN] Detected cycle or repeated node: {}. Skipping to prevent infinite recursion.", root_id);
-                continue;
-            }
             visited.insert(root_id.clone());
             if let Some(lineage_root_id) = base_id.clone() {
                 let lineage = self.lineage(&lineage_root_id, &root_id);
@@ -409,20 +405,11 @@ impl Nodes {
     }
 
     pub fn merge(&mut self, new_nodes: &Nodes) -> Result<(), anyhow::Error> {
-        println!(
-            "[DEBUG] merge: before: {}, merging: {}",
-            self.nodes.len(),
-            new_nodes.nodes.len()
-        );
         let nodes = &mut self.nodes;
         let children = &mut self.children;
         for node in new_nodes.nodes.values() {
             // Prevent self-parenting
             if node.tax_id == node.parent_tax_id {
-                eprintln!(
-                    "[WARN] Node {} is its own parent. Skipping to prevent loop.",
-                    node.tax_id
-                );
                 continue;
             }
             // Prevent cycles: check if parent is a descendant of this node
@@ -439,10 +426,6 @@ impl Nodes {
                 ancestor = parent_node.parent_tax_id.clone();
             }
             if cycle {
-                eprintln!(
-                    "[WARN] Inserting node {} would create a cycle. Skipping.",
-                    node.tax_id
-                );
                 continue;
             }
             // Always insert/replace the node
@@ -462,7 +445,6 @@ impl Nodes {
                 }
             }
         }
-        println!("[DEBUG] merge: after: {}", self.nodes.len());
         Ok(())
     }
 
@@ -991,22 +973,16 @@ impl Nodes {
             &id_map,
             false,
             options.create_taxa,
+            options.xref_label.clone(),
         )?;
-        println!("[DEBUG] Parsed new_nodes: {}", new_nodes.nodes.len());
-        println!("[DEBUG] Parsed new_names: {}", new_names.len());
         // Try to add names to existing nodes
         let mut nodes_struct = Nodes { nodes, children };
         let add_names_result = nodes_struct.add_names(&new_names);
-        println!("[DEBUG] add_names result: {:?}", add_names_result);
         // Optionally, add new nodes if not present
         let mut created_count = 0;
         for (taxid, node) in new_nodes.nodes.iter() {
             // Prevent self-parenting
             if node.tax_id == node.parent_tax_id {
-                eprintln!(
-                    "[WARN] Node {} is its own parent. Skipping to prevent loop.",
-                    node.tax_id
-                );
                 continue;
             }
             // Prevent cycles: check if parent is a descendant of this node
@@ -1023,14 +999,9 @@ impl Nodes {
                 ancestor = parent_node.parent_tax_id.clone();
             }
             if cycle {
-                eprintln!(
-                    "[WARN] Inserting node {} would create a cycle. Skipping.",
-                    node.tax_id
-                );
                 continue;
             }
             if !nodes_struct.nodes.contains_key(taxid) {
-                println!("[DEBUG] Creating new node for taxid: {}", taxid);
                 nodes_struct.nodes.insert(taxid.clone(), node.clone());
                 let parent = node.parent_tax_id.clone();
                 let child = node.tax_id.clone();
@@ -1049,11 +1020,6 @@ impl Nodes {
                 created_count += 1;
             }
         }
-        println!(
-            "[DEBUG] Created {} new nodes from genomehubs file {}",
-            created_count,
-            genomehubs_files.display()
-        );
         Ok(nodes_struct)
     }
 }

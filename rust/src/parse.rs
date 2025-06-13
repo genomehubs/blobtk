@@ -47,6 +47,7 @@ fn add_new_names(
     taxon_names: &HashMap<String, String>,
     names: &mut HashMap<String, Vec<Name>>,
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
+    xref_label: &Option<String>,
 ) {
     if !taxon.tax_id.is_some() {
         return;
@@ -70,9 +71,14 @@ fn add_new_names(
             }
         }
 
+        let unique_name = match xref_label {
+            Some(label) => format!("{}:{}", label, name),
+            None => name.clone(),
+        };
         let taxon_name = Name {
             tax_id: tax_id.clone(),
             name: name.clone(),
+            unique_name,
             class: Some(name_class.clone()),
             ..Default::default()
         };
@@ -124,6 +130,7 @@ fn nodes_from_file(
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
     write_validated: bool,
     create_taxa: bool,
+    xref_label: Option<String>,
 ) -> Result<(HashMap<String, Vec<Name>>, HashMap<String, Node>), error::Error> {
     let keys = vec!["attributes", "taxon_names", "taxonomy"];
     let mut fixed_names = HashMap::new();
@@ -186,7 +193,7 @@ fn nodes_from_file(
         if let Some(taxon) = &assigned_taxon {
             match_counts.assigned += 1;
             if let Some(taxon_names) = taxon_names_section {
-                add_new_names(&taxon, taxon_names, &mut names, &id_map);
+                add_new_names(&taxon, taxon_names, &mut names, &id_map, &xref_label);
             }
             ghubs_config.write_modified_row(
                 &processed,
@@ -294,6 +301,10 @@ fn nodes_from_file(
                                 format!("anc_{}_{}", inter_rank, inter_name.replace(' ', "_"));
                             // Only add if not already present
                             if !nodes.contains_key(&inter_tax_id) {
+                                let inter_unique_name = match xref_label {
+                                    Some(ref label) => format!("{}:{}", label, inter_name),
+                                    None => "".to_string(),
+                                };
                                 let inter_node = Node {
                                     tax_id: inter_tax_id.clone(),
                                     parent_tax_id: prev_tax_id.clone(),
@@ -302,6 +313,7 @@ fn nodes_from_file(
                                     names: Some(vec![Name {
                                         tax_id: inter_tax_id.clone(),
                                         name: inter_name.clone(),
+                                        unique_name: inter_unique_name,
                                         class: Some("scientific name".to_string()),
                                         ..Default::default()
                                     }]),
@@ -334,6 +346,7 @@ fn nodes_from_file(
                                 taxon_names,
                                 &mut names,
                                 &id_map,
+                                &xref_label,
                             );
                         }
                         ghubs_config.write_modified_row(
@@ -386,6 +399,10 @@ fn nodes_from_file(
                             };
                             // Insert genus node if not already present
                             if !nodes.contains_key(&genus_tax_id) {
+                                let genus_unique_name = match xref_label {
+                                    Some(ref label) => format!("{}:{}", label, genus_name),
+                                    None => "".to_string(),
+                                };
                                 let genus_node = Node {
                                     tax_id: genus_tax_id.clone(),
                                     parent_tax_id: higher_candidate.tax_id.clone().unwrap(),
@@ -394,6 +411,7 @@ fn nodes_from_file(
                                     names: Some(vec![Name {
                                         tax_id: genus_tax_id.clone(),
                                         name: genus_name.to_string(),
+                                        unique_name: genus_unique_name,
                                         class: Some("scientific name".to_string()),
                                         ..Default::default()
                                     }]),
@@ -424,6 +442,7 @@ fn nodes_from_file(
                                     taxon_names,
                                     &mut names,
                                     &id_map,
+                                    &xref_label,
                                 );
                             }
                             ghubs_config.write_modified_row(
@@ -449,6 +468,7 @@ fn nodes_from_file(
                         taxon_names,
                         &mut names,
                         &id_map,
+                        &xref_label,
                     );
                 }
                 ghubs_config.write_modified_row(
@@ -500,6 +520,7 @@ pub fn parse_file(
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
     write_validated: bool,
     create_taxa: bool,
+    xref_label: Option<String>,
 ) -> Result<(Nodes, HashMap<String, Vec<Name>>, Source), error::Error> {
     // let mut children = HashMap::new();
 
@@ -514,6 +535,7 @@ pub fn parse_file(
         &id_map,
         write_validated,
         create_taxa,
+        xref_label.clone(),
     )?;
     let mut nodes = Nodes {
         nodes: HashMap::new(),
@@ -522,10 +544,18 @@ pub fn parse_file(
     let source = Source::new(&ghubs_config);
     for (tax_id, node) in tmp_nodes.iter() {
         let mut node = node.clone();
-        // TODO: set xref label as unique name
+        let unique_name = match &xref_label {
+            Some(label) => format!(
+                "{}:{}",
+                label,
+                node.scientific_name.clone().unwrap_or_default()
+            ),
+            None => String::new(),
+        };
         let name = Name {
             tax_id: tax_id.clone(),
             name: node.scientific_name.clone().unwrap(),
+            unique_name,
             class: Some("scientific name".to_string()),
             ..Default::default()
         };

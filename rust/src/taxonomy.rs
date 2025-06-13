@@ -119,12 +119,12 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
 
     // 2. Merge in each additional taxonomy in the order given in the config
     if let Some(taxonomies) = options.taxonomies.clone() {
-        for taxonomy in taxonomies {
-            let new_nodes = taxdump_to_nodes(&taxonomy, Some(&mut nodes)).unwrap();
-            let taxonomy_format = taxonomy.taxonomy_format;
+        for taxonomy_options in taxonomies {
+            let new_nodes = taxdump_to_nodes(&taxonomy_options, Some(&mut nodes)).unwrap();
+            let taxonomy_format = taxonomy_options.taxonomy_format;
             let mut filtered_new_nodes = new_nodes.clone();
             // Filter new_nodes by root_taxon_id and base_taxon_id if specified
-            if let Some(root_ids) = taxonomy.root_taxon_id.clone() {
+            if let Some(root_ids) = taxonomy_options.root_taxon_id.clone() {
                 let mut keep = std::collections::HashSet::new();
                 for root_id in root_ids {
                     // Collect all descendants of root_id
@@ -143,7 +143,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                 filtered_new_nodes.children.retain(|k, _| keep.contains(k));
             }
             // Optionally filter by base_taxon_id (if you want to restrict further)
-            if let Some(base_id) = taxonomy.base_taxon_id.clone() {
+            if let Some(base_id) = taxonomy_options.base_taxon_id.clone() {
                 if filtered_new_nodes.nodes.contains_key(&base_id) {
                     let mut keep = std::collections::HashSet::new();
                     let mut stack = vec![base_id.clone()];
@@ -165,20 +165,20 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                     lookup_nodes(
                         &filtered_new_nodes,
                         &mut nodes,
-                        &taxonomy.name_classes,
+                        &taxonomy_options.name_classes,
                         &options.name_classes,
-                        taxonomy.xref_label.clone(),
-                        taxonomy.create_taxa,
+                        taxonomy_options.xref_label.clone(),
+                        taxonomy_options.create_taxa,
                     );
                 }
                 Some(cli::TaxonomyFormat::NCBI) => {
                     lookup_nodes(
                         &filtered_new_nodes,
                         &mut nodes,
-                        &taxonomy.name_classes,
+                        &taxonomy_options.name_classes,
                         &options.name_classes,
-                        taxonomy.xref_label.clone(),
-                        taxonomy.create_taxa,
+                        taxonomy_options.xref_label.clone(),
+                        taxonomy_options.create_taxa,
                     );
                 }
                 Some(cli::TaxonomyFormat::OTT) => {
@@ -186,8 +186,8 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                         &filtered_new_nodes,
                         &mut nodes,
                         &"ncbi",
-                        taxonomy.xref_label.clone(),
-                        taxonomy.create_taxa,
+                        taxonomy_options.xref_label.clone(),
+                        taxonomy_options.create_taxa,
                     );
                 }
                 _ => {
@@ -198,15 +198,15 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
         }
     }
 
-    if let Some(genomehubs_files) = options.genomehubs_files.clone() {
-        let id_map = build_fast_lookup(&nodes, &options.name_classes);
-        for genomehubs_file in genomehubs_files {
-            let (new_nodes, new_names, source) =
-                parse_file(genomehubs_file, &id_map, false, false)?;
-            nodes.add_names(&new_names)?;
-            nodes.merge(&new_nodes)?;
-        }
-    }
+    // if let Some(genomehubs_files) = options.genomehubs_files.clone() {
+    //     let id_map = build_fast_lookup(&nodes, &options.name_classes);
+    //     for genomehubs_file in genomehubs_files {
+    //         let (new_nodes, new_names, source) =
+    //             parse_file(genomehubs_file, &id_map, false, false, taxonomy.xref_label)?;
+    //         nodes.add_names(&new_names)?;
+    //         nodes.merge(&new_nodes)?;
+    //     }
+    // }
 
     if let Some(taxdump_out) = options.out.clone() {
         let root_taxon_ids = options.root_taxon_id.clone();
