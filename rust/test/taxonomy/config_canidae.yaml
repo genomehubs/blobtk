@@ -28,6 +28,7 @@ taxonomies:
     name_classes:
       - scientific name
     xref_label: tolid
+    create_taxa: true
   # - path: test/taxonomy/ott
   #   taxonomy_format: ott
   #   root_taxon_id:

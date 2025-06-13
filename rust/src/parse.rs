@@ -123,6 +123,7 @@ fn nodes_from_file(
     ghubs_config: &mut GHubsConfig,
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
     write_validated: bool,
+    create_taxa: bool,
 ) -> Result<(HashMap<String, Vec<Name>>, HashMap<String, Node>), error::Error> {
     let keys = vec!["attributes", "taxon_names", "taxonomy"];
     let mut fixed_names = HashMap::new();
@@ -254,7 +255,189 @@ fn nodes_from_file(
 
             ghubs_config.write_exception(&combined_report);
         }
-        if unmatched {
+        if unmatched && create_taxa {
+            // --- BEGIN INTERMEDIATE NODE LOGIC ---
+            if create_taxa {
+                // Only try to create intermediate nodes if we have a putative match with a higher rank
+                if let Some(MatchStatus::PutativeMatch(higher_candidate)) =
+                    &taxon_match.higher_status
+                {
+                    // Get the lineage from the matched parent to the new node
+                    let mut lineage = vec![];
+                    if let Some(lineage_str) = taxonomy_section.unwrap().get("lineage") {
+                        lineage = lineage_str
+                            .split(';')
+                            .map(|s| s.trim().to_string())
+                            .collect();
+                    }
+                    // Get the ranks for the lineage (assume ordered from root to leaf)
+                    let mut ranks = vec![];
+                    if let Some(ranks_str) = taxonomy_section.unwrap().get("lineage_ranks") {
+                        ranks = ranks_str.split(';').map(|s| s.trim().to_string()).collect();
+                    }
+                    // Find the index of the matched parent and the new node in the lineage
+                    let parent_name = &higher_candidate.name;
+                    let node_name = &taxon_match.taxon.name;
+                    let parent_idx = lineage.iter().position(|n| n == parent_name);
+                    let node_idx = lineage.iter().position(|n| n == node_name);
+                    if let (Some(parent_idx), Some(node_idx)) = (parent_idx, node_idx) {
+                        // Walk from parent_idx+1 to node_idx-1 to find missing intermediates
+                        let mut prev_tax_id = higher_candidate.tax_id.clone().unwrap();
+                        for i in (parent_idx + 1)..node_idx {
+                            let inter_name = &lineage[i];
+                            let inter_rank = ranks
+                                .get(i)
+                                .cloned()
+                                .unwrap_or_else(|| "no rank".to_string());
+                            // Synthesize a tax_id (e.g., hash or prefix+name)
+                            let inter_tax_id =
+                                format!("anc_{}_{}", inter_rank, inter_name.replace(' ', "_"));
+                            // Only add if not already present
+                            if !nodes.contains_key(&inter_tax_id) {
+                                let inter_node = Node {
+                                    tax_id: inter_tax_id.clone(),
+                                    parent_tax_id: prev_tax_id.clone(),
+                                    rank: inter_rank.clone(),
+                                    scientific_name: Some(inter_name.clone()),
+                                    names: Some(vec![Name {
+                                        tax_id: inter_tax_id.clone(),
+                                        name: inter_name.clone(),
+                                        class: Some("scientific name".to_string()),
+                                        ..Default::default()
+                                    }]),
+                                    ..Default::default()
+                                };
+                                nodes.insert(inter_tax_id.clone(), inter_node);
+                            }
+                            prev_tax_id = inter_tax_id;
+                        }
+                        // Now add the final node, parented to the last intermediate (or matched parent)
+                        let mut node = Node {
+                            tax_id: taxon_match
+                                .taxon
+                                .tax_id
+                                .clone()
+                                .unwrap_or_else(|| node_name.clone()),
+                            parent_tax_id: prev_tax_id.clone(),
+                            rank: taxon_match.taxon.rank.clone(),
+                            scientific_name: Some(node_name.clone()),
+                            names: None,
+                            ..Default::default()
+                        };
+                        nodes.insert(node.tax_id.clone(), node.clone());
+                        if let Some(taxon_names) = taxon_names_section {
+                            add_new_names(
+                                &Candidate {
+                                    tax_id: Some(node.tax_id.clone()),
+                                    ..Default::default()
+                                },
+                                taxon_names,
+                                &mut names,
+                                &id_map,
+                            );
+                        }
+                        ghubs_config.write_modified_row(
+                            &processed,
+                            "taxonomy",
+                            "taxon_id".to_string(),
+                            node.tax_id.clone(),
+                        )?;
+                        continue; // skip the old unmatched logic
+                    }
+                }
+            }
+            // --- END INTERMEDIATE NODE LOGIC ---
+            // --- BEGIN GENUS INTERMEDIATE NODE LOGIC ---
+            if create_taxa {
+                if let Some(MatchStatus::PutativeMatch(higher_candidate)) =
+                    &taxon_match.higher_status
+                {
+                    let node_rank = taxon_match.taxon.rank.as_str();
+                    let node_name = &taxon_match.taxon.name;
+                    // Only apply this logic for species or subspecies
+                    if node_rank == "species" || node_rank == "subspecies" {
+                        // Extract genus from species name (first word)
+                        if let Some(genus_name) = node_name.split_whitespace().next() {
+                            // Check if node.tax_id matches tolId pattern: 1-2 lower, 1 upper, 2 lower, 1 upper, 2-3 lower
+                            let tolid_re =
+                                regex::Regex::new(r"^[a-z]{1,2}[A-Z][a-z]{2,3}[A-Z]").unwrap();
+                            let genus_tax_id = {
+                                let alt_id = taxonomy_section
+                                    .unwrap()
+                                    .get("alt_taxon_id")
+                                    .cloned()
+                                    .unwrap_or_else(|| {
+                                        format!("anc_genus_{}", genus_name.replace(' ', "_"))
+                                    });
+                                if tolid_re.is_match(&alt_id) {
+                                    // Find index of second uppercase letter
+                                    let mut upper_indices = alt_id
+                                        .char_indices()
+                                        .filter(|&(_, c)| c.is_ascii_uppercase());
+                                    let _ = upper_indices.next(); // skip first
+                                    if let Some((second_upper_idx, _)) = upper_indices.next() {
+                                        alt_id[..second_upper_idx].to_string()
+                                    } else {
+                                        format!("anc_genus_{}", genus_name.replace(' ', "_"))
+                                    }
+                                } else {
+                                    format!("anc_genus_{}", genus_name.replace(' ', "_"))
+                                }
+                            };
+                            // Insert genus node if not already present
+                            if !nodes.contains_key(&genus_tax_id) {
+                                let genus_node = Node {
+                                    tax_id: genus_tax_id.clone(),
+                                    parent_tax_id: higher_candidate.tax_id.clone().unwrap(),
+                                    rank: "genus".to_string(),
+                                    scientific_name: Some(genus_name.to_string()),
+                                    names: Some(vec![Name {
+                                        tax_id: genus_tax_id.clone(),
+                                        name: genus_name.to_string(),
+                                        class: Some("scientific name".to_string()),
+                                        ..Default::default()
+                                    }]),
+                                    ..Default::default()
+                                };
+                                nodes.insert(genus_tax_id.clone(), genus_node);
+                            }
+                            // Now add the species/subspecies node, parented to the genus
+                            let mut node = Node {
+                                tax_id: taxon_match
+                                    .taxon
+                                    .tax_id
+                                    .clone()
+                                    .unwrap_or_else(|| node_name.clone()),
+                                parent_tax_id: genus_tax_id.clone(),
+                                rank: taxon_match.taxon.rank.clone(),
+                                scientific_name: Some(node_name.clone()),
+                                names: None,
+                                ..Default::default()
+                            };
+                            nodes.insert(node.tax_id.clone(), node.clone());
+                            if let Some(taxon_names) = taxon_names_section {
+                                add_new_names(
+                                    &Candidate {
+                                        tax_id: Some(node.tax_id.clone()),
+                                        ..Default::default()
+                                    },
+                                    taxon_names,
+                                    &mut names,
+                                    &id_map,
+                                );
+                            }
+                            ghubs_config.write_modified_row(
+                                &processed,
+                                "taxonomy",
+                                "taxon_id".to_string(),
+                                node.tax_id.clone(),
+                            )?;
+                            continue; // skip the old unmatched logic
+                        }
+                    }
+                }
+            }
+            // --- END GENUS INTERMEDIATE NODE LOGIC ---
             if let Some(node) = add_new_taxid(&taxon_match, taxonomy_section.unwrap(), &id_map) {
                 nodes.insert(node.tax_id.clone(), node.clone());
                 if let Some(taxon_names) = taxon_names_section {
@@ -316,6 +499,7 @@ pub fn parse_file(
     config_file: PathBuf,
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
     write_validated: bool,
+    create_taxa: bool,
 ) -> Result<(Nodes, HashMap<String, Vec<Name>>, Source), error::Error> {
     // let mut children = HashMap::new();
 
@@ -324,8 +508,13 @@ pub fn parse_file(
         Err(err) => return Err(err),
     };
     // let source = Source::new(&ghubs_config);
-    let (names, tmp_nodes) =
-        nodes_from_file(&config_file, &mut ghubs_config, &id_map, write_validated)?;
+    let (names, tmp_nodes) = nodes_from_file(
+        &config_file,
+        &mut ghubs_config,
+        &id_map,
+        write_validated,
+        create_taxa,
+    )?;
     let mut nodes = Nodes {
         nodes: HashMap::new(),
         children: HashMap::new(),

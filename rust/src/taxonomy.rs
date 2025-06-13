@@ -201,7 +201,8 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     if let Some(genomehubs_files) = options.genomehubs_files.clone() {
         let id_map = build_fast_lookup(&nodes, &options.name_classes);
         for genomehubs_file in genomehubs_files {
-            let (new_nodes, new_names, source) = parse_file(genomehubs_file, &id_map, false)?;
+            let (new_nodes, new_names, source) =
+                parse_file(genomehubs_file, &id_map, false, false)?;
             nodes.add_names(&new_names)?;
             nodes.merge(&new_nodes)?;
         }

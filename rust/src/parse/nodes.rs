@@ -986,7 +986,12 @@ impl Nodes {
             name_classes,
         );
         // parse_file returns (Nodes, HashMap<String, Vec<Name>>, String)
-        let (new_nodes, new_names, source) = parse_file(genomehubs_files.clone(), &id_map, false)?;
+        let (new_nodes, new_names, source) = parse_file(
+            genomehubs_files.clone(),
+            &id_map,
+            false,
+            options.create_taxa,
+        )?;
         println!("[DEBUG] Parsed new_nodes: {}", new_nodes.nodes.len());
         println!("[DEBUG] Parsed new_names: {}", new_names.len());
         // Try to add names to existing nodes
