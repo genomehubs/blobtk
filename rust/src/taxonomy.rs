@@ -24,7 +24,7 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
             Err(_) => {
                 return Err(error::Error::FileNotFound(format!(
                     "{}",
-                    &config_file.to_str().unwrap()
+                    &config_file.to_string_lossy()
                 )))
             }
         };
@@ -33,7 +33,7 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
             Err(err) => {
                 return Err(error::Error::SerdeError(format!(
                     "{} {}",
-                    &config_file.to_str().unwrap(),
+                    &config_file.to_string_lossy(),
                     err.to_string()
                 )))
             }
@@ -92,18 +92,15 @@ pub fn taxdump_to_nodes(
     let options = load_options(&options)?;
     let nodes;
     if let Some(taxdump) = options.path.clone() {
+        dbg!(&taxdump);
         nodes = match options.taxonomy_format {
-            Some(cli::TaxonomyFormat::GBIF) => {
-                Nodes::from_gbif(taxdump, &options, existing).unwrap()
-            }
-            Some(cli::TaxonomyFormat::ENA) => {
-                Nodes::from_jsonl(taxdump, &options, existing).unwrap()
-            }
-            Some(cli::TaxonomyFormat::OTT) => Nodes::from_ott(taxdump, &options, existing).unwrap(),
+            Some(cli::TaxonomyFormat::GBIF) => Nodes::from_gbif(taxdump, &options, existing)?,
+            Some(cli::TaxonomyFormat::ENA) => Nodes::from_jsonl(taxdump, &options, existing)?,
+            Some(cli::TaxonomyFormat::OTT) => Nodes::from_ott(taxdump, &options, existing)?,
             Some(cli::TaxonomyFormat::GenomeHubs) => {
-                Nodes::from_genomehubs(taxdump, &options, existing).unwrap()
+                Nodes::from_genomehubs(taxdump, &options, existing)?
             }
-            _ => Nodes::from_taxdump(taxdump, options.xref_label.clone()).unwrap(),
+            _ => Nodes::from_taxdump(taxdump, options.xref_label.clone())?,
         };
     } else {
         return Err(error::Error::NotDefined(format!("taxdump")));
@@ -120,7 +117,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     // 2. Merge in each additional taxonomy in the order given in the config
     if let Some(taxonomies) = options.taxonomies.clone() {
         for taxonomy_options in taxonomies {
-            let new_nodes = taxdump_to_nodes(&taxonomy_options, Some(&mut nodes)).unwrap();
+            let new_nodes = taxdump_to_nodes(&taxonomy_options, Some(&mut nodes))?;
             let taxonomy_format = taxonomy_options.taxonomy_format;
             let mut filtered_new_nodes = new_nodes.clone();
             // Filter new_nodes by root_taxon_id and base_taxon_id if specified

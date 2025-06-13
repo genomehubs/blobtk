@@ -18,6 +18,7 @@ use struct_iterable::Iterable;
 
 use crate::cli::TaxonomyOptions;
 use crate::io;
+use crate::io::file_reader;
 
 /// A taxon name
 #[derive(Clone, Debug, Default, Eq, Iterable, Ord, PartialEq, PartialOrd)]
@@ -133,7 +134,7 @@ impl Node {
         if self.rank == "subspecies" {
             return 'b';
         }
-        self.rank.chars().next().unwrap()
+        self.rank.chars().next().unwrap_or(' ')
     }
 
     pub fn scientific_name(&self) -> String {
@@ -238,7 +239,10 @@ impl Nodes {
 
     /// Get parent Node.
     pub fn parent(&self, taxon_id: &String) -> Option<&Node> {
-        let node = self.nodes.get(taxon_id).unwrap();
+        let node = match self.nodes.get(taxon_id) {
+            Some(n) => n,
+            None => return None,
+        };
         self.nodes.get(&node.parent_tax_id)
     }
 
@@ -482,7 +486,7 @@ impl Nodes {
     pub fn from_taxdump(
         taxdump: PathBuf,
         xref_label: Option<String>,
-    ) -> Result<Nodes, anyhow::Error> {
+    ) -> Result<Nodes, crate::error::Error> {
         let mut nodes = HashMap::new();
         let mut children = HashMap::new();
 
@@ -494,16 +498,19 @@ impl Nodes {
         if let Ok(lines) = io::read_lines(nodes_file) {
             for line in lines {
                 if let Ok(s) = line {
-                    let node = Node::parse(&s).unwrap().1;
+                    let node = match Node::parse(&s) {
+                        Ok((_, n)) => n,
+                        Err(_) => continue,
+                    };
                     let parent = node.parent_tax_id.clone();
                     let child = node.tax_id.clone();
                     if parent != child {
                         match children.entry(parent) {
                             Entry::Vacant(e) => {
-                                e.insert(vec![child]);
+                                e.insert(vec![child.clone()]);
                             }
                             Entry::Occupied(mut e) => {
-                                e.get_mut().push(child);
+                                e.get_mut().push(child.clone());
                             }
                         }
                     }
@@ -520,18 +527,22 @@ impl Nodes {
         if let Ok(lines) = io::read_lines(names_file) {
             for line in lines {
                 if let Ok(s) = line {
-                    let name = Name::parse(&s, &xref_label).unwrap().1;
-                    let node = nodes.get_mut(&name.tax_id).unwrap();
-                    if let Some(class) = name.clone().class {
-                        if class == "scientific name" {
-                            node.scientific_name = Some(name.clone().name)
+                    let name = match Name::parse(&s, &xref_label) {
+                        Ok((_, n)) => n,
+                        Err(_) => continue,
+                    };
+                    if let Some(node) = nodes.get_mut(&name.tax_id) {
+                        if let Some(class) = name.clone().class {
+                            if class == "scientific name" {
+                                node.scientific_name = Some(name.clone().name)
+                            }
                         }
-                    }
-                    let mut names = node.names.as_mut();
-                    if let Some(names) = names.as_mut() {
-                        names.push(name);
-                    } else {
-                        node.names = Some(vec![name]);
+                        let mut names = node.names.as_mut();
+                        if let Some(names) = names.as_mut() {
+                            names.push(name);
+                        } else {
+                            node.names = Some(vec![name]);
+                        }
                     }
                 }
             }
@@ -548,13 +559,17 @@ impl Nodes {
         if let Ok(lines) = io::read_lines(merged_file) {
             for line in lines {
                 if let Ok(s) = line {
-                    let name = Name::parse_merged(&s).unwrap().1;
-                    let node = nodes.get_mut(&name.tax_id).unwrap();
-                    let mut names = node.names.as_mut();
-                    if let Some(names) = names.as_mut() {
-                        names.push(name);
-                    } else {
-                        node.names = Some(vec![name]);
+                    let name = match Name::parse_merged(&s) {
+                        Ok((_, n)) => n,
+                        Err(_) => continue,
+                    };
+                    if let Some(node) = nodes.get_mut(&name.tax_id) {
+                        let mut names = node.names.as_mut();
+                        if let Some(names) = names.as_mut() {
+                            names.push(name);
+                        } else {
+                            node.names = Some(vec![name]);
+                        }
                     }
                 }
             }
@@ -567,7 +582,7 @@ impl Nodes {
         ott_path: PathBuf,
         options: &TaxonomyOptions,
         existing: Option<&mut Nodes>,
-    ) -> Result<Nodes, anyhow::Error> {
+    ) -> Result<Nodes, crate::error::Error> {
         use std::collections::hash_map::Entry;
         use std::fs::File;
         use std::io::{BufRead, BufReader};
@@ -584,10 +599,10 @@ impl Nodes {
         // Parse taxonomy.tsv with correct OTT separator (\t|\t)
         let mut taxonomy_file = ott_path.clone();
         taxonomy_file.push("taxonomy.tsv");
-        let file = File::open(&taxonomy_file)?;
+        let file = File::open(&taxonomy_file).map_err(crate::error::Error::from)?;
         let reader = BufReader::new(file);
         for line in reader.lines() {
-            let line = line?;
+            let line = line.map_err(crate::error::Error::from)?;
             if line.starts_with("uid\t") {
                 continue;
             }
@@ -652,10 +667,10 @@ impl Nodes {
         let mut synonyms_file = ott_path.clone();
         synonyms_file.push("synonyms.tsv");
         if synonyms_file.exists() {
-            let file = File::open(&synonyms_file)?;
+            let file = File::open(&synonyms_file).map_err(crate::error::Error::from)?;
             let reader = BufReader::new(file);
             for line in reader.lines() {
-                let line = line?;
+                let line = line.map_err(crate::error::Error::from)?;
                 if line.starts_with("synonym\t") {
                     continue;
                 }
@@ -702,10 +717,10 @@ impl Nodes {
         let mut forwards_file = ott_path.clone();
         forwards_file.push("forwards.tsv");
         if forwards_file.exists() {
-            let file = File::open(&forwards_file)?;
+            let file = File::open(&forwards_file).map_err(crate::error::Error::from)?;
             let reader = BufReader::new(file);
             for line in reader.lines() {
-                let line = line?;
+                let line = line.map_err(crate::error::Error::from)?;
                 if line.starts_with("id\t") {
                     continue;
                 }
@@ -744,7 +759,7 @@ impl Nodes {
         gbif_backbone: PathBuf,
         options: &TaxonomyOptions,
         existing: Option<&mut Nodes>,
-    ) -> Result<Nodes, anyhow::Error> {
+    ) -> Result<Nodes, crate::error::Error> {
         let mut nodes;
         let mut children;
         if let Some(existing_nodes) = existing {
@@ -774,18 +789,30 @@ impl Nodes {
         ignore.insert("PROPARTE_SYNONYM");
         ignore.insert("SYNONYM");
         for result in rdr.records() {
-            let record = result?;
-            let status = record.get(4).unwrap();
+            let record = result.map_err(crate::error::Error::from)?;
+            let status = match record.get(4) {
+                Some(s) => s,
+                None => continue,
+            };
             if ignore.contains(status) {
                 continue;
             }
-            let tax_id = record.get(0).unwrap().to_string();
+            let tax_id = match record.get(0) {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
             let name_class = match status {
                 "ACCEPTED" => "scientific name".to_string(),
                 _ => "synonym".to_string(),
             };
-            let taxon_name = record.get(19).unwrap().to_string();
-            let mut parent_tax_id = record.get(1).unwrap().to_string();
+            let taxon_name = match record.get(19) {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
+            let mut parent_tax_id = match record.get(1) {
+                Some(s) => s.to_string(),
+                None => "root".to_string(),
+            };
             if parent_tax_id == "\\N" {
                 parent_tax_id = "root".to_string()
             }
@@ -806,7 +833,10 @@ impl Nodes {
                     let node = Node {
                         tax_id,
                         parent_tax_id,
-                        rank: record.get(5).unwrap().to_case(Case::Lower),
+                        rank: match record.get(5) {
+                            Some(r) => r.to_case(Case::Lower),
+                            None => "".to_string(),
+                        },
                         scientific_name: if name_class == "scientific name" {
                             Some(taxon_name)
                         } else {
@@ -846,7 +876,7 @@ impl Nodes {
         jsonl_path: PathBuf,
         options: &TaxonomyOptions,
         existing: Option<&mut Nodes>,
-    ) -> Result<Nodes, anyhow::Error> {
+    ) -> Result<Nodes, crate::error::Error> {
         use convert_case::Case;
         use convert_case::Casing;
         use serde_json::Value;
@@ -862,28 +892,29 @@ impl Nodes {
         let mut children = HashMap::new();
         if let Some(existing_nodes) = existing {
             let table = crate::parse::lookup::build_lookup(existing_nodes, &name_classes, false);
-            let file = File::open(jsonl_path)?;
-            let reader = BufReader::new(file);
+            let reader = file_reader(jsonl_path).map_err(crate::error::Error::from)?;
             for line in reader.lines() {
-                let line = line?;
-                let v: Value = serde_json::from_str(&line)?;
+                let line = line.map_err(crate::error::Error::from)?;
+                let v: Value = serde_json::from_str(&line).map_err(crate::error::Error::from)?;
                 let tax_id = v["taxId"].as_str().unwrap_or("").to_string();
                 let rank = v["rank"].as_str().unwrap_or("").to_string();
                 let scientific_name = v["scientificName"].as_str().unwrap_or("").to_string();
                 // Parse lineage as Vec<String>
                 let lineage: Vec<String> = if let Some(lin) = v.get("lineage") {
                     if lin.is_string() {
-                        lin.as_str()
-                            .unwrap()
-                            .split(';')
-                            .map(|s| s.trim().to_string())
-                            .collect()
+                        if let Some(lin_str) = lin.as_str() {
+                            lin_str.split(';').map(|s| s.trim().to_string()).collect()
+                        } else {
+                            vec![]
+                        }
                     } else if lin.is_array() {
-                        lin.as_array()
-                            .unwrap()
-                            .iter()
-                            .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                            .collect()
+                        if let Some(arr) = lin.as_array() {
+                            arr.iter()
+                                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                                .collect()
+                        } else {
+                            vec![]
+                        }
                     } else {
                         vec![]
                     }
@@ -946,7 +977,7 @@ impl Nodes {
         genomehubs_files: PathBuf,
         options: &TaxonomyOptions,
         existing: Option<&mut Nodes>,
-    ) -> Result<Nodes, anyhow::Error> {
+    ) -> Result<Nodes, crate::error::Error> {
         use crate::parse::lookup::build_fast_lookup;
         use crate::parse::parse_file;
         use std::collections::HashMap;
@@ -967,14 +998,13 @@ impl Nodes {
             },
             name_classes,
         );
-        // parse_file returns (Nodes, HashMap<String, Vec<Name>>, String)
         let (new_nodes, new_names, source) = parse_file(
             genomehubs_files.clone(),
             &id_map,
             false,
             options.create_taxa,
             options.xref_label.clone(),
-        )?;
+        ).map_err(crate::error::Error::from)?;
         // Try to add names to existing nodes
         let mut nodes_struct = Nodes { nodes, children };
         let add_names_result = nodes_struct.add_names(&new_names);
