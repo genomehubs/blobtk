@@ -100,6 +100,9 @@ pub fn taxdump_to_nodes(
                 Nodes::from_jsonl(taxdump, &options, existing).unwrap()
             }
             Some(cli::TaxonomyFormat::OTT) => Nodes::from_ott(taxdump, &options, existing).unwrap(),
+            Some(cli::TaxonomyFormat::GenomeHubs) => {
+                Nodes::from_genomehubs(taxdump, &options, existing).unwrap()
+            }
             _ => Nodes::from_taxdump(taxdump, options.xref_label.clone()).unwrap(),
         };
     } else {

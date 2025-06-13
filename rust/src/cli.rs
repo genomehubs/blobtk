@@ -462,6 +462,8 @@ pub enum TaxonomyFormat {
     ENA,
     /// OTT (Open Tree of Life) taxonomy containing taxonomy.tsv, synonyms.tsv and forwards.tsv
     OTT,
+    /// GenomeHubs TSV/YAML file pair
+    GenomeHubs,
 }
 
 /// Options to pass to `blobtk taxonomy`

@@ -164,7 +164,8 @@ pub struct GHubsFileConfig {
     #[serde(
         rename = "source_date",
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "date_format"
+        deserialize_with = "date_format",
+        default
     )]
     pub source_date: Option<String>,
     /// Source contact name
@@ -177,7 +178,7 @@ pub struct GHubsFileConfig {
     pub skip_partial: Option<SkipPartial>,
     /// Relative path to a directory containing test files
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub test: Option<PathBuf>,
+    pub tests: Option<PathBuf>,
     /// URL to download file
     #[serde(rename = "url", skip_serializing_if = "Option::is_none")]
     pub file_url: Option<String>,
@@ -1219,7 +1220,8 @@ pub struct Source {
     #[serde(
         rename = "source_date",
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "date_format"
+        deserialize_with = "date_format",
+        default
     )]
     pub date: Option<String>,
     /// Source contact name
@@ -1232,14 +1234,18 @@ fn date_format<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let s = String::deserialize(deserializer)?;
-    if chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").is_ok() {
-        Ok(Some(s))
+    let opt = Option::<String>::deserialize(deserializer)?;
+    if let Some(ref s) = opt {
+        if chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok() {
+            Ok(Some(s.clone()))
+        } else {
+            Err(serde::de::Error::custom(format!(
+                "Invalid date format `{}`. Dates must be `YYYY-MM-DD`",
+                s
+            )))
+        }
     } else {
-        Err(serde::de::Error::custom(format!(
-            "Invalid date format `{}`. Dates must be `YYYY-MM-DD`",
-            s
-        )))
+        Ok(None)
     }
 }
 

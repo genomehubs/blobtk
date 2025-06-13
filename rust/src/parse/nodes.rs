@@ -274,6 +274,7 @@ impl Nodes {
         taxdump_path: &PathBuf,
         append: bool,
     ) -> () {
+        use std::collections::HashSet;
         let nodes_path = io::append_to_path(taxdump_path, "/nodes.dmp");
         let names_path = io::append_to_path(taxdump_path, "/names.dmp");
 
@@ -288,6 +289,30 @@ impl Nodes {
             io::get_writer(&Some(names_path.clone()))
         };
 
+        let mut visited = HashSet::new();
+        self.write_taxdump_inner(
+            root_taxon_ids,
+            leaf_taxon_ids,
+            base_id,
+            taxdump_path,
+            append,
+            &mut nodes_writer,
+            &mut names_writer,
+            &mut visited,
+        );
+    }
+
+    fn write_taxdump_inner(
+        &self,
+        root_taxon_ids: Option<Vec<String>>,
+        leaf_taxon_ids: Option<HashSet<String>>,
+        base_id: Option<String>,
+        taxdump_path: &PathBuf,
+        append: bool,
+        nodes_writer: &mut dyn std::io::Write,
+        names_writer: &mut dyn std::io::Write,
+        visited: &mut HashSet<String>,
+    ) {
         // Find all root nodes if not specified
         let mut root_ids = vec![];
         match root_taxon_ids {
@@ -297,10 +322,13 @@ impl Nodes {
                 }
             }
             None => {
-                // Find all nodes whose parent_tax_id is not present in the map or is empty
-                let all_tax_ids: std::collections::HashSet<_> = self.nodes.keys().cloned().collect();
+                let all_tax_ids: std::collections::HashSet<_> =
+                    self.nodes.keys().cloned().collect();
                 for (tax_id, node) in self.nodes.iter() {
-                    if node.parent_tax_id.is_empty() || !all_tax_ids.contains(&node.parent_tax_id) || node.parent_tax_id == *tax_id {
+                    if node.parent_tax_id.is_empty()
+                        || !all_tax_ids.contains(&node.parent_tax_id)
+                        || node.parent_tax_id == *tax_id
+                    {
                         root_ids.push(tax_id.clone());
                     }
                 }
@@ -309,6 +337,11 @@ impl Nodes {
 
         let mut ancestors = HashSet::new();
         for root_id in root_ids {
+            if visited.contains(&root_id) {
+                eprintln!("[WARN] Detected cycle or repeated node: {}. Skipping to prevent infinite recursion.", root_id);
+                continue;
+            }
+            visited.insert(root_id.clone());
             if let Some(lineage_root_id) = base_id.clone() {
                 let lineage = self.lineage(&lineage_root_id, &root_id);
                 for anc_node in lineage {
@@ -349,12 +382,15 @@ impl Nodes {
                                 }
                             }
                         }
-                        self.write_taxdump(
+                        self.write_taxdump_inner(
                             Some(vec![child.clone()]),
                             leaf_taxon_ids.clone(),
                             None,
                             taxdump_path,
                             true,
+                            nodes_writer,
+                            names_writer,
+                            visited,
                         );
                     }
                 }
@@ -380,18 +416,48 @@ impl Nodes {
         );
         let nodes = &mut self.nodes;
         let children = &mut self.children;
-        for node in new_nodes.nodes.iter() {
+        for node in new_nodes.nodes.values() {
+            // Prevent self-parenting
+            if node.tax_id == node.parent_tax_id {
+                eprintln!(
+                    "[WARN] Node {} is its own parent. Skipping to prevent loop.",
+                    node.tax_id
+                );
+                continue;
+            }
+            // Prevent cycles: check if parent is a descendant of this node
+            let mut ancestor = node.parent_tax_id.clone();
+            let mut cycle = false;
+            while let Some(parent_node) = nodes.get(&ancestor) {
+                if parent_node.tax_id == node.tax_id {
+                    cycle = true;
+                    break;
+                }
+                if parent_node.tax_id == parent_node.parent_tax_id {
+                    break;
+                }
+                ancestor = parent_node.parent_tax_id.clone();
+            }
+            if cycle {
+                eprintln!(
+                    "[WARN] Inserting node {} would create a cycle. Skipping.",
+                    node.tax_id
+                );
+                continue;
+            }
             // Always insert/replace the node
-            nodes.insert(node.1.tax_id.clone(), node.1.clone());
-            let parent = node.1.parent_tax_id.clone();
-            let child = node.1.tax_id.clone();
+            nodes.insert(node.tax_id.clone(), node.clone());
+            let parent = node.parent_tax_id.clone();
+            let child = node.tax_id.clone();
             if parent != child {
                 match children.entry(parent) {
                     Entry::Vacant(e) => {
                         e.insert(vec![child]);
                     }
                     Entry::Occupied(mut e) => {
-                        e.get_mut().push(child);
+                        if !e.get().contains(&child) {
+                            e.get_mut().push(child);
+                        }
                     }
                 }
             }
@@ -524,7 +590,10 @@ impl Nodes {
         use std::fs::File;
         use std::io::{BufRead, BufReader};
         let (mut nodes, mut children) = if let Some(existing_nodes) = existing {
-            (existing_nodes.nodes.clone(), existing_nodes.children.clone())
+            (
+                existing_nodes.nodes.clone(),
+                existing_nodes.children.clone(),
+            )
         } else {
             (HashMap::new(), HashMap::new())
         };
@@ -537,11 +606,19 @@ impl Nodes {
         let reader = BufReader::new(file);
         for line in reader.lines() {
             let line = line?;
-            if line.starts_with("uid\t") { continue; }
+            if line.starts_with("uid\t") {
+                continue;
+            }
             let fields: Vec<&str> = line.split("\t|\t").collect();
-            if fields.len() < 5 { continue; }
+            if fields.len() < 5 {
+                continue;
+            }
             let tax_id = fields[0].trim().to_string();
-            let parent_tax_id = if fields[1].trim().is_empty() { "root".to_string() } else { fields[1].trim().to_string() };
+            let parent_tax_id = if fields[1].trim().is_empty() {
+                "root".to_string()
+            } else {
+                fields[1].trim().to_string()
+            };
             let name = fields[2].trim().to_string();
             let rank = fields[3].trim().to_string();
             let xrefs = fields[4];
@@ -579,8 +656,12 @@ impl Nodes {
             let child = node.tax_id.clone();
             if parent != child {
                 match children.entry(parent) {
-                    Entry::Vacant(e) => { e.insert(vec![child.clone()]); },
-                    Entry::Occupied(mut e) => { e.get_mut().push(child.clone()); }
+                    Entry::Vacant(e) => {
+                        e.insert(vec![child.clone()]);
+                    }
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().push(child.clone());
+                    }
                 }
             }
             nodes.insert(child, node);
@@ -593,12 +674,20 @@ impl Nodes {
             let reader = BufReader::new(file);
             for line in reader.lines() {
                 let line = line?;
-                if line.starts_with("synonym\t") { continue; }
+                if line.starts_with("synonym\t") {
+                    continue;
+                }
                 let fields: Vec<&str> = line.split("\t|\t").collect();
-                if fields.len() < 2 { continue; }
+                if fields.len() < 2 {
+                    continue;
+                }
                 let synonym = fields[0].trim();
                 let tax_id = fields[1].trim();
-                let sourceinfo = if fields.len() > 4 { fields[4].trim() } else { "" };
+                let sourceinfo = if fields.len() > 4 {
+                    fields[4].trim()
+                } else {
+                    ""
+                };
                 // Build unique_name as <prefix>:<synonym> if sourceinfo contains a prefix
                 let unique_name = if let Some((prefix, _)) = sourceinfo.split_once(':') {
                     format!("{}:{}", prefix, synonym)
@@ -635,16 +724,23 @@ impl Nodes {
             let reader = BufReader::new(file);
             for line in reader.lines() {
                 let line = line?;
-                if line.starts_with("id\t") { continue; }
+                if line.starts_with("id\t") {
+                    continue;
+                }
                 let fields: Vec<&str> = line.split('\t').collect();
-                if fields.len() < 2 { continue; }
+                if fields.len() < 2 {
+                    continue;
+                }
                 let merged_id = fields[0];
                 let replacement_id = fields[1];
                 if let Some(node) = nodes.get_mut(replacement_id) {
                     let mut found = false;
                     if let Some(ref mut node_names) = node.names {
                         for n in node_names.iter() {
-                            if n.name == merged_id { found = true; break; }
+                            if n.name == merged_id {
+                                found = true;
+                                break;
+                            }
                         }
                         if !found {
                             node_names.push(Name {
@@ -862,5 +958,97 @@ impl Nodes {
         }
         // Always return empty, as ENA nodes are only attached via lookup
         Ok(Nodes { nodes, children })
+    }
+
+    pub fn from_genomehubs(
+        genomehubs_files: PathBuf,
+        options: &TaxonomyOptions,
+        existing: Option<&mut Nodes>,
+    ) -> Result<Nodes, anyhow::Error> {
+        use crate::parse::lookup::build_fast_lookup;
+        use crate::parse::parse_file;
+        use std::collections::HashMap;
+        use std::path::PathBuf;
+        let (mut nodes, mut children) = if let Some(existing_nodes) = existing {
+            (
+                existing_nodes.nodes.clone(),
+                existing_nodes.children.clone(),
+            )
+        } else {
+            (HashMap::new(), HashMap::new())
+        };
+        let name_classes = &options.name_classes;
+        let id_map = build_fast_lookup(
+            &Nodes {
+                nodes: nodes.clone(),
+                children: children.clone(),
+            },
+            name_classes,
+        );
+        // parse_file returns (Nodes, HashMap<String, Vec<Name>>, String)
+        let (new_nodes, new_names, source) = parse_file(genomehubs_files.clone(), &id_map, false)?;
+        println!("[DEBUG] Parsed new_nodes: {}", new_nodes.nodes.len());
+        println!("[DEBUG] Parsed new_names: {}", new_names.len());
+        // Try to add names to existing nodes
+        let mut nodes_struct = Nodes { nodes, children };
+        let add_names_result = nodes_struct.add_names(&new_names);
+        println!("[DEBUG] add_names result: {:?}", add_names_result);
+        // Optionally, add new nodes if not present
+        let mut created_count = 0;
+        for (taxid, node) in new_nodes.nodes.iter() {
+            // Prevent self-parenting
+            if node.tax_id == node.parent_tax_id {
+                eprintln!(
+                    "[WARN] Node {} is its own parent. Skipping to prevent loop.",
+                    node.tax_id
+                );
+                continue;
+            }
+            // Prevent cycles: check if parent is a descendant of this node
+            let mut ancestor = node.parent_tax_id.clone();
+            let mut cycle = false;
+            while let Some(parent_node) = nodes_struct.nodes.get(&ancestor) {
+                if parent_node.tax_id == node.tax_id {
+                    cycle = true;
+                    break;
+                }
+                if parent_node.tax_id == parent_node.parent_tax_id {
+                    break;
+                }
+                ancestor = parent_node.parent_tax_id.clone();
+            }
+            if cycle {
+                eprintln!(
+                    "[WARN] Inserting node {} would create a cycle. Skipping.",
+                    node.tax_id
+                );
+                continue;
+            }
+            if !nodes_struct.nodes.contains_key(taxid) {
+                println!("[DEBUG] Creating new node for taxid: {}", taxid);
+                nodes_struct.nodes.insert(taxid.clone(), node.clone());
+                let parent = node.parent_tax_id.clone();
+                let child = node.tax_id.clone();
+                if parent != child {
+                    match nodes_struct.children.entry(parent) {
+                        std::collections::hash_map::Entry::Vacant(e) => {
+                            e.insert(vec![child.clone()]);
+                        }
+                        std::collections::hash_map::Entry::Occupied(mut e) => {
+                            if !e.get().contains(&child) {
+                                e.get_mut().push(child.clone());
+                            }
+                        }
+                    }
+                }
+                created_count += 1;
+            }
+        }
+        println!(
+            "[DEBUG] Created {} new nodes from genomehubs file {}",
+            created_count,
+            genomehubs_files.display()
+        );
+        Ok(nodes_struct)
     }
 }
