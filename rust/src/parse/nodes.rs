@@ -1004,7 +1004,8 @@ impl Nodes {
             false,
             options.create_taxa,
             options.xref_label.clone(),
-        ).map_err(crate::error::Error::from)?;
+        )
+        .map_err(crate::error::Error::from)?;
         // Try to add names to existing nodes
         let mut nodes_struct = Nodes { nodes, children };
         let add_names_result = nodes_struct.add_names(&new_names);
@@ -1051,5 +1052,20 @@ impl Nodes {
             }
         }
         Ok(nodes_struct)
+    }
+
+    /// Efficiently merge only names from new_nodes into self, skipping parent/child/cycle logic.
+    /// Use this when create_taxa is false for large taxonomies (e.g. OTT) to avoid O(N^2) merge cost.
+    pub fn merge_names_only(&mut self, new_nodes: &Nodes) -> Result<(), anyhow::Error> {
+        let mut name_map: HashMap<String, Vec<Name>> = HashMap::new();
+        for (taxid, node) in &new_nodes.nodes {
+            if let Some(names) = &node.names {
+                name_map
+                    .entry(taxid.clone())
+                    .or_insert_with(Vec::new)
+                    .extend(names.clone());
+            }
+        }
+        self.add_names(&name_map)
     }
 }

@@ -157,6 +157,19 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                     filtered_new_nodes.children.retain(|k, _| keep.contains(k));
                 }
             }
+            // Use fast name-only merge for OTT if create_taxa is false
+            if let Some(cli::TaxonomyFormat::OTT) = taxonomy_format {
+                dbg!(&taxonomy_options.create_taxa);
+                if taxonomy_options.create_taxa == false {
+                    eprintln!(
+                        "Merging nodes by name only for OTT taxonomy: {}",
+                        taxonomy_options.path.as_ref().unwrap().to_string_lossy()
+                    );
+                    nodes.merge_names_only(&filtered_new_nodes)?;
+                    dbg!("Merged nodes by name only");
+                    continue;
+                }
+            }
             match taxonomy_format {
                 Some(cli::TaxonomyFormat::GBIF) => {
                     lookup_nodes(

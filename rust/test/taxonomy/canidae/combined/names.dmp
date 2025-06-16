@@ -47,12 +47,98 @@
 379584	|	Caniformia	|	ncbi:Caniformia	|	scientific name	|
 9608	|	Canidae	|	ncbi:Canidae	|	scientific name	|
 9608	|	dog, coyote, wolf, fox	|	ncbi:dog, coyote, wolf, fox	|	genbank common name	|
+9608	|	ncbi:9608	|	ott:ncbi:9608	|	xref	|
+9608	|	worms:404128	|	ott:worms:404128	|	xref	|
+9608	|	gbif:9701	|	ott:gbif:9701	|	xref	|
+9608	|	irmng:104585	|	ott:irmng:104585	|	xref	|
+9608	|	Amphicyon angustidens	|	gbif:Amphicyon angustidens	|	synonym	|
+9608	|	Cynodictis angustidens	|	gbif:Cynodictis angustidens	|	synonym	|
+9608	|	Hesperocyon angustidens	|	gbif:Hesperocyon angustidens	|	synonym	|
+9608	|	Pseudocynodictis angustidens	|	gbif:Pseudocynodictis angustidens	|	synonym	|
+9608	|	ott:770319	|	ott:770319	|	xref	|
 9611	|	Canis	|	ncbi:Canis	|	scientific name	|
+9611	|	Jacalius	|	gbif:Jacalius	|	synonym	|
+9611	|	gbif:4833441	|	gbif:4833441	|	xref	|
+9611	|	Canis	|	gbif:Canis	|	scientific name	|
+9611	|	gbif:5219142	|	gbif:5219142	|	xref	|
+9611	|	Thos	|	gbif:Thos	|	synonym	|
+9611	|	gbif:4833475	|	gbif:4833475	|	xref	|
+9611	|	Dieba	|	gbif:Dieba	|	synonym	|
+9611	|	gbif:4833483	|	gbif:4833483	|	xref	|
+9611	|	Lyciscus	|	gbif:Lyciscus	|	synonym	|
+9611	|	gbif:3240004	|	gbif:3240004	|	xref	|
+9611	|	Lupulus	|	gbif:Lupulus	|	synonym	|
+9611	|	gbif:5428984	|	gbif:5428984	|	xref	|
+9611	|	Simenia	|	gbif:Simenia	|	synonym	|
+9611	|	gbif:3240002	|	gbif:3240002	|	xref	|
+9611	|	Oreocyon	|	gbif:Oreocyon	|	synonym	|
+9611	|	gbif:3240003	|	gbif:3240003	|	xref	|
+9611	|	Mamcanisus	|	gbif:Mamcanisus	|	synonym	|
+9611	|	gbif:4833480	|	gbif:4833480	|	xref	|
+9611	|	Alopedon	|	gbif:Alopedon	|	synonym	|
+9611	|	gbif:4833486	|	gbif:4833486	|	xref	|
+9611	|	Canix	|	gbif:Canix	|	synonym	|
+9611	|	gbif:4833472	|	gbif:4833472	|	xref	|
+9611	|	Chaon	|	gbif:Chaon	|	synonym	|
+9611	|	gbif:4833482	|	gbif:4833482	|	xref	|
+9611	|	Neocyon	|	gbif:Neocyon	|	synonym	|
+9611	|	gbif:4833477	|	gbif:4833477	|	xref	|
+9611	|	Vulpicanis	|	gbif:Vulpicanis	|	synonym	|
+9611	|	gbif:4833485	|	gbif:4833485	|	xref	|
+9611	|	Schaeffia	|	gbif:Schaeffia	|	synonym	|
+9611	|	gbif:4833473	|	gbif:4833473	|	xref	|
+9611	|	Alopsis	|	gbif:Alopsis	|	synonym	|
+9611	|	gbif:4833474	|	gbif:4833474	|	xref	|
+9611	|	Dasycyon	|	gbif:Dasycyon	|	synonym	|
+9611	|	gbif:4833481	|	gbif:4833481	|	xref	|
+9611	|	Dimenia	|	gbif:Dimenia	|	synonym	|
+9611	|	gbif:4833523	|	gbif:4833523	|	xref	|
+9611	|	Oxygous	|	gbif:Oxygous	|	synonym	|
+9611	|	gbif:4833478	|	gbif:4833478	|	xref	|
+9611	|	Oxygonus	|	gbif:Oxygonus	|	synonym	|
+9611	|	gbif:3240005	|	gbif:3240005	|	xref	|
+9611	|	Sacalius	|	gbif:Sacalius	|	synonym	|
+9611	|	gbif:4833479	|	gbif:4833479	|	xref	|
+9611	|	ncbi:9611	|	ott:ncbi:9611	|	xref	|
+9611	|	irmng:1282727	|	ott:irmng:1282727	|	xref	|
+9611	|	Aenocyon	|	gbif:Aenocyon	|	synonym	|
+9611	|	Lupulella	|	gbif:Lupulella	|	synonym	|
+9611	|	Lupus	|	gbif:Lupus	|	synonym	|
+9611	|	5744160	|	5744160	|	merged taxon id	|
+9611	|	5551856	|	5551856	|	merged taxon id	|
+9611	|	ott:372706	|	ott:372706	|	xref	|
 9612	|	Canis lupus Linnaeus, 1758	|	ncbi:Canis lupus Linnaeus, 1758	|	authority	|
 9612	|	Canis lupus	|	ncbi:Canis lupus	|	scientific name	|
 9612	|	gray wolf	|	ncbi:gray wolf	|	genbank common name	|
 9612	|	grey wolf	|	ncbi:grey wolf	|	common name	|
-9612	|	mCanLup	|		|	tol_id	|
+9612	|	mCanLup	|	tolid:mCanLup	|	tol_id	|
+9612	|	Canis tundrarum	|	gbif:Canis tundrarum	|	synonym	|
+9612	|	gbif:8461893	|	gbif:8461893	|	xref	|
+9612	|	Canis furlongi	|	gbif:Canis furlongi	|	synonym	|
+9612	|	gbif:8562725	|	gbif:8562725	|	xref	|
+9612	|	Canis lupus	|	gbif:Canis lupus	|	scientific name	|
+9612	|	gbif:5219173	|	gbif:5219173	|	xref	|
+9612	|	Canis nubilus	|	gbif:Canis nubilus	|	synonym	|
+9612	|	gbif:8585515	|	gbif:8585515	|	xref	|
+9612	|	Canis petrolei	|	gbif:Canis petrolei	|	synonym	|
+9612	|	gbif:8612408	|	gbif:8612408	|	xref	|
+9612	|	Lupus gigas	|	gbif:Lupus gigas	|	synonym	|
+9612	|	gbif:8507535	|	gbif:8507535	|	xref	|
+9612	|	Lupus lupus	|	gbif:Lupus lupus	|	synonym	|
+9612	|	gbif:4409357	|	gbif:4409357	|	xref	|
+9612	|	Canis pambasileus	|	gbif:Canis pambasileus	|	synonym	|
+9612	|	gbif:8668235	|	gbif:8668235	|	xref	|
+9612	|	ncbi:9612	|	ott:ncbi:9612	|	xref	|
+9612	|	irmng:11407661	|	ott:irmng:11407661	|	xref	|
+9612	|	Aenocyon milleri	|	gbif:Aenocyon milleri	|	synonym	|
+9612	|	Canis dingo	|	irmng:Canis dingo	|	synonym	|
+9612	|	Canis familiaris	|	irmng:Canis familiaris	|	synonym	|
+9612	|	Canis lycaon	|	gbif:Canis lycaon	|	synonym	|
+9612	|	Canis milleri	|	gbif:Canis milleri	|	synonym	|
+9612	|	Canis occidentalis	|	gbif:Canis occidentalis	|	synonym	|
+9612	|	Canis variabilis	|	gbif:Canis variabilis	|	synonym	|
+9612	|	5554033	|	5554033	|	merged taxon id	|
+9612	|	ott:247341	|	ott:247341	|	xref	|
 9615	|	beagle dog	|	ncbi:beagle dog	|	includes	|
 9615	|	beagle dogs	|	ncbi:beagle dogs	|	includes	|
 9615	|	Canis canis	|	ncbi:Canis canis	|	synonym	|
@@ -63,22 +149,56 @@
 9615	|	Canis lupus familiaris	|	ncbi:Canis lupus familiaris	|	scientific name	|
 9615	|	dog	|	ncbi:dog	|	genbank common name	|
 9615	|	dogs	|	ncbi:dogs	|	common name	|
+9615	|	Canis lupus familiaris	|	gbif:Canis lupus familiaris	|	scientific name	|
+9615	|	gbif:6164210	|	gbif:6164210	|	xref	|
+9615	|	Pachycyon robustus	|	gbif:Pachycyon robustus	|	synonym	|
+9615	|	gbif:8704445	|	gbif:8704445	|	xref	|
+9615	|	Canis familiarus domesticus	|	gbif:Canis familiarus domesticus	|	synonym	|
+9615	|	gbif:6164211	|	gbif:6164211	|	xref	|
+9615	|	Canis familiaris	|	gbif:Canis familiaris	|	synonym	|
+9615	|	gbif:5219200	|	gbif:5219200	|	xref	|
+9615	|	ncbi:9615	|	ott:ncbi:9615	|	xref	|
+9615	|	beagle dog	|	ncbi:beagle dog	|	synonym	|
+9615	|	beagle dogs	|	ncbi:beagle dogs	|	synonym	|
+9615	|	ott:247333	|	ott:247333	|	xref	|
 143281	|	Canis lupus baileyi Nelson & Goldman, 1929	|	ncbi:Canis lupus baileyi Nelson & Goldman, 1929	|	authority	|
 143281	|	Canis lupus baileyi	|	ncbi:Canis lupus baileyi	|	scientific name	|
 143281	|	Mexican gray wolf	|	ncbi:Mexican gray wolf	|	genbank common name	|
+143281	|	Canis lupus baileyi	|	gbif:Canis lupus baileyi	|	scientific name	|
+143281	|	gbif:6164191	|	gbif:6164191	|	xref	|
+143281	|	ncbi:143281	|	ott:ncbi:143281	|	xref	|
+143281	|	ott:67371	|	ott:67371	|	xref	|
 188536	|	Canis lupus hodophilax	|	ncbi:Canis lupus hodophilax	|	scientific name	|
 188536	|	Canis lupus hodophilax (Temminck, 1839)	|	ncbi:Canis lupus hodophilax (Temminck, 1839)	|	authority	|
 188536	|	Japanese wolf	|	ncbi:Japanese wolf	|	genbank common name	|
+188536	|	Canis lupus hodophilax	|	gbif:Canis lupus hodophilax	|	scientific name	|
+188536	|	gbif:6164213	|	gbif:6164213	|	xref	|
+188536	|	ncbi:188536	|	ott:ncbi:188536	|	xref	|
+188536	|	ott:318630	|	ott:318630	|	xref	|
 228401	|	Canis lupus lycaon Schreber, 1775	|	ncbi:Canis lupus lycaon Schreber, 1775	|	authority	|
 228401	|	Canis lupus lycaon	|	ncbi:Canis lupus lycaon	|	scientific name	|
 228401	|	Canis lycaon	|	ncbi:Canis lycaon	|	synonym	|
 228401	|	eastern Canadian wolf	|	ncbi:eastern Canadian wolf	|	genbank common name	|
+228401	|	Canis lupus lycaon	|	gbif:Canis lupus lycaon	|	scientific name	|
+228401	|	gbif:6164202	|	gbif:6164202	|	xref	|
+228401	|	Canis lycaon	|	gbif:Canis lycaon	|	scientific name	|
+228401	|	gbif:8441206	|	gbif:8441206	|	xref	|
+228401	|	ncbi:228401	|	ott:ncbi:228401	|	xref	|
+228401	|	ott:948004	|	ott:948004	|	xref	|
 246881	|	Canis lupus chanco Gray, 1863	|	ncbi:Canis lupus chanco Gray, 1863	|	authority	|
 246881	|	Canis lupus chanco	|	ncbi:Canis lupus chanco	|	scientific name	|
 246881	|	Mongolian wolf	|	ncbi:Mongolian wolf	|	genbank common name	|
+246881	|	Canis lupus chanco	|	gbif:Canis lupus chanco	|	scientific name	|
+246881	|	gbif:6164182	|	gbif:6164182	|	xref	|
+246881	|	ncbi:246881	|	ott:ncbi:246881	|	xref	|
+246881	|	ott:47500	|	ott:47500	|	xref	|
 246882	|	Canis lupus pallipes	|	ncbi:Canis lupus pallipes	|	scientific name	|
 246882	|	Canis lupus pallipes Sykes, 1831	|	ncbi:Canis lupus pallipes Sykes, 1831	|	authority	|
 246882	|	Indian wolf	|	ncbi:Indian wolf	|	genbank common name	|
+246882	|	Canis lupus pallipes	|	gbif:Canis lupus pallipes	|	scientific name	|
+246882	|	gbif:6164181	|	gbif:6164181	|	xref	|
+246882	|	ncbi:246882	|	ott:ncbi:246882	|	xref	|
+246882	|	ott:47497	|	ott:47497	|	xref	|
 286419	|	Canis dingo Meyer, 1793	|	ncbi:Canis dingo Meyer, 1793	|	authority	|
 286419	|	Canis dingo	|	ncbi:Canis dingo	|	synonym	|
 286419	|	Canis familiaris dingo Meyer, 1793	|	ncbi:Canis familiaris dingo Meyer, 1793	|	authority	|
@@ -86,63 +206,175 @@
 286419	|	Canis lupus dingo Meyer, 1793	|	ncbi:Canis lupus dingo Meyer, 1793	|	authority	|
 286419	|	Canis lupus dingo	|	ncbi:Canis lupus dingo	|	scientific name	|
 286419	|	dingo	|	ncbi:dingo	|	genbank common name	|
+286419	|	Canis dingo	|	gbif:Canis dingo	|	synonym	|
+286419	|	gbif:8311212	|	gbif:8311212	|	xref	|
+286419	|	Canis dingo	|	gbif:Canis dingo	|	scientific name	|
+286419	|	gbif:5219214	|	gbif:5219214	|	xref	|
+286419	|	Canis lupus dingo	|	gbif:Canis lupus dingo	|	scientific name	|
+286419	|	gbif:6164184	|	gbif:6164184	|	xref	|
+286419	|	ncbi:286419	|	ott:ncbi:286419	|	xref	|
+286419	|	ott:380529	|	ott:380529	|	xref	|
 425934	|	Canis lupus signatus Cabrera, 1907	|	ncbi:Canis lupus signatus Cabrera, 1907	|	authority	|
 425934	|	Canis lupus signatus	|	ncbi:Canis lupus signatus	|	scientific name	|
 425934	|	Iberian wolf	|	ncbi:Iberian wolf	|	genbank common name	|
 425934	|	lobo iberico	|	ncbi:lobo iberico	|	common name	|
+425934	|	ncbi:425934	|	ott:ncbi:425934	|	xref	|
+425934	|	ott:545727	|	ott:545727	|	xref	|
 443256	|	Canis lupus lupus Linnaeus, 1758	|	ncbi:Canis lupus lupus Linnaeus, 1758	|	authority	|
 443256	|	Canis lupus lupus	|	ncbi:Canis lupus lupus	|	scientific name	|
 443256	|	Eurasian wolf	|	ncbi:Eurasian wolf	|	genbank common name	|
+443256	|	Canis lupus lupus	|	gbif:Canis lupus lupus	|	scientific name	|
+443256	|	gbif:7193871	|	gbif:7193871	|	xref	|
+443256	|	ncbi:443256	|	ott:ncbi:443256	|	xref	|
+443256	|	ott:883675	|	ott:883675	|	xref	|
 554455	|	Canis lupus laniger Hodgson, 1847	|	ncbi:Canis lupus laniger Hodgson, 1847	|	authority	|
 554455	|	Canis lupus laniger	|	ncbi:Canis lupus laniger	|	scientific name	|
 554455	|	Tibetan wolf	|	ncbi:Tibetan wolf	|	genbank common name	|
+554455	|	Canis lupus laniger	|	gbif:Canis lupus laniger	|	scientific name	|
+554455	|	gbif:11758603	|	gbif:11758603	|	xref	|
+554455	|	ncbi:554455	|	ott:ncbi:554455	|	xref	|
+554455	|	ott:80830	|	ott:80830	|	xref	|
 644627	|	Canis lupus hattai Kishida, 1931	|	ncbi:Canis lupus hattai Kishida, 1931	|	authority	|
 644627	|	Canis lupus hattai	|	ncbi:Canis lupus hattai	|	scientific name	|
 644627	|	Ezo wolf	|	ncbi:Ezo wolf	|	genbank common name	|
 644627	|	Hokkaido wolf	|	ncbi:Hokkaido wolf	|	common name	|
+644627	|	Canis lupus hattai	|	gbif:Canis lupus hattai	|	scientific name	|
+644627	|	gbif:6164186	|	gbif:6164186	|	xref	|
+644627	|	ncbi:644627	|	ott:ncbi:644627	|	xref	|
+644627	|	ott:83897	|	ott:83897	|	xref	|
 659069	|	Canis lupus mogollonensis Goldman, 1937	|	ncbi:Canis lupus mogollonensis Goldman, 1937	|	authority	|
 659069	|	Canis lupus mogollonensis	|	ncbi:Canis lupus mogollonensis	|	scientific name	|
 659069	|	Mogollon mountain wolf	|	ncbi:Mogollon mountain wolf	|	common name	|
+659069	|	Canis lupus mogollonensis	|	gbif:Canis lupus mogollonensis	|	scientific name	|
+659069	|	gbif:6164201	|	gbif:6164201	|	xref	|
+659069	|	ncbi:659069	|	ott:ncbi:659069	|	xref	|
+659069	|	ott:263524	|	ott:263524	|	xref	|
 676787	|	Canis lupus labradorius Goldman, 1937	|	ncbi:Canis lupus labradorius Goldman, 1937	|	authority	|
 676787	|	Canis lupus labradorius	|	ncbi:Canis lupus labradorius	|	scientific name	|
 676787	|	Labrador wolf	|	ncbi:Labrador wolf	|	genbank common name	|
+676787	|	Canis lupus labradorius	|	gbif:Canis lupus labradorius	|	scientific name	|
+676787	|	gbif:6164214	|	gbif:6164214	|	xref	|
+676787	|	ncbi:676787	|	ott:ncbi:676787	|	xref	|
+676787	|	ott:531973	|	ott:531973	|	xref	|
 990119	|	Canis lupus x Canis lupus familiaris	|	ncbi:Canis lupus x Canis lupus familiaris	|	scientific name	|
 990119	|	wolfdog	|	ncbi:wolfdog	|	genbank common name	|
 990119	|	wolf-dog hybrid	|	ncbi:wolf-dog hybrid	|	common name	|
+990119	|	ncbi:990119	|	ott:ncbi:990119	|	xref	|
+990119	|	ott:4941915	|	ott:4941915	|	xref	|
 1295334	|	Canis lupus desertorum Bogdanov, 1882	|	ncbi:Canis lupus desertorum Bogdanov, 1882	|	authority	|
 1295334	|	Canis lupus desertorum	|	ncbi:Canis lupus desertorum	|	scientific name	|
+1295334	|	Canis lupus desertorum	|	gbif:Canis lupus desertorum	|	scientific name	|
+1295334	|	gbif:11511335	|	gbif:11511335	|	xref	|
+1295334	|	ncbi:1295334	|	ott:ncbi:1295334	|	xref	|
+1295334	|	ott:234374	|	ott:234374	|	xref	|
 1320375	|	Arctic wolf	|	ncbi:Arctic wolf	|	genbank common name	|
 1320375	|	Canis lupus arctos Pocock, 1935	|	ncbi:Canis lupus arctos Pocock, 1935	|	authority	|
 1320375	|	Canis lupus arctos	|	ncbi:Canis lupus arctos	|	scientific name	|
 1320375	|	snow wolf	|	ncbi:snow wolf	|	common name	|
 1320375	|	white wolf	|	ncbi:white wolf	|	common name	|
+1320375	|	Canis lupus arctos	|	gbif:Canis lupus arctos	|	scientific name	|
+1320375	|	gbif:6164203	|	gbif:6164203	|	xref	|
+1320375	|	ncbi:1320375	|	ott:ncbi:1320375	|	xref	|
+1320375	|	ott:5340002	|	ott:5340002	|	xref	|
 1341016	|	Canis lupus campestris Dwigubski, 1804	|	ncbi:Canis lupus campestris Dwigubski, 1804	|	authority	|
 1341016	|	Canis lupus campestris	|	ncbi:Canis lupus campestris	|	scientific name	|
 1341016	|	steppe wolf	|	ncbi:steppe wolf	|	genbank common name	|
+1341016	|	Canis lupus campestris	|	gbif:Canis lupus campestris	|	scientific name	|
+1341016	|	gbif:6164193	|	gbif:6164193	|	xref	|
+1341016	|	ncbi:1341016	|	ott:ncbi:1341016	|	xref	|
+1341016	|	ott:4941916	|	ott:4941916	|	xref	|
 1605264	|	Canis lupus variabilis	|	ncbi:Canis lupus variabilis	|	scientific name	|
 1605264	|	Canis lupus variabilis Wied-Neuwied 1841	|	ncbi:Canis lupus variabilis Wied-Neuwied 1841	|	authority	|
 1605264	|	Canis variabilis	|	ncbi:Canis variabilis	|	synonym	|
+1605264	|	Canis lupus variabilis	|	gbif:Canis lupus variabilis	|	scientific name	|
+1605264	|	gbif:11203525	|	gbif:11203525	|	xref	|
+1605264	|	Canis variabilis	|	gbif:Canis variabilis	|	scientific name	|
+1605264	|	gbif:11215189	|	gbif:11215189	|	xref	|
+1605264	|	ncbi:1605264	|	ott:ncbi:1605264	|	xref	|
+1605264	|	ott:5839539	|	ott:5839539	|	xref	|
 2605939	|	Canis lupus orion Pocock, 1935	|	ncbi:Canis lupus orion Pocock, 1935	|	authority	|
 2605939	|	Canis lupus orion	|	ncbi:Canis lupus orion	|	scientific name	|
 2605939	|	Greenland wolf	|	ncbi:Greenland wolf	|	genbank common name	|
-2605939	|	mCanLor	|		|	tol_id	|
+2605939	|	mCanLor	|	tolid:mCanLor	|	tol_id	|
+2605939	|	Canis lupus orion	|	gbif:Canis lupus orion	|	scientific name	|
+2605939	|	gbif:6164192	|	gbif:6164192	|	xref	|
+2605939	|	ncbi:2605939	|	ott:ncbi:2605939	|	xref	|
+2605939	|	ott:7067596	|	ott:7067596	|	xref	|
 2841922	|	Canis lupus nubilus Say, 1823	|	ncbi:Canis lupus nubilus Say, 1823	|	authority	|
 2841922	|	Canis lupus nubilus	|	ncbi:Canis lupus nubilus	|	scientific name	|
+2841922	|	Canis lupus nubilus	|	gbif:Canis lupus nubilus	|	scientific name	|
+2841922	|	gbif:6164217	|	gbif:6164217	|	xref	|
 9614	|	Canis latrans Say, 1823	|	ncbi:Canis latrans Say, 1823	|	authority	|
 9614	|	Canis latrans	|	ncbi:Canis latrans	|	scientific name	|
 9614	|	coyote	|	ncbi:coyote	|	genbank common name	|
-9614	|	mCanLat	|		|	tol_id	|
+9614	|	mCanLat	|	tolid:mCanLat	|	tol_id	|
+9614	|	Canis impavidus	|	gbif:Canis impavidus	|	synonym	|
+9614	|	gbif:8597273	|	gbif:8597273	|	xref	|
+9614	|	Canis clepticus	|	gbif:Canis clepticus	|	synonym	|
+9614	|	gbif:8548287	|	gbif:8548287	|	xref	|
+9614	|	Canis caneloensis	|	gbif:Canis caneloensis	|	synonym	|
+9614	|	gbif:8600385	|	gbif:8600385	|	xref	|
+9614	|	Canis riviveronis	|	gbif:Canis riviveronis	|	synonym	|
+9614	|	gbif:8648294	|	gbif:8648294	|	xref	|
+9614	|	Canis orcutti	|	gbif:Canis orcutti	|	synonym	|
+9614	|	gbif:8628608	|	gbif:8628608	|	xref	|
+9614	|	Canis pallidus	|	gbif:Canis pallidus	|	synonym	|
+9614	|	gbif:8444894	|	gbif:8444894	|	xref	|
+9614	|	Canis jamesi	|	gbif:Canis jamesi	|	synonym	|
+9614	|	gbif:8475313	|	gbif:8475313	|	xref	|
+9614	|	Canis peninsulae	|	gbif:Canis peninsulae	|	synonym	|
+9614	|	gbif:8651522	|	gbif:8651522	|	xref	|
+9614	|	Canis lestes	|	gbif:Canis lestes	|	synonym	|
+9614	|	gbif:8680692	|	gbif:8680692	|	xref	|
+9614	|	Canis microdon	|	gbif:Canis microdon	|	synonym	|
+9614	|	gbif:8447713	|	gbif:8447713	|	xref	|
+9614	|	Canis frustror	|	gbif:Canis frustror	|	synonym	|
+9614	|	gbif:8684045	|	gbif:8684045	|	xref	|
+9614	|	Canis estor	|	gbif:Canis estor	|	synonym	|
+9614	|	gbif:8503697	|	gbif:8503697	|	xref	|
+9614	|	Canis latrans	|	gbif:Canis latrans	|	scientific name	|
+9614	|	gbif:5219153	|	gbif:5219153	|	xref	|
+9614	|	Canis hondurensis	|	gbif:Canis hondurensis	|	synonym	|
+9614	|	gbif:8518710	|	gbif:8518710	|	xref	|
+9614	|	Canis irvingtonensis	|	gbif:Canis irvingtonensis	|	synonym	|
+9614	|	gbif:8566815	|	gbif:8566815	|	xref	|
+9614	|	Canis mearnsi	|	gbif:Canis mearnsi	|	synonym	|
+9614	|	gbif:8701072	|	gbif:8701072	|	xref	|
+9614	|	Canis andersoni	|	gbif:Canis andersoni	|	synonym	|
+9614	|	gbif:8521681	|	gbif:8521681	|	xref	|
+9614	|	Lyciscus cagottis	|	gbif:Lyciscus cagottis	|	synonym	|
+9614	|	gbif:8581434	|	gbif:8581434	|	xref	|
+9614	|	Canis goldmani	|	gbif:Canis goldmani	|	synonym	|
+9614	|	gbif:8472465	|	gbif:8472465	|	xref	|
+9614	|	Canis nebrascensis	|	gbif:Canis nebrascensis	|	synonym	|
+9614	|	gbif:8631767	|	gbif:8631767	|	xref	|
+9614	|	Canis vigilis	|	gbif:Canis vigilis	|	synonym	|
+9614	|	gbif:8551289	|	gbif:8551289	|	xref	|
+9614	|	ncbi:9614	|	ott:ncbi:9614	|	xref	|
+9614	|	irmng:10941214	|	ott:irmng:10941214	|	xref	|
+9614	|	Canis ochropus	|	gbif:Canis ochropus	|	synonym	|
+9614	|	ott:247331	|	ott:247331	|	xref	|
 2841923	|	Canis latrans latrans Say, 1823	|	ncbi:Canis latrans latrans Say, 1823	|	authority	|
 2841923	|	Canis latrans latrans	|	ncbi:Canis latrans latrans	|	scientific name	|
+2841923	|	Canis latrans latrans	|	gbif:Canis latrans latrans	|	scientific name	|
+2841923	|	gbif:7193874	|	gbif:7193874	|	xref	|
 32534	|	Canis simensis Ruppell, 1840	|	ncbi:Canis simensis Ruppell, 1840	|	authority	|
 32534	|	Canis simensis	|	ncbi:Canis simensis	|	scientific name	|
 32534	|	Ethiopian wolf	|	ncbi:Ethiopian wolf	|	genbank common name	|
 32534	|	simian jackal	|	ncbi:simian jackal	|	common name	|
-32534	|	mCanSim	|		|	tol_id	|
+32534	|	mCanSim	|	tolid:mCanSim	|	tol_id	|
+32534	|	Canis simensis	|	gbif:Canis simensis	|	scientific name	|
+32534	|	gbif:5219143	|	gbif:5219143	|	xref	|
+32534	|	ncbi:32534	|	ott:ncbi:32534	|	xref	|
+32534	|	irmng:10762843	|	ott:irmng:10762843	|	xref	|
+32534	|	ott:752755	|	ott:752755	|	xref	|
 45781	|	Canis rufus Audubon & Bachman, 1851	|	ncbi:Canis rufus Audubon & Bachman, 1851	|	authority	|
 45781	|	Canis rufus	|	ncbi:Canis rufus	|	scientific name	|
 45781	|	red wolf	|	ncbi:red wolf	|	genbank common name	|
-45781	|	mCanRuf	|		|	tol_id	|
+45781	|	mCanRuf	|	tolid:mCanRuf	|	tol_id	|
+45781	|	ncbi:45781	|	ott:ncbi:45781	|	xref	|
+45781	|	irmng:10201335	|	ott:irmng:10201335	|	xref	|
+45781	|	ott:113383	|	ott:113383	|	xref	|
 2841919	|	Canis rufus gregoryi Goldman, 1937	|	ncbi:Canis rufus gregoryi Goldman, 1937	|	authority	|
 2841919	|	Canis rufus gregoryi	|	ncbi:Canis rufus gregoryi	|	scientific name	|
 2841920	|	Canis rufus rufus Audubon & Bachman, 1851	|	ncbi:Canis rufus rufus Audubon & Bachman, 1851	|	authority	|
@@ -152,31 +384,65 @@
 68723	|	Canis adustus	|	ncbi:Canis adustus	|	scientific name	|
 68723	|	Canis adustus Sundevall, 1847	|	ncbi:Canis adustus Sundevall, 1847	|	authority	|
 68723	|	side-striped jackal	|	ncbi:side-striped jackal	|	genbank common name	|
-68723	|	mCanAdu	|		|	tol_id	|
+68723	|	mCanAdu	|	tolid:mCanAdu	|	tol_id	|
+68723	|	Canis adustus	|	gbif:Canis adustus	|	scientific name	|
+68723	|	gbif:5219146	|	gbif:5219146	|	xref	|
+68723	|	ncbi:68723	|	ott:ncbi:68723	|	xref	|
+68723	|	irmng:10719262	|	ott:irmng:10719262	|	xref	|
+68723	|	ott:621176	|	ott:621176	|	xref	|
 68724	|	Canis aureus Linnaeus, 1758	|	ncbi:Canis aureus Linnaeus, 1758	|	authority	|
 68724	|	Canis aureus	|	ncbi:Canis aureus	|	scientific name	|
 68724	|	golden jackal	|	ncbi:golden jackal	|	genbank common name	|
-68724	|	mCanAur	|		|	tol_id	|
+68724	|	mCanAur	|	tolid:mCanAur	|	tol_id	|
+68724	|	Aureus aureus	|	gbif:Aureus aureus	|	synonym	|
+68724	|	gbif:4409358	|	gbif:4409358	|	xref	|
+68724	|	Canis aureus	|	gbif:Canis aureus	|	scientific name	|
+68724	|	gbif:5219219	|	gbif:5219219	|	xref	|
+68724	|	ncbi:68724	|	ott:ncbi:68724	|	xref	|
+68724	|	irmng:10200773	|	ott:irmng:10200773	|	xref	|
+68724	|	ott:621168	|	ott:621168	|	xref	|
 2957507	|	Canis aureus cruesemanni Matschie, 1900	|	ncbi:Canis aureus cruesemanni Matschie, 1900	|	authority	|
 2957507	|	Canis aureus cruesemanni	|	ncbi:Canis aureus cruesemanni	|	scientific name	|
+2957507	|	Canis aureus cruesemanni	|	gbif:Canis aureus cruesemanni	|	scientific name	|
+2957507	|	gbif:6164168	|	gbif:6164168	|	xref	|
 68725	|	black-backed jackal	|	ncbi:black-backed jackal	|	genbank common name	|
 68725	|	Canis mesomelas Schreber, 1775	|	ncbi:Canis mesomelas Schreber, 1775	|	authority	|
 68725	|	Canis mesomelas	|	ncbi:Canis mesomelas	|	scientific name	|
-68725	|	mCanMes	|		|	tol_id	|
+68725	|	mCanMes	|	tolid:mCanMes	|	tol_id	|
+68725	|	Canis mesomelas	|	gbif:Canis mesomelas	|	scientific name	|
+68725	|	gbif:5219216	|	gbif:5219216	|	xref	|
+68725	|	Thos mesomelas	|	gbif:Thos mesomelas	|	synonym	|
+68725	|	gbif:8903521	|	gbif:8903521	|	xref	|
+68725	|	ncbi:68725	|	ott:ncbi:68725	|	xref	|
+68725	|	irmng:10997553	|	ott:irmng:10997553	|	xref	|
+68725	|	ott:666235	|	ott:666235	|	xref	|
 69045	|	Canis mesomelas elongae	|	ncbi:Canis mesomelas elongae	|	scientific name	|
 69045	|	eastern African black-backed jackal	|	ncbi:eastern African black-backed jackal	|	genbank common name	|
+69045	|	ncbi:69045	|	ott:ncbi:69045	|	xref	|
+69045	|	ott:576165	|	ott:576165	|	xref	|
 242524	|	Canis indica Aggarwal, Kivisild, Ramadevi & Singh, 2007	|	ncbi:Canis indica Aggarwal, Kivisild, Ramadevi & Singh, 2007	|	authority	|
 242524	|	Canis indica	|	ncbi:Canis indica	|	scientific name	|
 242524	|	Canis lupus indica	|	ncbi:Canis lupus indica	|	synonym	|
 242524	|	Indian gray wolf	|	ncbi:Indian gray wolf	|	synonym	|
-242524	|	mCanInd	|		|	tol_id	|
+242524	|	mCanInd	|	tolid:mCanInd	|	tol_id	|
+242524	|	ncbi:242524	|	ott:ncbi:242524	|	xref	|
+242524	|	gbif:9073606	|	ott:gbif:9073606	|	xref	|
+242524	|	Canis indicus	|	gbif:Canis indicus	|	synonym	|
+242524	|	ott:346728	|	ott:346728	|	xref	|
 242525	|	Canis himalayensis	|	ncbi:Canis himalayensis	|	scientific name	|
 242525	|	Canis lupus himalayensis Aggarwal, Ramadevi & Singh, 2003	|	ncbi:Canis lupus himalayensis Aggarwal, Ramadevi & Singh, 2003	|	authority	|
 242525	|	Canis lupus himalayensis	|	ncbi:Canis lupus himalayensis	|	synonym	|
 242525	|	Himalayan wolf	|	ncbi:Himalayan wolf	|	genbank common name	|
-242525	|	mCanHim	|		|	tol_id	|
+242525	|	mCanHim	|	tolid:mCanHim	|	tol_id	|
+242525	|	ncbi:242525	|	ott:ncbi:242525	|	xref	|
+242525	|	ott:346723	|	ott:346723	|	xref	|
 1002243	|	environmental samples	|	environmental samples <carnivores,genus Canis>	|	scientific name	|
+1002243	|	Canis environmental samples	|	ott:4941917	|	scientific name	|
+1002243	|	ncbi:1002243	|	ott:ncbi:1002243	|	xref	|
+1002243	|	ott:4941917	|	ott:4941917	|	xref	|
 1002244	|	Canis environmental sample	|	ncbi:Canis environmental sample	|	scientific name	|
+1002244	|	ncbi:1002244	|	ott:ncbi:1002244	|	xref	|
+1002244	|	ott:4941918	|	ott:4941918	|	xref	|
 1707807	|	African golden wolf	|	ncbi:African golden wolf	|	genbank common name	|
 1707807	|	African wolf	|	ncbi:African wolf	|	common name	|
 1707807	|	Canis anthus	|	ncbi:Canis anthus	|	synonym	|
@@ -192,21 +458,53 @@
 1707807	|	Egyptian jackal	|	ncbi:Egyptian jackal	|	common name	|
 1707807	|	thoa	|	ncbi:thoa	|	common name	|
 1707807	|	1001911	|	ncbi:1001911	|	merged taxon id	|
-1707807	|	mCanLua	|		|	tol_id	|
+1707807	|	mCanLua	|	tolid:mCanLua	|	tol_id	|
+1707807	|	Canis lupaster	|	gbif:Canis lupaster	|	scientific name	|
+1707807	|	gbif:8702600	|	gbif:8702600	|	xref	|
+1707807	|	Canis anthus	|	gbif:Canis anthus	|	scientific name	|
+1707807	|	gbif:8538199	|	gbif:8538199	|	xref	|
+1707807	|	ncbi:1707807	|	ott:ncbi:1707807	|	xref	|
+1707807	|	ott:5835572	|	ott:5835572	|	xref	|
 2562269	|	Canis dirus Leidy, 1858	|	ncbi:Canis dirus Leidy, 1858	|	authority	|
 2562269	|	Canis dirus	|	ncbi:Canis dirus	|	scientific name	|
 2562269	|	dire wolf	|	ncbi:dire wolf	|	genbank common name	|
-2562269	|	mCanDir	|		|	tol_id	|
+2562269	|	mCanDir	|	tolid:mCanDir	|	tol_id	|
+2562269	|	Canis dirus	|	gbif:Canis dirus	|	scientific name	|
+2562269	|	gbif:5936116	|	gbif:5936116	|	xref	|
+2562269	|	Aenocyon dirus	|	gbif:Aenocyon dirus	|	synonym	|
+2562269	|	gbif:9530899	|	gbif:9530899	|	xref	|
+2562269	|	Canis indianensis	|	gbif:Canis indianensis	|	synonym	|
+2562269	|	gbif:8609243	|	gbif:8609243	|	xref	|
+2562269	|	Aenocyon ayersi	|	gbif:Aenocyon ayersi	|	synonym	|
+2562269	|	gbif:9428097	|	gbif:9428097	|	xref	|
+2562269	|	Canis ayersi	|	gbif:Canis ayersi	|	synonym	|
+2562269	|	gbif:8483216	|	gbif:8483216	|	xref	|
+2562269	|	Canis mississippiensis	|	gbif:Canis mississippiensis	|	synonym	|
+2562269	|	gbif:8588559	|	gbif:8588559	|	xref	|
+2562269	|	ncbi:2562269	|	ott:ncbi:2562269	|	xref	|
+2562269	|	ott:3612500	|	ott:3612500	|	xref	|
 2626217	|	unclassified Canis	|	ncbi:unclassified Canis	|	scientific name	|
+2626217	|	ncbi:2626217	|	ott:ncbi:2626217	|	xref	|
+2626217	|	ott:7655955	|	ott:7655955	|	xref	|
 9616	|	Canis sp.	|	ncbi:Canis sp.	|	scientific name	|
+9616	|	ncbi:9616	|	ott:ncbi:9616	|	xref	|
+9616	|	ott:247325	|	ott:247325	|	xref	|
 613187	|	Canis sp. CANInt1	|	ncbi:Canis sp. CANInt1	|	scientific name	|
+613187	|	ncbi:613187	|	ott:ncbi:613187	|	xref	|
+613187	|	ott:470950	|	ott:470950	|	xref	|
 1419257	|	Canis sp. Belgium/36,000	|	ncbi:Canis sp. Belgium/36,000	|	scientific name	|
 1419257	|	Canis sp. Belgium 36,000	|	ncbi:Canis sp. Belgium 36,000	|	synonym	|
 1419257	|	Canis sp. OT-2013/Belgium	|	ncbi:Canis sp. OT-2013/Belgium	|	synonym	|
+1419257	|	ncbi:1419257	|	ott:ncbi:1419257	|	xref	|
+1419257	|	ott:5338951	|	ott:5338951	|	xref	|
 1419712	|	Canis sp. OT-2013/Russia	|	ncbi:Canis sp. OT-2013/Russia	|	synonym	|
 1419712	|	Canis sp. Russia/33,500	|	ncbi:Canis sp. Russia/33,500	|	scientific name	|
 1419712	|	Canis sp. Russia 33,500	|	ncbi:Canis sp. Russia 33,500	|	synonym	|
+1419712	|	ncbi:1419712	|	ott:ncbi:1419712	|	xref	|
+1419712	|	ott:5338950	|	ott:5338950	|	xref	|
 1785177	|	Canis sp. KEB-2016	|	ncbi:Canis sp. KEB-2016	|	scientific name	|
+1785177	|	ncbi:1785177	|	ott:ncbi:1785177	|	xref	|
+1785177	|	ott:5925604	|	ott:5925604	|	xref	|
 2714668	|	Canis sp. 70-TX-01	|	ncbi:Canis sp. 70-TX-01	|	scientific name	|
 2714669	|	Canis sp. 70-TX-02	|	ncbi:Canis sp. 70-TX-02	|	scientific name	|
 2714670	|	Canis sp. 70-TX-03	|	ncbi:Canis sp. 70-TX-03	|	scientific name	|
@@ -218,92 +516,490 @@
 2769327	|	Canis sp. CM0006548	|	ncbi:Canis sp. CM0006548	|	scientific name	|
 2769328	|	Canis sp. UMMZ91100	|	ncbi:Canis sp. UMMZ91100	|	scientific name	|
 2769329	|	Canis sp. CM038379	|	ncbi:Canis sp. CM038379	|	scientific name	|
-mVulPal	|	pale fox	|		|	common_name	|
-mVulPal	|	mVulPal	|		|	tol_id	|
-mVulPal	|	Vulpes pallida	|		|	scientific name	|
-mLycVet	|	hoary fox	|		|	common_name	|
-mLycVet	|	mLycVet	|		|	tol_id	|
-mLycVet	|	Lycalopex vetulus	|		|	scientific name	|
-mUroLit	|	island gray fox	|		|	common_name	|
-mUroLit	|	mUroLit	|		|	tol_id	|
-mUroLit	|	Urocyon littoralis	|		|	scientific name	|
-mNycPro	|	raccoon dog	|		|	common_name	|
-mNycPro	|	mNycPro	|		|	tol_id	|
-mNycPro	|	Nyctereutes procyonoides	|		|	scientific name	|
-mLycPic	|	mLycPic	|		|	tol_id	|
-mLycPic	|	African hunting dog	|		|	common_name	|
-mLycPic	|	Lycaon pictus	|		|	scientific name	|
-mDusAus	|	mDusAus	|		|	tol_id	|
-mDusAus	|	Falkland islands wolf	|		|	common_name	|
-mDusAus	|	Dusicyon australis	|		|	scientific name	|
-mVulCan	|	Blandford's fox	|		|	common_name	|
-mVulCan	|	mVulCan	|		|	tol_id	|
-mVulCan	|	Vulpes cana	|		|	scientific name	|
-mVulZer	|	fennec fox	|		|	common_name	|
-mVulZer	|	mVulZer	|		|	tol_id	|
-mVulZer	|	Vulpes zerda	|		|	scientific name	|
-mUroCin	|	gray fox	|		|	common_name	|
-mUroCin	|	mUroCin	|		|	tol_id	|
-mUroCin	|	Urocyon cinereoargenteus	|		|	scientific name	|
-mVulCor	|	Corsac fox	|		|	common_name	|
-mVulCor	|	mVulCor	|		|	tol_id	|
-mVulCor	|	Vulpes corsac	|		|	scientific name	|
-mChrBra	|	maned wolf	|		|	common_name	|
-mChrBra	|	mChrBra	|		|	tol_id	|
-mChrBra	|	Chrysocyon brachyurus	|		|	scientific name	|
-mVulRue	|	mVulRue	|		|	tol_id	|
-mVulRue	|	Rueppel's fox	|		|	common_name	|
-mVulRue	|	Vulpes rueppellii	|		|	scientific name	|
-mVulVel	|	swift fox	|		|	common_name	|
-mVulVel	|	mVulVel	|		|	tol_id	|
-mVulVel	|	Vulpes velox	|		|	scientific name	|
-mVulMac	|	mVulMac	|		|	tol_id	|
-mVulMac	|	kit fox	|		|	common_name	|
-mVulMac	|	Vulpes macrotis	|		|	scientific name	|
-mVulLag	|	Arctic fox	|		|	common_name	|
-mVulLag	|	mVulLag	|		|	tol_id	|
-mVulLag	|	Vulpes lagopus	|		|	scientific name	|
-mLycSec	|	mLycSec	|		|	tol_id	|
-mLycSec	|	Sechura desert fox	|		|	common_name	|
-mLycSec	|	Lycalopex sechurae	|		|	scientific name	|
-mAteMic	|	small-eared dog	|		|	common_name	|
-mAteMic	|	mAteMic	|		|	tol_id	|
-mAteMic	|	Atelocynus microtis	|		|	scientific name	|
-mLycGym	|	Pampas fox	|		|	common_name	|
-mLycGym	|	mLycGym	|		|	tol_id	|
-mLycGym	|	Lycalopex gymnocercus	|		|	scientific name	|
-mCuoAlp	|	mCuoAlp	|		|	tol_id	|
-mCuoAlp	|	dhole	|		|	common_name	|
-mCuoAlp	|	Cuon alpinus	|		|	scientific name	|
-mVulBen	|	mVulBen	|		|	tol_id	|
-mVulBen	|	Bengal fox	|		|	common_name	|
-mVulBen	|	Vulpes bengalensis	|		|	scientific name	|
-mOtoMeg	|	mOtoMeg	|		|	tol_id	|
-mOtoMeg	|	bat-eared fox	|		|	common_name	|
-mOtoMeg	|	Otocyon megalotis	|		|	scientific name	|
-mVulCha	|	cape fox	|		|	common_name	|
-mVulCha	|	mVulCha	|		|	tol_id	|
-mVulCha	|	Vulpes chama	|		|	scientific name	|
-mVulFer	|	mVulFer	|		|	tol_id	|
-mVulFer	|	Tibetan sand fox	|		|	common_name	|
-mVulFer	|	Vulpes ferrilata	|		|	scientific name	|
-mLycFul	|	Darwin's zorro	|		|	common_name	|
-mLycFul	|	mLycFul	|		|	tol_id	|
-mLycFul	|	Lycalopex fulvipes	|		|	scientific name	|
-mLycCul	|	mLycCul	|		|	tol_id	|
-mLycCul	|	Culpeo	|		|	common_name	|
-mLycCul	|	Lycalopex culpaeus	|		|	scientific name	|
-mLycGri	|	South American gray fox	|		|	common_name	|
-mLycGri	|	mLycGri	|		|	tol_id	|
-mLycGri	|	Lycalopex griseus	|		|	scientific name	|
-mSpeVen	|	bush dog	|		|	common_name	|
-mSpeVen	|	mSpeVen	|		|	tol_id	|
-mSpeVen	|	Speothos venaticus	|		|	scientific name	|
-mCerTho	|	mCerTho	|		|	tol_id	|
-mCerTho	|	crab-eating fox	|		|	common_name	|
-mCerTho	|	Cerdocyon thous	|		|	scientific name	|
-mDusAvu	|	mDusAvu	|		|	tol_id	|
-mDusAvu	|	Dusicyon avus	|		|	scientific name	|
-mVulVul	|	mVulVul	|		|	tol_id	|
-mVulVul	|	red fox	|		|	common_name	|
-mVulVul	|	Vulpes vulpes	|		|	scientific name	|
+3040042	|	Canis latrans x Canis lupus	|	ena:canis latrans x canis lupus	|	scientific name	|
+2957508	|	Canis aureus aureus	|	ena:canis aureus aureus	|	scientific name	|
+728234	|	Canis lupus hallstromi	|	ena:canis lupus hallstromi	|	scientific name	|
+mNyc	|	Nyctereutes	|	tolid:Nyctereutes	|	scientific name	|
+mNyc	|	Nycthereutes	|	gbif:Nycthereutes	|	synonym	|
+mNyc	|	gbif:4833529	|	gbif:4833529	|	xref	|
+mNyc	|	Nycteractes	|	gbif:Nycteractes	|	synonym	|
+mNyc	|	gbif:4833526	|	gbif:4833526	|	xref	|
+mNyc	|	Nictereutes	|	gbif:Nictereutes	|	synonym	|
+mNyc	|	gbif:4833528	|	gbif:4833528	|	xref	|
+mNyc	|	Nyctereuctes	|	gbif:Nyctereuctes	|	synonym	|
+mNyc	|	gbif:4833525	|	gbif:4833525	|	xref	|
+mNyc	|	Nyctereutes	|	gbif:Nyctereutes	|	scientific name	|
+mNyc	|	gbif:2434551	|	gbif:2434551	|	xref	|
+mNyc	|	Nyctireutes	|	gbif:Nyctireutes	|	synonym	|
+mNyc	|	gbif:4833527	|	gbif:4833527	|	xref	|
+mNyc	|	Nyctoractes	|	gbif:Nyctoractes	|	synonym	|
+mNyc	|	gbif:4833524	|	gbif:4833524	|	xref	|
+34880	|	raccoon dog	|	tolid:raccoon dog	|	common_name	|
+34880	|	mNycPro	|	tolid:mNycPro	|	tol_id	|
+34880	|	Nyctereutes procyonoides	|	tolid:Nyctereutes procyonoides	|	scientific name	|
+34880	|	Nyctereutes procynoides	|	gbif:Nyctereutes procynoides	|	synonym	|
+34880	|	gbif:10508836	|	gbif:10508836	|	xref	|
+34880	|	Nyctereutes procyonoides	|	gbif:Nyctereutes procyonoides	|	scientific name	|
+34880	|	gbif:2434552	|	gbif:2434552	|	xref	|
+34880	|	Canis procyonoides	|	gbif:Canis procyonoides	|	synonym	|
+34880	|	gbif:5739464	|	gbif:5739464	|	xref	|
+34880	|	ncbi:34880	|	ott:ncbi:34880	|	xref	|
+34880	|	irmng:11119000	|	ott:irmng:11119000	|	xref	|
+34880	|	ott:949680	|	ott:949680	|	xref	|
+mDus	|	Dusicyon	|	tolid:Dusicyon	|	scientific name	|
+mDus	|	Dusicyon	|	gbif:Dusicyon	|	scientific name	|
+mDus	|	gbif:2434451	|	gbif:2434451	|	xref	|
+mDus	|	Ducicyon	|	gbif:Ducicyon	|	synonym	|
+mDus	|	gbif:9503504	|	gbif:9503504	|	xref	|
+mDus	|	Dusocyon	|	gbif:Dusocyon	|	synonym	|
+mDus	|	gbif:4833520	|	gbif:4833520	|	xref	|
+mDus	|	Dasicyon	|	gbif:Dasicyon	|	synonym	|
+mDus	|	gbif:4833522	|	gbif:4833522	|	xref	|
+mDus	|	Atelocyon	|	gbif:Atelocyon	|	synonym	|
+mDus	|	gbif:4833521	|	gbif:4833521	|	xref	|
+1316008	|	mDusAvu	|	tolid:mDusAvu	|	tol_id	|
+1316008	|	Dusicyon avus	|	tolid:Dusicyon avus	|	scientific name	|
+1316008	|	Dusicyon avus	|	gbif:Dusicyon avus	|	scientific name	|
+1316008	|	gbif:8488303	|	gbif:8488303	|	xref	|
+1316008	|	Canis platensis	|	gbif:Canis platensis	|	synonym	|
+1316008	|	gbif:8699237	|	gbif:8699237	|	xref	|
+1316008	|	Ducicyon avus	|	gbif:Ducicyon avus	|	synonym	|
+1316008	|	gbif:9455202	|	gbif:9455202	|	xref	|
+1316008	|	ncbi:1316008	|	ott:ncbi:1316008	|	xref	|
+1316008	|	ott:4117978	|	ott:4117978	|	xref	|
+673762	|	mDusAus	|	tolid:mDusAus	|	tol_id	|
+673762	|	Falkland islands wolf	|	tolid:Falkland islands wolf	|	common_name	|
+673762	|	Dusicyon australis	|	tolid:Dusicyon australis	|	scientific name	|
+673762	|	Canis australis	|	gbif:Canis australis	|	synonym	|
+673762	|	gbif:7689983	|	gbif:7689983	|	xref	|
+673762	|	Dusicyon australis	|	gbif:Dusicyon australis	|	scientific name	|
+673762	|	gbif:2434452	|	gbif:2434452	|	xref	|
+673762	|	ncbi:673762	|	ott:ncbi:673762	|	xref	|
+673762	|	irmng:11427963	|	ott:irmng:11427963	|	xref	|
+673762	|	ott:408359	|	ott:408359	|	xref	|
+mCuo	|	Cuon	|	tolid:Cuon	|	scientific name	|
+mCuo	|	Primaevus	|	gbif:Primaevus	|	synonym	|
+mCuo	|	gbif:4833548	|	gbif:4833548	|	xref	|
+mCuo	|	Primoevus	|	gbif:Primoevus	|	synonym	|
+mCuo	|	gbif:4833547	|	gbif:4833547	|	xref	|
+mCuo	|	Anurocyon	|	gbif:Anurocyon	|	synonym	|
+mCuo	|	gbif:4833545	|	gbif:4833545	|	xref	|
+mCuo	|	Cuon	|	gbif:Cuon	|	scientific name	|
+mCuo	|	gbif:2434316	|	gbif:2434316	|	xref	|
+mCuo	|	Chryseus	|	gbif:Chryseus	|	synonym	|
+mCuo	|	gbif:4834370	|	gbif:4834370	|	xref	|
+mCuo	|	Chrysaeus	|	gbif:Chrysaeus	|	synonym	|
+mCuo	|	gbif:4833546	|	gbif:4833546	|	xref	|
+mCuo	|	Cyon	|	gbif:Cyon	|	synonym	|
+mCuo	|	gbif:4833549	|	gbif:4833549	|	xref	|
+68730	|	dhole	|	tolid:dhole	|	common_name	|
+68730	|	mCuoAlp	|	tolid:mCuoAlp	|	tol_id	|
+68730	|	Cuon alpinus	|	tolid:Cuon alpinus	|	scientific name	|
+68730	|	Cuon alpinus	|	gbif:Cuon alpinus	|	scientific name	|
+68730	|	gbif:2434317	|	gbif:2434317	|	xref	|
+68730	|	Canis alpinus	|	gbif:Canis alpinus	|	synonym	|
+68730	|	gbif:7705729	|	gbif:7705729	|	xref	|
+68730	|	ncbi:68730	|	ott:ncbi:68730	|	xref	|
+68730	|	irmng:10856319	|	ott:irmng:10856319	|	xref	|
+68730	|	ott:313163	|	ott:313163	|	xref	|
+mSpe	|	Speothos	|	tolid:Speothos	|	scientific name	|
+mSpe	|	Ycticyon	|	gbif:Ycticyon	|	synonym	|
+mSpe	|	gbif:4833508	|	gbif:4833508	|	xref	|
+mSpe	|	Speotos	|	gbif:Speotos	|	synonym	|
+mSpe	|	gbif:4833560	|	gbif:4833560	|	xref	|
+mSpe	|	Cynalycus	|	gbif:Cynalycus	|	synonym	|
+mSpe	|	gbif:4833555	|	gbif:4833555	|	xref	|
+mSpe	|	Ictidocyon	|	gbif:Ictidocyon	|	synonym	|
+mSpe	|	gbif:4833471	|	gbif:4833471	|	xref	|
+mSpe	|	Abathmodon	|	gbif:Abathmodon	|	synonym	|
+mSpe	|	gbif:4833554	|	gbif:4833554	|	xref	|
+mSpe	|	Melictes	|	gbif:Melictes	|	synonym	|
+mSpe	|	gbif:4833444	|	gbif:4833444	|	xref	|
+mSpe	|	Speothos	|	gbif:Speothos	|	scientific name	|
+mSpe	|	gbif:2434443	|	gbif:2434443	|	xref	|
+mSpe	|	Melictis	|	gbif:Melictis	|	synonym	|
+mSpe	|	gbif:4833558	|	gbif:4833558	|	xref	|
+mSpe	|	Cynalius	|	gbif:Cynalius	|	synonym	|
+mSpe	|	gbif:4833556	|	gbif:4833556	|	xref	|
+mSpe	|	Speothus	|	gbif:Speothus	|	synonym	|
+mSpe	|	gbif:4833557	|	gbif:4833557	|	xref	|
+mSpe	|	Cynalicus	|	gbif:Cynalicus	|	synonym	|
+mSpe	|	gbif:4833553	|	gbif:4833553	|	xref	|
+mSpe	|	Spethos	|	gbif:Spethos	|	synonym	|
+mSpe	|	gbif:4833552	|	gbif:4833552	|	xref	|
+68741	|	mSpeVen	|	tolid:mSpeVen	|	tol_id	|
+68741	|	bush dog	|	tolid:bush dog	|	common_name	|
+68741	|	Speothos venaticus	|	tolid:Speothos venaticus	|	scientific name	|
+68741	|	Speothos venaticus	|	gbif:Speothos venaticus	|	scientific name	|
+68741	|	gbif:2434444	|	gbif:2434444	|	xref	|
+68741	|	Cynogale venatica	|	gbif:Cynogale venatica	|	synonym	|
+68741	|	gbif:8682167	|	gbif:8682167	|	xref	|
+68741	|	ncbi:68741	|	ott:ncbi:68741	|	xref	|
+68741	|	irmng:10766393	|	ott:irmng:10766393	|	xref	|
+68741	|	ott:684074	|	ott:684074	|	xref	|
+mAte	|	Atelocynus	|	tolid:Atelocynus	|	scientific name	|
+mAte	|	Canis	|	gbif:Canis	|	synonym	|
+mAte	|	gbif:8227762	|	gbif:8227762	|	xref	|
+mAte	|	Atelocynus	|	gbif:Atelocynus	|	scientific name	|
+mAte	|	gbif:2434453	|	gbif:2434453	|	xref	|
+68722	|	small-eared dog	|	tolid:small-eared dog	|	common_name	|
+68722	|	mAteMic	|	tolid:mAteMic	|	tol_id	|
+68722	|	Atelocynus microtis	|	tolid:Atelocynus microtis	|	scientific name	|
+68722	|	Dusicyon microtis	|	gbif:Dusicyon microtis	|	synonym	|
+68722	|	gbif:2434457	|	gbif:2434457	|	xref	|
+68722	|	Canis microtis	|	gbif:Canis microtis	|	synonym	|
+68722	|	gbif:5219233	|	gbif:5219233	|	xref	|
+68722	|	Atelocynus microtis	|	gbif:Atelocynus microtis	|	scientific name	|
+68722	|	gbif:2434454	|	gbif:2434454	|	xref	|
+68722	|	ncbi:68722	|	ott:ncbi:68722	|	xref	|
+68722	|	irmng:10860780	|	ott:irmng:10860780	|	xref	|
+68722	|	ott:621172	|	ott:621172	|	xref	|
+mUro	|	Urocyon	|	tolid:Urocyon	|	scientific name	|
+mUro	|	Urocyon	|	gbif:Urocyon	|	scientific name	|
+mUro	|	gbif:2434558	|	gbif:2434558	|	xref	|
+55040	|	mUroCin	|	tolid:mUroCin	|	tol_id	|
+55040	|	gray fox	|	tolid:gray fox	|	common_name	|
+55040	|	Urocyon cinereoargenteus	|	tolid:Urocyon cinereoargenteus	|	scientific name	|
+55040	|	Urocyon parvidens	|	gbif:Urocyon parvidens	|	synonym	|
+55040	|	gbif:12128352	|	gbif:12128352	|	xref	|
+55040	|	Urocyon californicus	|	gbif:Urocyon californicus	|	synonym	|
+55040	|	gbif:12015605	|	gbif:12015605	|	xref	|
+55040	|	Canis cinereoargentatus	|	gbif:Canis cinereoargentatus	|	synonym	|
+55040	|	gbif:11351056	|	gbif:11351056	|	xref	|
+55040	|	Canis virginianus	|	gbif:Canis virginianus	|	synonym	|
+55040	|	gbif:12084832	|	gbif:12084832	|	xref	|
+55040	|	Vulpes pensylvanicus	|	gbif:Vulpes pensylvanicus	|	synonym	|
+55040	|	gbif:11959269	|	gbif:11959269	|	xref	|
+55040	|	Urocyon cinereoargenteus	|	gbif:Urocyon cinereoargenteus	|	scientific name	|
+55040	|	gbif:2434566	|	gbif:2434566	|	xref	|
+55040	|	Urocyon guatemalae	|	gbif:Urocyon guatemalae	|	synonym	|
+55040	|	gbif:12027066	|	gbif:12027066	|	xref	|
+55040	|	Canis cinereoargenteus	|	gbif:Canis cinereoargenteus	|	synonym	|
+55040	|	gbif:7484026	|	gbif:7484026	|	xref	|
+55040	|	ncbi:55040	|	ott:ncbi:55040	|	xref	|
+55040	|	irmng:10201337	|	ott:irmng:10201337	|	xref	|
+55040	|	ott:685113	|	ott:685113	|	xref	|
+244585	|	island gray fox	|	tolid:island gray fox	|	common_name	|
+244585	|	mUroLit	|	tolid:mUroLit	|	tol_id	|
+244585	|	Urocyon littoralis	|	tolid:Urocyon littoralis	|	scientific name	|
+244585	|	Vulpes littoralis	|	gbif:Vulpes littoralis	|	synonym	|
+244585	|	gbif:8591370	|	gbif:8591370	|	xref	|
+244585	|	Canis littoralis	|	gbif:Canis littoralis	|	synonym	|
+244585	|	gbif:9376685	|	gbif:9376685	|	xref	|
+244585	|	Urocyon littoralis	|	gbif:Urocyon littoralis	|	scientific name	|
+244585	|	gbif:2434559	|	gbif:2434559	|	xref	|
+244585	|	ncbi:244585	|	ott:ncbi:244585	|	xref	|
+244585	|	irmng:10452931	|	ott:irmng:10452931	|	xref	|
+244585	|	ott:682591	|	ott:682591	|	xref	|
+mLyc	|	Lycaon	|	tolid:Lycaon	|	scientific name	|
+mLyc	|	Lycaon	|	gbif:Lycaon	|	synonym	|
+mLyc	|	gbif:7945497	|	gbif:7945497	|	xref	|
+mLyc	|	Cynhyaena	|	gbif:Cynhyaena	|	synonym	|
+mLyc	|	gbif:4833515	|	gbif:4833515	|	xref	|
+mLyc	|	Hyenoides	|	gbif:Hyenoides	|	synonym	|
+mLyc	|	gbif:4833519	|	gbif:4833519	|	xref	|
+mLyc	|	Kynos	|	gbif:Kynos	|	synonym	|
+mLyc	|	gbif:4833516	|	gbif:4833516	|	xref	|
+mLyc	|	Cynohyoena	|	gbif:Cynohyoena	|	synonym	|
+mLyc	|	gbif:4833488	|	gbif:4833488	|	xref	|
+mLyc	|	Cynhyoena	|	gbif:Cynhyoena	|	synonym	|
+mLyc	|	gbif:4833502	|	gbif:4833502	|	xref	|
+mLyc	|	Cynus	|	gbif:Cynus	|	synonym	|
+mLyc	|	gbif:4833487	|	gbif:4833487	|	xref	|
+mLyc	|	Hyaenoides	|	gbif:Hyaenoides	|	synonym	|
+mLyc	|	gbif:4833517	|	gbif:4833517	|	xref	|
+mLyc	|	Lycaon	|	gbif:Lycaon	|	scientific name	|
+mLyc	|	gbif:2434544	|	gbif:2434544	|	xref	|
+68739	|	mLycSec	|	tolid:mLycSec	|	tol_id	|
+68739	|	Sechura desert fox	|	tolid:Sechura desert fox	|	common_name	|
+68739	|	Lycalopex sechurae	|	tolid:Lycalopex sechurae	|	scientific name	|
+68739	|	Canis sechurae	|	gbif:Canis sechurae	|	synonym	|
+68739	|	gbif:8502055	|	gbif:8502055	|	xref	|
+68739	|	Pseudalopex sechurae	|	gbif:Pseudalopex sechurae	|	synonym	|
+68739	|	gbif:2434327	|	gbif:2434327	|	xref	|
+68739	|	Lycalopex sechurae	|	gbif:Lycalopex sechurae	|	scientific name	|
+68739	|	gbif:2434326	|	gbif:2434326	|	xref	|
+68739	|	ncbi:68739	|	ott:ncbi:68739	|	xref	|
+68739	|	irmng:10224209	|	ott:irmng:10224209	|	xref	|
+68739	|	ott:313143	|	ott:313143	|	xref	|
+68734	|	mLycVet	|	tolid:mLycVet	|	tol_id	|
+68734	|	hoary fox	|	tolid:hoary fox	|	common_name	|
+68734	|	Lycalopex vetulus	|	tolid:Lycalopex vetulus	|	scientific name	|
+68734	|	Canis vetulus	|	gbif:Canis vetulus	|	synonym	|
+68734	|	gbif:8463452	|	gbif:8463452	|	xref	|
+68734	|	Lycalopex vetulus	|	gbif:Lycalopex vetulus	|	scientific name	|
+68734	|	gbif:2434331	|	gbif:2434331	|	xref	|
+68734	|	Pseudalopex vetulus	|	gbif:Pseudalopex vetulus	|	synonym	|
+68734	|	gbif:2434332	|	gbif:2434332	|	xref	|
+68734	|	ncbi:68734	|	ott:ncbi:68734	|	xref	|
+68734	|	irmng:10224210	|	ott:irmng:10224210	|	xref	|
+68734	|	ott:313153	|	ott:313153	|	xref	|
+354191	|	mLycFul	|	tolid:mLycFul	|	tol_id	|
+354191	|	Darwin's zorro	|	tolid:Darwin's zorro	|	common_name	|
+354191	|	Lycalopex fulvipes	|	tolid:Lycalopex fulvipes	|	scientific name	|
+354191	|	Lycalopex fulvipes	|	gbif:Lycalopex fulvipes	|	scientific name	|
+354191	|	gbif:2434330	|	gbif:2434330	|	xref	|
+354191	|	Pseudalopex fulvipes	|	gbif:Pseudalopex fulvipes	|	synonym	|
+354191	|	gbif:5787242	|	gbif:5787242	|	xref	|
+354191	|	Vulpes fulvipes	|	gbif:Vulpes fulvipes	|	synonym	|
+354191	|	gbif:8491461	|	gbif:8491461	|	xref	|
+354191	|	ncbi:354191	|	ott:ncbi:354191	|	xref	|
+354191	|	Pseudalopex griseus fulvipes	|	ncbi:Pseudalopex griseus fulvipes	|	synonym	|
+354191	|	ott:996573	|	ott:996573	|	xref	|
+9622	|	mLycPic	|	tolid:mLycPic	|	tol_id	|
+9622	|	African hunting dog	|	tolid:African hunting dog	|	common_name	|
+9622	|	Lycaon pictus	|	tolid:Lycaon pictus	|	scientific name	|
+9622	|	Hyaena picta	|	gbif:Hyaena picta	|	synonym	|
+9622	|	gbif:8302883	|	gbif:8302883	|	xref	|
+9622	|	Lycaon pictus	|	gbif:Lycaon pictus	|	scientific name	|
+9622	|	gbif:5219317	|	gbif:5219317	|	xref	|
+9622	|	ncbi:9622	|	ott:ncbi:9622	|	xref	|
+9622	|	irmng:10591018	|	ott:irmng:10591018	|	xref	|
+9622	|	ott:821953	|	ott:821953	|	xref	|
+68737	|	mLycGri	|	tolid:mLycGri	|	tol_id	|
+68737	|	South American gray fox	|	tolid:South American gray fox	|	common_name	|
+68737	|	Lycalopex griseus	|	tolid:Lycalopex griseus	|	scientific name	|
+68737	|	ncbi:68737	|	ott:ncbi:68737	|	xref	|
+68737	|	Dusicyon griseus	|	ncbi:Dusicyon griseus	|	synonym	|
+68737	|	Pseudalopex griseus	|	ncbi:Pseudalopex griseus	|	synonym	|
+68737	|	ott:776070	|	ott:776070	|	xref	|
+68736	|	Culpeo	|	tolid:Culpeo	|	common_name	|
+68736	|	mLycCul	|	tolid:mLycCul	|	tol_id	|
+68736	|	Lycalopex culpaeus	|	tolid:Lycalopex culpaeus	|	scientific name	|
+68736	|	Lycalopex culpaeus	|	gbif:Lycalopex culpaeus	|	scientific name	|
+68736	|	gbif:2434340	|	gbif:2434340	|	xref	|
+68736	|	Pseudalopex culpaeus	|	gbif:Pseudalopex culpaeus	|	synonym	|
+68736	|	gbif:2434343	|	gbif:2434343	|	xref	|
+68736	|	Canis culpaeus	|	gbif:Canis culpaeus	|	synonym	|
+68736	|	gbif:8650077	|	gbif:8650077	|	xref	|
+68736	|	ncbi:68736	|	ott:ncbi:68736	|	xref	|
+68736	|	irmng:11162127	|	ott:irmng:11162127	|	xref	|
+68736	|	ott:776077	|	ott:776077	|	xref	|
+425201	|	Pampas fox	|	tolid:Pampas fox	|	common_name	|
+425201	|	mLycGym	|	tolid:mLycGym	|	tol_id	|
+425201	|	Lycalopex gymnocercus	|	tolid:Lycalopex gymnocercus	|	scientific name	|
+425201	|	Pseudalopex griseus	|	gbif:Pseudalopex griseus	|	synonym	|
+425201	|	gbif:2434329	|	gbif:2434329	|	xref	|
+425201	|	Pseudalopex gymnocercus	|	gbif:Pseudalopex gymnocercus	|	synonym	|
+425201	|	gbif:2434336	|	gbif:2434336	|	xref	|
+425201	|	Procyon gymnocercus	|	gbif:Procyon gymnocercus	|	synonym	|
+425201	|	gbif:8456668	|	gbif:8456668	|	xref	|
+425201	|	Lycalopex gymnocercus	|	gbif:Lycalopex gymnocercus	|	scientific name	|
+425201	|	gbif:2434333	|	gbif:2434333	|	xref	|
+425201	|	Lycalopex griseus	|	gbif:Lycalopex griseus	|	synonym	|
+425201	|	gbif:2434328	|	gbif:2434328	|	xref	|
+425201	|	ncbi:425201	|	ott:ncbi:425201	|	xref	|
+425201	|	irmng:11361328	|	ott:irmng:11361328	|	xref	|
+425201	|	? griseus	|	gbif:? griseus	|	synonym	|
+425201	|	ott:839340	|	ott:839340	|	xref	|
+mCer	|	Cerdocyon	|	tolid:Cerdocyon	|	scientific name	|
+mCer	|	Carcinocyon	|	gbif:Carcinocyon	|	synonym	|
+mCer	|	gbif:4833445	|	gbif:4833445	|	xref	|
+mCer	|	Thous	|	gbif:Thous	|	synonym	|
+mCer	|	gbif:7009347	|	gbif:7009347	|	xref	|
+mCer	|	Cerdocyon	|	gbif:Cerdocyon	|	scientific name	|
+mCer	|	gbif:2434583	|	gbif:2434583	|	xref	|
+9620	|	mCerTho	|	tolid:mCerTho	|	tol_id	|
+9620	|	crab-eating fox	|	tolid:crab-eating fox	|	common_name	|
+9620	|	Cerdocyon thous	|	tolid:Cerdocyon thous	|	scientific name	|
+9620	|	Canis thous	|	gbif:Canis thous	|	synonym	|
+9620	|	gbif:8561069	|	gbif:8561069	|	xref	|
+9620	|	Dusicyon thous	|	gbif:Dusicyon thous	|	synonym	|
+9620	|	gbif:8181583	|	gbif:8181583	|	xref	|
+9620	|	Cerdocyon thous	|	gbif:Cerdocyon thous	|	scientific name	|
+9620	|	gbif:2434584	|	gbif:2434584	|	xref	|
+9620	|	ncbi:9620	|	ott:ncbi:9620	|	xref	|
+9620	|	irmng:10194971	|	ott:irmng:10194971	|	xref	|
+9620	|	3612581	|	3612581	|	merged taxon id	|
+9620	|	ott:821960	|	ott:821960	|	xref	|
+mVul	|	Vulpes	|	tolid:Vulpes	|	scientific name	|
+mVul	|	Vulpis	|	gbif:Vulpis	|	synonym	|
+mVul	|	gbif:4833491	|	gbif:4833491	|	xref	|
+mVul	|	Alopex	|	gbif:Alopex	|	synonym	|
+mVul	|	gbif:2434448	|	gbif:2434448	|	xref	|
+mVul	|	Vulpes	|	gbif:Vulpes	|	synonym	|
+mVul	|	gbif:11401930	|	gbif:11401930	|	xref	|
+mVul	|	Megalotis	|	gbif:Megalotis	|	synonym	|
+mVul	|	gbif:3239999	|	gbif:3239999	|	xref	|
+mVul	|	Cynalopex	|	gbif:Cynalopex	|	synonym	|
+mVul	|	gbif:4833493	|	gbif:4833493	|	xref	|
+mVul	|	Fennecus	|	gbif:Fennecus	|	synonym	|
+mVul	|	gbif:4833490	|	gbif:4833490	|	xref	|
+mVul	|	Vulpes	|	gbif:Vulpes	|	scientific name	|
+mVul	|	gbif:5219234	|	gbif:5219234	|	xref	|
+mVul	|	Mamvulpesus	|	gbif:Mamvulpesus	|	synonym	|
+mVul	|	gbif:4833492	|	gbif:4833492	|	xref	|
+mVul	|	Leucocyon	|	gbif:Leucocyon	|	synonym	|
+mVul	|	gbif:4833494	|	gbif:4833494	|	xref	|
+9629	|	mVulCor	|	tolid:mVulCor	|	tol_id	|
+9629	|	Corsac fox	|	tolid:Corsac fox	|	common_name	|
+9629	|	Vulpes corsac	|	tolid:Vulpes corsac	|	scientific name	|
+9629	|	Vulpes corsac	|	gbif:Vulpes corsac	|	scientific name	|
+9629	|	gbif:5219293	|	gbif:5219293	|	xref	|
+9629	|	Canis corsac	|	gbif:Canis corsac	|	synonym	|
+9629	|	gbif:8524319	|	gbif:8524319	|	xref	|
+9629	|	ncbi:9629	|	ott:ncbi:9629	|	xref	|
+9629	|	irmng:10600399	|	ott:irmng:10600399	|	xref	|
+9629	|	ott:523960	|	ott:523960	|	xref	|
+494514	|	Arctic fox	|	tolid:Arctic fox	|	common_name	|
+494514	|	mVulLag	|	tolid:mVulLag	|	tol_id	|
+494514	|	Vulpes lagopus	|	tolid:Vulpes lagopus	|	scientific name	|
+494514	|	Alopex lagopus	|	gbif:Alopex lagopus	|	synonym	|
+494514	|	gbif:2434532	|	gbif:2434532	|	xref	|
+494514	|	Vulpes lagopus	|	gbif:Vulpes lagopus	|	scientific name	|
+494514	|	gbif:5219303	|	gbif:5219303	|	xref	|
+494514	|	Leucocyon lagopus	|	gbif:Leucocyon lagopus	|	synonym	|
+494514	|	gbif:7564941	|	gbif:7564941	|	xref	|
+494514	|	Canis lagopus	|	gbif:Canis lagopus	|	synonym	|
+494514	|	gbif:6545372	|	gbif:6545372	|	xref	|
+494514	|	ncbi:494514	|	ott:ncbi:494514	|	xref	|
+494514	|	worms:404130	|	ott:worms:404130	|	xref	|
+494514	|	irmng:11028758	|	ott:irmng:11028758	|	xref	|
+494514	|	ott:775766	|	ott:775766	|	xref	|
+561074	|	Tibetan sand fox	|	tolid:Tibetan sand fox	|	common_name	|
+561074	|	mVulFer	|	tolid:mVulFer	|	tol_id	|
+561074	|	Vulpes ferrilata	|	tolid:Vulpes ferrilata	|	scientific name	|
+561074	|	Vulpes ferrilata	|	gbif:Vulpes ferrilata	|	scientific name	|
+561074	|	gbif:5219309	|	gbif:5219309	|	xref	|
+561074	|	ncbi:561074	|	ott:ncbi:561074	|	xref	|
+561074	|	irmng:10224212	|	ott:irmng:10224212	|	xref	|
+561074	|	ott:110766	|	ott:110766	|	xref	|
+9631	|	mVulVel	|	tolid:mVulVel	|	tol_id	|
+9631	|	swift fox	|	tolid:swift fox	|	common_name	|
+9631	|	Vulpes velox	|	tolid:Vulpes velox	|	scientific name	|
+9631	|	Canis velox	|	gbif:Canis velox	|	synonym	|
+9631	|	gbif:8622646	|	gbif:8622646	|	xref	|
+9631	|	Vulpes velox	|	gbif:Vulpes velox	|	scientific name	|
+9631	|	gbif:5219290	|	gbif:5219290	|	xref	|
+9631	|	ncbi:9631	|	ott:ncbi:9631	|	xref	|
+9631	|	irmng:10201336	|	ott:irmng:10201336	|	xref	|
+9631	|	Vulpes velox hebes	|	gbif:Vulpes velox hebes	|	synonym	|
+9631	|	Vulpes velox velox	|	gbif:Vulpes velox velox	|	synonym	|
+9631	|	ott:297455	|	ott:297455	|	xref	|
+354190	|	Blandford's fox	|	tolid:Blandford's fox	|	common_name	|
+354190	|	mVulCan	|	tolid:mVulCan	|	tol_id	|
+354190	|	Vulpes cana	|	tolid:Vulpes cana	|	scientific name	|
+354190	|	Vulpes cana	|	gbif:Vulpes cana	|	scientific name	|
+354190	|	gbif:5219235	|	gbif:5219235	|	xref	|
+354190	|	ncbi:354190	|	ott:ncbi:354190	|	xref	|
+354190	|	irmng:10224211	|	ott:irmng:10224211	|	xref	|
+354190	|	ott:996571	|	ott:996571	|	xref	|
+9630	|	mVulMac	|	tolid:mVulMac	|	tol_id	|
+9630	|	kit fox	|	tolid:kit fox	|	common_name	|
+9630	|	Vulpes macrotis	|	tolid:Vulpes macrotis	|	scientific name	|
+9630	|	Vulpes macrotis	|	gbif:Vulpes macrotis	|	scientific name	|
+9630	|	gbif:5219311	|	gbif:5219311	|	xref	|
+9630	|	Vulpes muticus	|	gbif:Vulpes muticus	|	synonym	|
+9630	|	gbif:5219314	|	gbif:5219314	|	xref	|
+9630	|	ncbi:9630	|	ott:ncbi:9630	|	xref	|
+9630	|	irmng:10586995	|	ott:irmng:10586995	|	xref	|
+9630	|	Vulpes macrotis macrotis	|	gbif:Vulpes macrotis macrotis	|	synonym	|
+9630	|	Vulpes macrotis mutica	|	gbif:Vulpes macrotis mutica	|	synonym	|
+9630	|	Vulpes macrotis neomexicanus	|	gbif:Vulpes macrotis neomexicanus	|	synonym	|
+9630	|	Vulpes velox macrotis	|	ncbi:Vulpes velox macrotis	|	synonym	|
+9630	|	Vulpes velox mutica	|	gbif:Vulpes velox mutica	|	synonym	|
+9630	|	ott:297453	|	ott:297453	|	xref	|
+2494276	|	Bengal fox	|	tolid:Bengal fox	|	common_name	|
+2494276	|	mVulBen	|	tolid:mVulBen	|	tol_id	|
+2494276	|	Vulpes bengalensis	|	tolid:Vulpes bengalensis	|	scientific name	|
+2494276	|	Vulpes bengalensis	|	gbif:Vulpes bengalensis	|	scientific name	|
+2494276	|	gbif:5219308	|	gbif:5219308	|	xref	|
+2494276	|	Canis bengalensis	|	gbif:Canis bengalensis	|	synonym	|
+2494276	|	gbif:8477784	|	gbif:8477784	|	xref	|
+1224817	|	pale fox	|	tolid:pale fox	|	common_name	|
+1224817	|	mVulPal	|	tolid:mVulPal	|	tol_id	|
+1224817	|	Vulpes pallida	|	tolid:Vulpes pallida	|	scientific name	|
+1224817	|	Canis pallidus	|	gbif:Canis pallidus	|	synonym	|
+1224817	|	gbif:8442441	|	gbif:8442441	|	xref	|
+1224817	|	Vulpes pallida	|	gbif:Vulpes pallida	|	scientific name	|
+1224817	|	gbif:5219237	|	gbif:5219237	|	xref	|
+1224817	|	ncbi:1224817	|	ott:ncbi:1224817	|	xref	|
+1224817	|	irmng:10224213	|	ott:irmng:10224213	|	xref	|
+1224817	|	ott:3612512	|	ott:3612512	|	xref	|
+68732	|	mVulZer	|	tolid:mVulZer	|	tol_id	|
+68732	|	fennec fox	|	tolid:fennec fox	|	common_name	|
+68732	|	Vulpes zerda	|	tolid:Vulpes zerda	|	scientific name	|
+68732	|	Canis zerda	|	gbif:Canis zerda	|	synonym	|
+68732	|	gbif:8217595	|	gbif:8217595	|	xref	|
+68732	|	Fennecus zerda	|	gbif:Fennecus zerda	|	synonym	|
+68732	|	gbif:5787243	|	gbif:5787243	|	xref	|
+68732	|	Vulpes zerda	|	gbif:Vulpes zerda	|	scientific name	|
+68732	|	gbif:5219310	|	gbif:5219310	|	xref	|
+68732	|	ncbi:68732	|	ott:ncbi:68732	|	xref	|
+68732	|	irmng:10861868	|	ott:irmng:10861868	|	xref	|
+68732	|	ott:315465	|	ott:315465	|	xref	|
+9627	|	red fox	|	tolid:red fox	|	common_name	|
+9627	|	mVulVul	|	tolid:mVulVul	|	tol_id	|
+9627	|	Vulpes vulpes	|	tolid:Vulpes vulpes	|	scientific name	|
+9627	|	Canis vulpes	|	gbif:Canis vulpes	|	synonym	|
+9627	|	gbif:8141224	|	gbif:8141224	|	xref	|
+9627	|	Vulpes vulpes	|	gbif:Vulpes vulpes	|	scientific name	|
+9627	|	gbif:5219243	|	gbif:5219243	|	xref	|
+9627	|	Vulpes palmaria	|	gbif:Vulpes palmaria	|	synonym	|
+9627	|	gbif:8443360	|	gbif:8443360	|	xref	|
+9627	|	ncbi:9627	|	ott:ncbi:9627	|	xref	|
+9627	|	irmng:11162128	|	ott:irmng:11162128	|	xref	|
+9627	|	Vulpes fulvus	|	irmng:Vulpes fulvus	|	synonym	|
+9627	|	5554031	|	5554031	|	merged taxon id	|
+9627	|	ott:821964	|	ott:821964	|	xref	|
+9626	|	cape fox	|	tolid:cape fox	|	common_name	|
+9626	|	mVulCha	|	tolid:mVulCha	|	tol_id	|
+9626	|	Vulpes chama	|	tolid:Vulpes chama	|	scientific name	|
+9626	|	Canis chama	|	gbif:Canis chama	|	synonym	|
+9626	|	gbif:8603181	|	gbif:8603181	|	xref	|
+9626	|	Vulpes chama	|	gbif:Vulpes chama	|	scientific name	|
+9626	|	gbif:5219236	|	gbif:5219236	|	xref	|
+9626	|	ncbi:9626	|	ott:ncbi:9626	|	xref	|
+9626	|	irmng:10912938	|	ott:irmng:10912938	|	xref	|
+9626	|	ott:821968	|	ott:821968	|	xref	|
+354189	|	mVulRue	|	tolid:mVulRue	|	tol_id	|
+354189	|	Rueppel's fox	|	tolid:Rueppel's fox	|	common_name	|
+354189	|	Vulpes rueppellii	|	tolid:Vulpes rueppellii	|	scientific name	|
+354189	|	Canis ruppelii	|	gbif:Canis ruppelii	|	synonym	|
+354189	|	gbif:9405848	|	gbif:9405848	|	xref	|
+354189	|	Canis rueppellii	|	gbif:Canis rueppellii	|	synonym	|
+354189	|	gbif:10973082	|	gbif:10973082	|	xref	|
+354189	|	Vulpes rueppellii	|	gbif:Vulpes rueppellii	|	scientific name	|
+354189	|	gbif:5219297	|	gbif:5219297	|	xref	|
+354189	|	ncbi:354189	|	ott:ncbi:354189	|	xref	|
+354189	|	irmng:10600400	|	ott:irmng:10600400	|	xref	|
+354189	|	ott:419501	|	ott:419501	|	xref	|
+mOto	|	Otocyon	|	tolid:Otocyon	|	scientific name	|
+mOto	|	Agrodius	|	gbif:Agrodius	|	synonym	|
+mOto	|	gbif:4833542	|	gbif:4833542	|	xref	|
+mOto	|	Otocyon	|	gbif:Otocyon	|	scientific name	|
+mOto	|	gbif:2434348	|	gbif:2434348	|	xref	|
+mOto	|	Octocyon	|	gbif:Octocyon	|	synonym	|
+mOto	|	gbif:4833543	|	gbif:4833543	|	xref	|
+mOto	|	Agriodus	|	gbif:Agriodus	|	synonym	|
+mOto	|	gbif:3239989	|	gbif:3239989	|	xref	|
+9624	|	mOtoMeg	|	tolid:mOtoMeg	|	tol_id	|
+9624	|	bat-eared fox	|	tolid:bat-eared fox	|	common_name	|
+9624	|	Otocyon megalotis	|	tolid:Otocyon megalotis	|	scientific name	|
+9624	|	Canis megalotis	|	gbif:Canis megalotis	|	synonym	|
+9624	|	gbif:8105499	|	gbif:8105499	|	xref	|
+9624	|	Otocyon megalotis	|	gbif:Otocyon megalotis	|	scientific name	|
+9624	|	gbif:2434349	|	gbif:2434349	|	xref	|
+9624	|	ncbi:9624	|	ott:ncbi:9624	|	xref	|
+9624	|	irmng:11074322	|	ott:irmng:11074322	|	xref	|
+9624	|	ott:821973	|	ott:821973	|	xref	|
+mChr	|	Chrysocyon	|	tolid:Chrysocyon	|	scientific name	|
+mChr	|	Crysocyon	|	gbif:Crysocyon	|	synonym	|
+mChr	|	gbif:4833500	|	gbif:4833500	|	xref	|
+mChr	|	Chrysocyon	|	gbif:Chrysocyon	|	scientific name	|
+mChr	|	gbif:2434449	|	gbif:2434449	|	xref	|
+68728	|	mChrBra	|	tolid:mChrBra	|	tol_id	|
+68728	|	maned wolf	|	tolid:maned wolf	|	common_name	|
+68728	|	Chrysocyon brachyurus	|	tolid:Chrysocyon brachyurus	|	scientific name	|
+68728	|	Canis brachyurus	|	gbif:Canis brachyurus	|	synonym	|
+68728	|	gbif:8484516	|	gbif:8484516	|	xref	|
+68728	|	Chrysocyon brachyurus	|	gbif:Chrysocyon brachyurus	|	scientific name	|
+68728	|	gbif:2434450	|	gbif:2434450	|	xref	|
+68728	|	ncbi:68728	|	ott:ncbi:68728	|	xref	|
+68728	|	irmng:11269572	|	ott:irmng:11269572	|	xref	|
+68728	|	ott:837601	|	ott:837601	|	xref	|
+3069387	|	Canidae intergeneric hybrids	|	ena:canidae intergeneric hybrids	|	scientific name	|
+3069388	|	Canis lupus familiaris x Lycalopex gymnocercus	|	ena:canis lupus familiaris x lycalopex gymnocercus	|	scientific name	|
+68735	|	Pseudalopex	|	ena:pseudalopex	|	scientific name	|
+2879912	|	Vulpes macrotis macrotis	|	ena:vulpes macrotis macrotis	|	scientific name	|
+1504800	|	Vulpes vulpes fulvus	|	ena:vulpes vulpes fulvus	|	scientific name	|
