@@ -345,7 +345,6 @@ pub fn build_fast_lookup(
     let progress_bar = styled_progress_bar(node_count, "Building lookup hash");
     for (tax_id, node) in nodes.nodes.iter() {
         progress_bar.inc(1);
-        // if rank_set.contains(node.rank.as_str()) {
         let lineage = nodes.lineage(&"1".to_string(), tax_id);
         let names = node.names_by_class(Some(&name_classes), true);
         let anc_ids: HashSet<String> = lineage
@@ -360,20 +359,21 @@ pub fn build_fast_lookup(
                 rank: node.rank(),
                 anc_ids: anc_ids.clone(),
             };
-            match id_map.entry(CString::new(clean_name(&name)).unwrap()) {
+            let key = CString::new(clean_name(&name)).unwrap();
+            match id_map.entry(key) {
                 blart::map::Entry::Vacant(e) => {
                     e.insert(vec![taxon_info]);
                 }
                 blart::map::Entry::Occupied(mut e) => {
-                    e.get_mut().push(taxon_info);
+                    // Only insert if this tax_id is not already present
+                    if !e.get().iter().any(|ti| ti.tax_id == taxon_info.tax_id) {
+                        e.get_mut().push(taxon_info);
+                    }
                 }
             }
         }
-        // }
     }
-
     progress_bar.finish();
-
     id_map
 }
 

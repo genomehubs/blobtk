@@ -13,6 +13,7 @@ use regex::Regex;
 use schemars::JsonSchema;
 use serde;
 use serde::{Deserialize, Deserializer, Serialize};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::error;
 use crate::io;
@@ -603,7 +604,11 @@ pub struct GHubsFieldConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxon_type: Option<String>,
     // List of values to translate
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_translate"
+    )]
     pub translate: Option<HashMap<String, StringOrVec>>,
     // Traverse function
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1642,82 +1647,87 @@ fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, Validatio
     }
 }
 
-fn translate_value(field: &GHubsFieldConfig, value: &String) -> Vec<String> {
-    let mut values = vec![];
-    if let Some(ref translate) = field.translate {
-        let translated = translate
-            .get(value)
-            .cloned()
-            .unwrap_or(StringOrVec::Single(value.to_owned()));
-        match translated {
-            StringOrVec::Single(val) => values.push(val),
-            StringOrVec::Multiple(vals) => values.extend(vals),
-        };
-    } else {
-        values.push(value.to_owned());
-    }
-    values
+fn normalize_key(s: &str) -> String {
+    s.trim().to_lowercase().nfc().collect::<String>()
 }
 
+fn deserialize_translate<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<String, StringOrVec>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<HashMap<String, StringOrVec>>::deserialize(deserializer)?;
+    if let Some(map) = opt {
+        let normalized = map
+            .into_iter()
+            .map(|(k, v)| (normalize_key(&k), v))
+            .collect();
+        Ok(Some(normalized))
+    } else {
+        Ok(None)
+    }
+}
+
+// Process a value: translate, apply function, validate, and return results
 fn process_value(
     value: String,
     field: &GHubsFieldConfig,
-) -> Result<
-    (
-        Vec<(String, ValidationStatus)>,
-        Vec<String>,
-        ValidationStatus,
-    ),
-    error::Error,
-> {
-    let values = translate_value(field, &value);
-    let mut ret_values = vec![];
+) -> Result<(Vec<(String, String)>, Vec<String>, ValidationStatus), error::Error> {
+    use unicode_normalization::UnicodeNormalization;
+    let mut values = vec![];
     let mut invalid_values = vec![];
-    for value in values {
-        if let Some(separator) = &field.separator {
-            let re = match separator {
-                StringOrVec::Single(sep) => Regex::new(sep).unwrap(),
-                StringOrVec::Multiple(separators) => Regex::new(
-                    separators
-                        // .iter()
-                        // .map(|sep| record.get(idx.to_owned()).unwrap_or(""))
-                        // .collect::<Vec<&str>>()
-                        .join(&"|")
-                        .as_str(),
-                )
-                .unwrap(),
-            };
-            for val in re.split(value.as_str()) {
-                validate_value(field, &mut ret_values, &mut invalid_values, val.to_string());
+    let mut status = ValidationStatus::None;
+    // Use field separator if present, otherwise default to ';'
+    let sep = field.separator.as_ref().map(|s| match s {
+        StringOrVec::Single(sep) => sep.as_str(),
+        StringOrVec::Multiple(seps) => seps.get(0).map(|s| s.as_str()).unwrap_or(";")
+    }).unwrap_or(";");
+    let mut input_values: Vec<String> = value
+        .split(sep)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && s != "None" && s != "NA")
+        .collect();
+    if input_values.is_empty() {
+        return Ok((vec![], vec![], ValidationStatus::Blank));
+    }
+    // Translation
+    if let Some(translate) = &field.translate {
+        let mut translated = vec![];
+        for v in input_values.iter() {
+            let norm_v = v.trim().to_lowercase().nfc().collect::<String>();
+            if let Some(t) = translate.get(&norm_v) {
+                match t {
+                    StringOrVec::Single(s) => translated.push(s.clone()),
+                    StringOrVec::Multiple(vec) => translated.extend(vec.clone()),
+                }
+            } else {
+                translated.push(v.clone());
             }
-        } else {
-            validate_value(field, &mut ret_values, &mut invalid_values, value.clone());
         }
+        input_values = translated;
     }
-    let status = if invalid_values.is_empty() {
-        ValidationStatus::Valid
-    } else if invalid_values.len() < ret_values.len() {
-        ValidationStatus::Partial
-    } else {
-        ValidationStatus::Invalid
-    };
-    Ok((ret_values, invalid_values, status))
-}
-
-fn validate_value(
-    field: &GHubsFieldConfig,
-    ret_values: &mut Vec<(String, ValidationStatus)>,
-    invalid_values: &mut Vec<String>,
-    val: String,
-) {
-    let (v, status) = apply_function(val.to_string(), &field);
-    let is_valid = match status {
-        ValidationStatus::Valid => true,
-        ValidationStatus::Blank => true,
-        _ => false,
-    };
-    if !is_valid {
-        invalid_values.push(val.to_string());
+    // Apply function and validate
+    for v in input_values.iter() {
+        let (val, val_status) = apply_function(v.clone(), field);
+        if val_status == ValidationStatus::Valid {
+            values.push((val.clone(), v.clone()));
+        } else {
+            invalid_values.push(v.clone());
+        }
+        status = match (status.clone(), val_status) {
+            (ValidationStatus::None, s) => s,
+            (ValidationStatus::Valid, ValidationStatus::Valid) => ValidationStatus::Valid,
+            (ValidationStatus::Valid, ValidationStatus::Invalid) => ValidationStatus::Partial,
+            (ValidationStatus::Partial, _) => ValidationStatus::Partial,
+            (_, ValidationStatus::Partial) => ValidationStatus::Partial,
+            (_, ValidationStatus::Blank) => status,
+            (_, ValidationStatus::Error) => ValidationStatus::Error,
+            (s, _) => s,
+        };
     }
-    ret_values.push((v, status));
+    if values.is_empty() && !invalid_values.is_empty() {
+        status = ValidationStatus::Invalid;
+    }
+    Ok((values, invalid_values, status))
 }
