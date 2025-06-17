@@ -5,6 +5,8 @@ use thiserror;
 pub enum Error {
     #[error("{0}")]
     Generic(String),
+    #[error("API error: {0}")]
+    ApiError(String),
     #[error("{0}")]
     ParseError(String),
     #[error("Parameter not defined: {0}")]
@@ -25,6 +27,12 @@ pub enum Error {
     UnknownField(String, String, String),
     #[error("YAML error: {0}")]
     YamlError(String),
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(err: anyhow::Error) -> Self {
+        Error::ApiError(err.to_string())
+    }
 }
 
 impl From<std::io::Error> for Error {

@@ -72,8 +72,8 @@ pub enum SubCommand {
     /// Process a BlobDir and produce static plots.
     /// Called as `blobtk plot`
     Plot(PlotOptions),
-    /// [experimental] Process a taxonomy and lookup lineages.
-    /// Called as `blobtk taxonomy`
+    /// [experimental] Process a taxonomy and lookup lineages, or start the API server with --api
+    /// Called as `blobtk taxonomy [--api] ...`
     Taxonomy(TaxonomyOptions),
     /// [experimental] Validate BlobToolKit and GenomeHubs files.
     /// Called as `blobtk validate`
@@ -485,15 +485,9 @@ pub struct TaxonomyOptions {
     /// Base taxon for filtered taxonomy lineages
     #[arg(long = "base-id", short = 'b')]
     pub base_taxon_id: Option<String>,
-    // /// Path to a directory containing files to be mapped to the taxonomy
-    // #[arg(long = "data-dir", short = 'd')]
-    // pub data_dir: Option<Vec<PathBuf>>,
     /// Path to output filtered backbone taxonomy
     #[arg(long = "taxdump-out", short = 'O')]
     pub out: Option<PathBuf>,
-    // /// Path to GBIF backbone taxonomy file (simple text)
-    // #[arg(long = "gbif-backbone", short = 'g')]
-    // pub gbif_backbone: Option<PathBuf>,
     /// Path to YAML format config file
     #[arg(long = "config", short = 'c')]
     pub config_file: Option<PathBuf>,
@@ -514,6 +508,14 @@ pub struct TaxonomyOptions {
     /// Files to match to taxIDs - Experimental
     #[arg(long = "genomehubs_files", short = 'g')]
     pub genomehubs_files: Option<Vec<PathBuf>>,
+    /// [experimental] Start the taxonomy API server instead of running a one-off merge/output
+    #[arg(long = "api")]
+    #[serde(default)]
+    pub api: bool,
+    /// Port to run the API server on (if --api is set)
+    #[arg(long, short = 'p', default_value_t = 3000)]
+    #[serde(default = "default_port")]
+    pub port: u16,
 }
 
 fn default_name_classes() -> Vec<String> {
@@ -522,6 +524,10 @@ fn default_name_classes() -> Vec<String> {
 
 fn default_create_taxa() -> bool {
     false
+}
+
+fn default_port() -> u16 {
+    3000
 }
 
 /// Options to pass to `blobtk validate`

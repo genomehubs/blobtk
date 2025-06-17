@@ -1,21 +1,11 @@
-// use nom::bytes::complete::tag;
-// use nom::sequence::delimited;
-
-// let mut parser = tag("|");
-
-// println!("{}", parser(line));
-
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::CString;
-use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 
 use blart::TreeMap;
-use convert_case::{Case, Casing};
 use indicatif::ProgressBar;
-use serde;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// Functions for name lookup.
@@ -28,18 +18,14 @@ pub mod nodes;
 pub mod genomehubs;
 
 use crate::error;
-use crate::io;
 
-use lookup::TaxonMatch;
-use lookup::{build_lookup, match_taxonomy_section, TaxonInfo};
-use lookup::{clean_name, MatchStatus};
-use lookup::{Candidate, MatchCounts};
-
+use genomehubs::{
+    GHubsConfig, SkipPartial, Source, StringOrVec, ValidationCounts, ValidationStatus,
+};
+use lookup::{
+    clean_name, match_taxonomy_section, Candidate, MatchCounts, MatchStatus, TaxonInfo, TaxonMatch,
+};
 use nodes::{Name, Node, Nodes};
-
-use genomehubs::{GHubsConfig, SkipPartial};
-use genomehubs::{Source, StringOrVec};
-use genomehubs::{ValidationCounts, ValidationStatus};
 
 // Add new names to the taxonomy
 fn add_new_names(
@@ -93,7 +79,7 @@ fn add_new_names(
 fn add_new_taxid(
     taxon: &TaxonMatch,
     taxonomy_section: &HashMap<String, String>,
-    id_map: &TreeMap<CString, Vec<TaxonInfo>>,
+    _id_map: &TreeMap<CString, Vec<TaxonInfo>>,
 ) -> Option<Node> {
     // check taxonomy_section has a value for alt_taxon_id that is not None or NA
     let alt_taxon_id;
@@ -324,7 +310,7 @@ fn nodes_from_file(
                             prev_tax_id = inter_tax_id;
                         }
                         // Now add the final node, parented to the last intermediate (or matched parent)
-                        let mut node = Node {
+                        let node = Node {
                             tax_id: taxon_match
                                 .taxon
                                 .tax_id
@@ -420,7 +406,7 @@ fn nodes_from_file(
                                 nodes.insert(genus_tax_id.clone(), genus_node);
                             }
                             // Now add the species/subspecies node, parented to the genus
-                            let mut node = Node {
+                            let node = Node {
                                 tax_id: taxon_match
                                     .taxon
                                     .tax_id

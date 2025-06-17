@@ -1,8 +1,7 @@
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::io::Write;
+use std::io::BufRead;
 use std::path::PathBuf;
 
 use anyhow;
@@ -13,15 +12,18 @@ use nom::{
     multi::separated_list0,
     IResult,
 };
-
+use serde::Serialize;
+use serde_json::Value;
 use struct_iterable::Iterable;
 
 use crate::cli::TaxonomyOptions;
 use crate::io;
 use crate::io::file_reader;
+use crate::parse::lookup::build_fast_lookup;
+use crate::parse::parse_file;
 
 /// A taxon name
-#[derive(Clone, Debug, Default, Eq, Iterable, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, Iterable, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Name {
     pub tax_id: String,
     pub name: String,
@@ -84,7 +86,7 @@ impl fmt::Display for Name {
 }
 
 /// A taxonomy node
-#[derive(Clone, Debug, Default, Eq, Iterable, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, Iterable, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Node {
     pub tax_id: String,
     pub parent_tax_id: String,
@@ -312,7 +314,7 @@ impl Nodes {
         leaf_taxon_ids: Option<HashSet<String>>,
         base_id: Option<String>,
         taxdump_path: &PathBuf,
-        append: bool,
+        _append: bool,
         nodes_writer: &mut dyn std::io::Write,
         names_writer: &mut dyn std::io::Write,
         visited: &mut HashSet<String>,
@@ -580,7 +582,7 @@ impl Nodes {
 
     pub fn from_ott(
         ott_path: PathBuf,
-        options: &TaxonomyOptions,
+        _options: &TaxonomyOptions,
         existing: Option<&mut Nodes>,
     ) -> Result<Nodes, crate::error::Error> {
         use std::collections::hash_map::Entry;
@@ -877,19 +879,13 @@ impl Nodes {
         options: &TaxonomyOptions,
         existing: Option<&mut Nodes>,
     ) -> Result<Nodes, crate::error::Error> {
-        use convert_case::Case;
-        use convert_case::Casing;
-        use serde_json::Value;
-        use std::collections::hash_map::Entry;
-        use std::fs::File;
-        use std::io::{BufRead, BufReader};
         let xref_label = options
             .xref_label
             .clone()
             .unwrap_or_else(|| "ena".to_string());
         let name_classes = vec!["scientific name".to_string()];
-        let mut nodes = HashMap::new();
-        let mut children = HashMap::new();
+        let nodes = HashMap::new();
+        let children = HashMap::new();
         if let Some(existing_nodes) = existing {
             let table = crate::parse::lookup::build_lookup(existing_nodes, &name_classes, false);
             let reader = file_reader(jsonl_path).map_err(crate::error::Error::from)?;
@@ -978,11 +974,7 @@ impl Nodes {
         options: &TaxonomyOptions,
         existing: Option<&mut Nodes>,
     ) -> Result<Nodes, crate::error::Error> {
-        use crate::parse::lookup::build_fast_lookup;
-        use crate::parse::parse_file;
-        use std::collections::HashMap;
-        use std::path::PathBuf;
-        let (mut nodes, mut children) = if let Some(existing_nodes) = existing {
+        let (nodes, children) = if let Some(existing_nodes) = existing {
             (
                 existing_nodes.nodes.clone(),
                 existing_nodes.children.clone(),
@@ -998,7 +990,7 @@ impl Nodes {
             },
             name_classes,
         );
-        let (new_nodes, new_names, source) = parse_file(
+        let (new_nodes, new_names, _source) = parse_file(
             genomehubs_files.clone(),
             &id_map,
             false,
@@ -1008,7 +1000,7 @@ impl Nodes {
         .map_err(crate::error::Error::from)?;
         // Try to add names to existing nodes
         let mut nodes_struct = Nodes { nodes, children };
-        let add_names_result = nodes_struct.add_names(&new_names);
+        let _add_names_result = nodes_struct.add_names(&new_names);
         // Optionally, add new nodes if not present
         let mut created_count = 0;
         for (taxid, node) in new_nodes.nodes.iter() {

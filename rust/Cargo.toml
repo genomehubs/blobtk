@@ -32,6 +32,7 @@ panic = "abort"
 [dependencies]
 anyhow = "1.0.71"
 atty = "0.2.14"
+axum = "0.8.4"
 blart = "0.3.0"
 chrono = "0.4.39"
 clap = { version = "4.0.29", features = [ "derive" ]}
@@ -70,6 +71,7 @@ svg = "0.13.1"
 thiserror = "1.0.40"
 tiny-skia = "0.8.3"
 titlecase = "2.2.1"
+tokio = { version = "1.45.1", features = ["full"] }
 trie-rs = "0.1.1"
 url = { version = "2.3.1", features = ["serde"] }
 usvg = "0.31.0"

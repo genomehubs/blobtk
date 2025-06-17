@@ -1,0 +1,9 @@
+path: test/taxonomy/canidae/combined
+taxonomy_format: ncbi
+root_taxon_id:
+  - 33208
+base_taxon_id: 33208
+name_classes:
+  - scientific name
+  - synonym
+xref_label: ncbi

@@ -10,12 +10,13 @@ use crate::cli;
 use crate::error;
 use crate::io;
 
+/// Functions running the taxonomy api
+pub mod api;
+
 pub use cli::TaxonomyOptions;
 
-use crate::parse::lookup::{build_fast_lookup, lookup_nodes, lookup_nodes_by_id};
+use crate::parse::lookup::{lookup_nodes, lookup_nodes_by_id};
 use crate::parse::nodes::Nodes;
-
-use crate::parse::parse_file;
 
 fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, error::Error> {
     if let Some(config_file) = options.config_file.clone() {
@@ -78,6 +79,12 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
                 Some(genomehubs_files) => Some(genomehubs_files),
                 None => options.genomehubs_files.clone(),
             },
+            api: options.api || taxonomy_options.api,
+            port: if options.port != 3000 {
+                options.port
+            } else {
+                taxonomy_options.port
+            },
 
             ..Default::default()
         });
@@ -92,7 +99,6 @@ pub fn taxdump_to_nodes(
     let options = load_options(&options)?;
     let nodes;
     if let Some(taxdump) = options.path.clone() {
-        dbg!(&taxdump);
         nodes = match options.taxonomy_format {
             Some(cli::TaxonomyFormat::GBIF) => Nodes::from_gbif(taxdump, &options, existing)?,
             Some(cli::TaxonomyFormat::ENA) => Nodes::from_jsonl(taxdump, &options, existing)?,
@@ -111,6 +117,24 @@ pub fn taxdump_to_nodes(
 /// Execute the `taxonomy` subcommand from `blobtk`.
 pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     let options = load_options(&options)?;
+    // If --api is set, start the API server and return
+    if options.api {
+        use crate::parse::lookup::build_fast_lookup;
+        use crate::taxonomy::api::run_api_server;
+        use std::sync::{Arc, RwLock};
+        use tokio::runtime::Runtime;
+        // Load taxonomy and id_map ONCE
+        let nodes = taxdump_to_nodes(&options, None)?;
+        let id_map = build_fast_lookup(&nodes, &options.name_classes);
+        let service = Arc::new(RwLock::new(crate::taxonomy::api::TaxonomyService::new(
+            nodes, id_map,
+        )));
+        // Start the API server on the requested port (blocking)
+        let port = options.port;
+        let rt = Runtime::new()?;
+        rt.block_on(run_api_server(service, port));
+        return Ok(());
+    }
     // 1. Parse the base taxonomy (main path)
     let mut nodes = taxdump_to_nodes(&options, None)?;
 
@@ -159,7 +183,6 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
             }
             // Use fast name-only merge for OTT if create_taxa is false
             if let Some(cli::TaxonomyFormat::OTT) = taxonomy_format {
-                dbg!(&taxonomy_options.create_taxa);
                 if taxonomy_options.create_taxa == false {
                     eprintln!(
                         "Merging nodes by name only for OTT taxonomy: {}",
