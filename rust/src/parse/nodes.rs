@@ -93,6 +93,8 @@ pub struct Node {
     pub rank: String,
     pub names: Option<Vec<Name>>,
     pub scientific_name: Option<String>,
+    pub row_index: Option<usize>,
+    pub raw_row: Option<String>,
 }
 
 const RANKS: [&str; 8] = [
@@ -221,6 +223,14 @@ impl fmt::Display for Node {
         }
         write!(f, "{}\t|", values.join("\t|\t"))
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MergeException {
+    pub tax_id: String,
+    pub row_index: Option<usize>,
+    pub raw_row: Option<String>,
+    pub reason: String,
 }
 
 /// A set of taxonomy nodes
@@ -410,12 +420,19 @@ impl Nodes {
         nodes
     }
 
-    pub fn merge(&mut self, new_nodes: &Nodes) -> Result<(), anyhow::Error> {
+    pub fn merge(&mut self, new_nodes: &Nodes) -> Result<Vec<MergeException>, anyhow::Error> {
         let nodes = &mut self.nodes;
         let children = &mut self.children;
+        let mut exceptions = Vec::new();
         for node in new_nodes.nodes.values() {
             // Prevent self-parenting
             if node.tax_id == node.parent_tax_id {
+                exceptions.push(MergeException {
+                    tax_id: node.tax_id.clone(),
+                    row_index: node.row_index,
+                    raw_row: node.raw_row.clone(),
+                    reason: "Self-parenting detected".to_string(),
+                });
                 continue;
             }
             // Prevent cycles: check if parent is a descendant of this node
@@ -432,6 +449,12 @@ impl Nodes {
                 ancestor = parent_node.parent_tax_id.clone();
             }
             if cycle {
+                exceptions.push(MergeException {
+                    tax_id: node.tax_id.clone(),
+                    row_index: node.row_index,
+                    raw_row: node.raw_row.clone(),
+                    reason: "Cycle detected".to_string(),
+                });
                 continue;
             }
             // Always insert/replace the node
@@ -451,7 +474,7 @@ impl Nodes {
                 }
             }
         }
-        Ok(())
+        Ok(exceptions)
     }
 
     pub fn add_names(
@@ -498,12 +521,14 @@ impl Nodes {
 
         // Parse nodes.dmp file
         if let Ok(lines) = io::read_lines(nodes_file) {
-            for line in lines {
+            for (row_index, line) in lines.enumerate() {
                 if let Ok(s) = line {
-                    let node = match Node::parse(&s) {
+                    let mut node = match Node::parse(&s) {
                         Ok((_, n)) => n,
                         Err(_) => continue,
                     };
+                    node.row_index = Some(row_index);
+                    node.raw_row = Some(s.clone());
                     let parent = node.parent_tax_id.clone();
                     let child = node.tax_id.clone();
                     if parent != child {
@@ -516,7 +541,6 @@ impl Nodes {
                             }
                         }
                     }
-
                     nodes.insert(node.tax_id.clone(), node);
                 }
             }
@@ -603,8 +627,9 @@ impl Nodes {
         taxonomy_file.push("taxonomy.tsv");
         let file = File::open(&taxonomy_file).map_err(crate::error::Error::from)?;
         let reader = BufReader::new(file);
-        for line in reader.lines() {
+        for (row_index, line) in reader.lines().enumerate() {
             let line = line.map_err(crate::error::Error::from)?;
+
             if line.starts_with("uid\t") {
                 continue;
             }
@@ -649,6 +674,8 @@ impl Nodes {
                 rank: rank.to_case(Case::Lower),
                 scientific_name: Some(name.clone()),
                 names: Some(names),
+                row_index: Some(row_index),
+                raw_row: Some(line.clone()),
                 ..Default::default()
             };
             let parent = node.parent_tax_id.clone();
@@ -790,7 +817,7 @@ impl Nodes {
         ignore.insert("HOMOTYPIC_SYNONYM");
         ignore.insert("PROPARTE_SYNONYM");
         ignore.insert("SYNONYM");
-        for result in rdr.records() {
+        for (row_index, result) in rdr.records().enumerate() {
             let record = result.map_err(crate::error::Error::from)?;
             let status = match record.get(4) {
                 Some(s) => s,
@@ -845,6 +872,8 @@ impl Nodes {
                             None
                         },
                         names: Some(vec![name]),
+                        row_index: Some(row_index),
+                        raw_row: Some(record.iter().collect::<Vec<_>>().join("\t")),
                         ..Default::default()
                     };
                     let parent = node.parent_tax_id.clone();
@@ -889,7 +918,7 @@ impl Nodes {
         if let Some(existing_nodes) = existing {
             let table = crate::parse::lookup::build_lookup(existing_nodes, &name_classes, false);
             let reader = file_reader(jsonl_path).map_err(crate::error::Error::from)?;
-            for line in reader.lines() {
+            for (row_index, line) in reader.lines().enumerate() {
                 let line = line.map_err(crate::error::Error::from)?;
                 let v: Value = serde_json::from_str(&line).map_err(crate::error::Error::from)?;
                 let tax_id = v["taxId"].as_str().unwrap_or("").to_string();
@@ -948,6 +977,8 @@ impl Nodes {
                                     ),
                                     ..Default::default()
                                 }]),
+                                row_index: Some(row_index),
+                                raw_row: Some(line.clone()),
                                 ..Default::default()
                             };
                             existing_nodes.nodes.insert(tax_id.clone(), node);

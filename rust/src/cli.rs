@@ -466,6 +466,19 @@ pub enum TaxonomyFormat {
     GenomeHubs,
 }
 
+impl std::fmt::Display for TaxonomyFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TaxonomyFormat::NCBI => "ncbi",
+            TaxonomyFormat::GBIF => "gbif",
+            TaxonomyFormat::ENA => "ena",
+            TaxonomyFormat::OTT => "ott",
+            TaxonomyFormat::GenomeHubs => "genomehubs",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 /// Options to pass to `blobtk taxonomy`
 #[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
 #[pyclass]

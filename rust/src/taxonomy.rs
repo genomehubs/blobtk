@@ -132,7 +132,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
         // Start the API server on the requested port (blocking)
         let port = options.port;
         let rt = Runtime::new()?;
-        rt.block_on(run_api_server(service, port));
+        let _ = rt.block_on(run_api_server(service, port));
         return Ok(());
     }
     // 1. Parse the base taxonomy (main path)
@@ -227,7 +227,33 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                     // skip lookup
                 }
             }
-            nodes.merge(&filtered_new_nodes)?;
+            let merge_exceptions = nodes.merge(&filtered_new_nodes)?;
+            // Write exceptions to exceptions.{taxonomyFormat}.json in the output directory
+            if !merge_exceptions.is_empty() {
+                use serde_json;
+                use std::fs::OpenOptions;
+                use std::io::Write;
+                let out_dir = options
+                    .out
+                    .as_ref()
+                    .map(|p| p.clone())
+                    .unwrap_or_else(|| std::path::PathBuf::from("."));
+                let format_str = taxonomy_format
+                    .as_ref()
+                    .map(|f| format!("{}", f).to_lowercase())
+                    .unwrap_or_else(|| "unknown".to_string());
+                let exceptions_path = out_dir.join(format!("exceptions.{}.jsonl", format_str));
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&exceptions_path)
+                    .expect("Unable to open exceptions file");
+                for exception in &merge_exceptions {
+                    let json =
+                        serde_json::to_string(exception).expect("Failed to serialize exception");
+                    writeln!(file, "{}", json).expect("Failed to write exception");
+                }
+            }
         }
     }
 

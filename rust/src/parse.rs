@@ -80,6 +80,8 @@ fn add_new_taxid(
     taxon: &TaxonMatch,
     taxonomy_section: &HashMap<String, String>,
     _id_map: &TreeMap<CString, Vec<TaxonInfo>>,
+    row_index: Option<usize>,
+    raw_row: Option<String>,
 ) -> Option<Node> {
     // check taxonomy_section has a value for alt_taxon_id that is not None or NA
     let alt_taxon_id;
@@ -102,6 +104,8 @@ fn add_new_taxid(
                 rank: taxon.taxon.rank.clone(),
                 scientific_name: Some(taxon.taxon.name.clone()),
                 names: None,
+                row_index,
+                raw_row,
                 ..Default::default()
             });
         }
@@ -144,6 +148,7 @@ fn nodes_from_file(
             continue;
         }
         let record = result?;
+        let raw_row = record.iter().collect::<Vec<_>>().join("\t");
         let (mut processed, mut combined_report) =
             ghubs_config.validate_record(&record, row_index, &keys);
         validation_counts.update(&combined_report.counts);
@@ -441,7 +446,13 @@ fn nodes_from_file(
                 }
             }
             // --- END GENUS INTERMEDIATE NODE LOGIC ---
-            if let Some(node) = add_new_taxid(&taxon_match, taxonomy_section.unwrap(), &id_map) {
+            if let Some(node) = add_new_taxid(
+                &taxon_match,
+                taxonomy_section.unwrap(),
+                &id_map,
+                Some(row_index),
+                Some(raw_row.clone()),
+            ) {
                 nodes.insert(node.tax_id.clone(), node.clone());
                 if let Some(taxon_names) = taxon_names_section {
                     add_new_names(
