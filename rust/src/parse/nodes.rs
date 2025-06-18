@@ -1002,7 +1002,7 @@ impl Nodes {
         let mut nodes_struct = Nodes { nodes, children };
         let _add_names_result = nodes_struct.add_names(&new_names);
         // Optionally, add new nodes if not present
-        let mut created_count = 0;
+        // let mut created_count = 0;
         for (taxid, node) in new_nodes.nodes.iter() {
             // Prevent self-parenting
             if node.tax_id == node.parent_tax_id {
@@ -1040,7 +1040,7 @@ impl Nodes {
                         }
                     }
                 }
-                created_count += 1;
+                // created_count += 1;
             }
         }
         Ok(nodes_struct)

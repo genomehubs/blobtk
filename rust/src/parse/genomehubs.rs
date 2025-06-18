@@ -9,7 +9,6 @@ use std::str::FromStr;
 use cpc::{eval, units::Unit};
 use csv::StringRecord;
 
-use regex::Regex;
 use schemars::JsonSchema;
 use serde;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -1679,10 +1678,14 @@ fn process_value(
     let mut invalid_values = vec![];
     let mut status = ValidationStatus::None;
     // Use field separator if present, otherwise default to ';'
-    let sep = field.separator.as_ref().map(|s| match s {
-        StringOrVec::Single(sep) => sep.as_str(),
-        StringOrVec::Multiple(seps) => seps.get(0).map(|s| s.as_str()).unwrap_or(";")
-    }).unwrap_or(";");
+    let sep = field
+        .separator
+        .as_ref()
+        .map(|s| match s {
+            StringOrVec::Single(sep) => sep.as_str(),
+            StringOrVec::Multiple(seps) => seps.get(0).map(|s| s.as_str()).unwrap_or(";"),
+        })
+        .unwrap_or(";");
     let mut input_values: Vec<String> = value
         .split(sep)
         .map(|s| s.trim().to_string())

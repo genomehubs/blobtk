@@ -134,7 +134,6 @@ fn nodes_from_file(
     let mut match_counts = MatchCounts::default();
 
     let pb = ProgressBar::new_spinner();
-    // dbg!(&id_map);
 
     for (row_index, result) in ghubs_config.init_csv_reader(None).records().enumerate() {
         pb.set_message(format!("[+] {}", validation_counts.to_jsonl().as_str()));
@@ -239,7 +238,6 @@ fn nodes_from_file(
             combined_report.spellcheck.push(taxon_match.clone());
             ghubs_config.write_exception(&combined_report);
         } else {
-            // dbg!(&taxon_match);
             match_counts.none += 1;
             unmatched = true;
             combined_report.status = ValidationStatus::Nomatch;
