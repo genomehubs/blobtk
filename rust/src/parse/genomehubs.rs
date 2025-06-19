@@ -129,9 +129,22 @@ pub struct GHubsFileConfig {
     #[serde(
         alias = "comment",
         skip_serializing_if = "Option::is_none",
+        default,
         deserialize_with = "string_to_u8_opt"
     )]
     pub comment_char: Option<u8>,
+    /// File description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // Display group
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_group: Option<String>,
+    // Display level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_level: Option<u8>,
+    // Exclusions options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusions: Option<ExclusionConfig>,
     /// File format
     /// Default: tsv
     pub format: GHubsFileFormat,
@@ -143,6 +156,9 @@ pub struct GHubsFileConfig {
     /// before this file
     #[serde(skip_serializing_if = "Option::is_none")]
     pub needs: Option<PathBufOrVec>,
+    /// Organelle type
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organelle: Option<Organelle>,
     /// Source name
     #[serde(rename = "source", alias = "source_name")]
     pub source_name: Option<String>,
@@ -573,6 +589,43 @@ pub struct GHubsFieldConfig {
     // Value separator
     #[serde(skip_serializing_if = "Option::is_none")]
     pub separator: Option<StringOrVec>,
+    /// Source name
+    #[serde(rename = "source", alias = "source_name")]
+    pub source_name: Option<String>,
+    /// Source abbreviation
+    #[serde(
+        rename = "source_abbreviation",
+        alias = "abbreviation",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_abbreviation: Option<String>,
+    /// Source URL (Single URL for all values)
+    #[serde(
+        rename = "source_url",
+        alias = "source_link",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_url: Option<String>,
+    /// Source URL stub (base URL for values)
+    #[serde(rename = "source_url_stub", skip_serializing_if = "Option::is_none")]
+    pub source_stub: Option<String>,
+    /// Source URL suffix (suffix for values)
+    #[serde(rename = "source_slug", skip_serializing_if = "Option::is_none")]
+    pub source_slug: Option<String>,
+    /// Source description
+    #[serde(rename = "source_description", skip_serializing_if = "Option::is_none")]
+    pub source_description: Option<String>,
+    /// Source last updated date
+    #[serde(
+        rename = "source_date",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "date_format",
+        default
+    )]
+    pub source_date: Option<String>,
+    /// Source contact name
+    #[serde(rename = "source_contact", skip_serializing_if = "Option::is_none")]
+    pub source_contact: Option<String>,
     // Attribute status
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FieldStatus>,
@@ -692,6 +745,14 @@ impl GHubsFieldConfig {
             path: self.path.or(other.path),
             return_type: self.return_type.or(other.return_type),
             separator: self.separator.or(other.separator),
+            source_name: self.source_name.or(other.source_name),
+            source_abbreviation: self.source_abbreviation.or(other.source_abbreviation),
+            source_url: self.source_url.or(other.source_url),
+            source_stub: self.source_stub.or(other.source_stub),
+            source_slug: self.source_slug.or(other.source_slug),
+            source_description: self.source_description.or(other.source_description),
+            source_date: self.source_date.or(other.source_date),
+            source_contact: self.source_contact.or(other.source_contact),
             status: self.status.or(other.status),
             summary: self.summary.or(other.summary),
             synonyms: self.synonyms.or(other.synonyms),
@@ -765,6 +826,9 @@ pub struct GHubsConfig {
     /// Analysis configuration options
     #[serde(skip_serializing_if = "Option::is_none")]
     pub analysis: Option<GHubsAnalysisConfig>,
+    /// Attribute defaults
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defaults: Option<GHubsDefaultsConfig>,
     /// Attribute fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, GHubsFieldConfig>>,
@@ -773,7 +837,7 @@ pub struct GHubsConfig {
     pub identifiers: Option<HashMap<String, GHubsFieldConfig>>,
     /// Metadata fields
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<GHubsFieldConfig>,
+    pub metadata: Option<HashMap<String, GHubsFieldConfig>>,
     /// Taxon names
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxon_names: Option<HashMap<String, GHubsFieldConfig>>,
@@ -809,6 +873,24 @@ pub struct GHubsConfig {
     /// to output file
     #[serde(skip)]
     pub output_headers: Vec<(String, String)>,
+}
+
+/// GenomeHubs configuration options
+#[derive(Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GHubsDefaultsConfig {
+    /// File configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<GHubsFileConfig>,
+    /// Analysis configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analysis: Option<GHubsAnalysisConfig>,
+    /// Attribute configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<GHubsFieldConfig>,
+    /// Identifier configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifiers: Option<GHubsFieldConfig>,
 }
 
 impl GHubsConfig {
