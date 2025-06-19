@@ -1438,6 +1438,7 @@ fn parse_genomehubs_config(config_file: &PathBuf) -> Result<GHubsConfig, error::
             }
         }
     }
+    ghubs_config.apply_defaults();
     Ok(ghubs_config)
 }
 
@@ -1847,3 +1848,238 @@ fn process_value(
     }
     Ok((values, invalid_values, status))
 }
+
+// --- Default propagation helpers for config merging ---
+impl GHubsFileConfig {
+    pub fn merge_missing(&mut self, other: &GHubsFileConfig) {
+        if self.comment_char.is_none() {
+            self.comment_char = other.comment_char;
+        }
+        if self.description.is_none() {
+            self.description = other.description.clone();
+        }
+        if self.display_group.is_none() {
+            self.display_group = other.display_group.clone();
+        }
+        if self.display_level.is_none() {
+            self.display_level = other.display_level;
+        }
+        if self.exclusions.is_none() {
+            self.exclusions = other.exclusions.clone();
+        }
+        if self.organelle.is_none() {
+            self.organelle = other.organelle.clone();
+        }
+        if self.source_name.is_none() {
+            self.source_name = other.source_name.clone();
+        }
+        if self.source_abbreviation.is_none() {
+            self.source_abbreviation = other.source_abbreviation.clone();
+        }
+        if self.source_url.is_none() {
+            self.source_url = other.source_url.clone();
+        }
+        if self.source_stub.is_none() {
+            self.source_stub = other.source_stub.clone();
+        }
+        if self.source_slug.is_none() {
+            self.source_slug = other.source_slug.clone();
+        }
+        if self.source_description.is_none() {
+            self.source_description = other.source_description.clone();
+        }
+        if self.source_date.is_none() {
+            self.source_date = other.source_date.clone();
+        }
+        if self.source_contact.is_none() {
+            self.source_contact = other.source_contact.clone();
+        }
+        if self.skip_partial.is_none() {
+            self.skip_partial = other.skip_partial.clone();
+        }
+        if self.tests.is_none() {
+            self.tests = other.tests.clone();
+        }
+        if self.file_url.is_none() {
+            self.file_url = other.file_url.clone();
+        }
+    }
+}
+
+impl GHubsFieldConfig {
+    pub fn merge_missing(&mut self, other: &GHubsFieldConfig) {
+        if self.bins.is_none() {
+            self.bins = other.bins.clone();
+        }
+        if self.comment.is_none() {
+            self.comment = other.comment.clone();
+        }
+        if self.constraint.is_none() {
+            self.constraint = other.constraint.clone();
+        }
+        if self.default.is_none() {
+            self.default = other.default.clone();
+        }
+        if self.description.is_none() {
+            self.description = other.description.clone();
+        }
+        if self.display_group.is_none() {
+            self.display_group = other.display_group.clone();
+        }
+        if self.display_level.is_none() {
+            self.display_level = other.display_level;
+        }
+        if self.display_name.is_none() {
+            self.display_name = other.display_name.clone();
+        }
+        if self.exclusions.is_none() {
+            self.exclusions = other.exclusions.clone();
+        }
+        if self.function.is_none() {
+            self.function = other.function.clone();
+        }
+        if self.h3res.is_none() {
+            self.h3res = other.h3res;
+        }
+        if self.header.is_none() {
+            self.header = other.header.clone();
+        }
+        if self.index.is_none() {
+            self.index = other.index.clone();
+        }
+        if self.is_primary_value.is_none() {
+            self.is_primary_value = other.is_primary_value;
+        }
+        if self.join.is_none() {
+            self.join = other.join.clone();
+        }
+        if self.key.is_none() {
+            self.key = other.key.clone();
+        }
+        if self.list_key.is_none() {
+            self.list_key = other.list_key.clone();
+        }
+        if self.long_description.is_none() {
+            self.long_description = other.long_description.clone();
+        }
+        if self.metadata.is_none() {
+            self.metadata = other.metadata.clone();
+        }
+        if self.name.is_none() {
+            self.name = other.name.clone();
+        }
+        if self.order.is_none() {
+            self.order = other.order.clone();
+        }
+        if self.organelle.is_none() {
+            self.organelle = other.organelle.clone();
+        }
+        if self.path.is_none() {
+            self.path = other.path.clone();
+        }
+        if self.return_type.is_none() {
+            self.return_type = other.return_type.clone();
+        }
+        if self.separator.is_none() {
+            self.separator = other.separator.clone();
+        }
+        if self.source_name.is_none() {
+            self.source_name = other.source_name.clone();
+        }
+        if self.source_abbreviation.is_none() {
+            self.source_abbreviation = other.source_abbreviation.clone();
+        }
+        if self.source_url.is_none() {
+            self.source_url = other.source_url.clone();
+        }
+        if self.source_stub.is_none() {
+            self.source_stub = other.source_stub.clone();
+        }
+        if self.source_slug.is_none() {
+            self.source_slug = other.source_slug.clone();
+        }
+        if self.source_description.is_none() {
+            self.source_description = other.source_description.clone();
+        }
+        if self.source_date.is_none() {
+            self.source_date = other.source_date.clone();
+        }
+        if self.source_contact.is_none() {
+            self.source_contact = other.source_contact.clone();
+        }
+    }
+    pub fn apply_file_defaults(&mut self, file: &GHubsFileConfig) {
+        if self.display_group.is_none() {
+            self.display_group = file.display_group.clone();
+        }
+        if self.display_level.is_none() {
+            self.display_level = file.display_level;
+        }
+        if self.exclusions.is_none() {
+            self.exclusions = file.exclusions.clone();
+        }
+        if self.organelle.is_none() {
+            self.organelle = file.organelle.clone();
+        }
+        if self.source_name.is_none() {
+            self.source_name = file.source_name.clone();
+        }
+        if self.source_abbreviation.is_none() {
+            self.source_abbreviation = file.source_abbreviation.clone();
+        }
+        if self.source_url.is_none() {
+            self.source_url = file.source_url.clone();
+        }
+        if self.source_stub.is_none() {
+            self.source_stub = file.source_stub.clone();
+        }
+        if self.source_slug.is_none() {
+            self.source_slug = file.source_slug.clone();
+        }
+        if self.source_description.is_none() {
+            self.source_description = file.source_description.clone();
+        }
+        if self.source_date.is_none() {
+            self.source_date = file.source_date.clone();
+        }
+        if self.source_contact.is_none() {
+            self.source_contact = file.source_contact.clone();
+        }
+    }
+}
+
+impl GHubsConfig {
+    pub fn apply_defaults(&mut self) {
+        // 1. Fill missing file fields from defaults.file
+        if let (Some(default_file), Some(file)) = (
+            self.defaults.as_ref().and_then(|d| d.file.as_ref()),
+            self.file.as_mut(),
+        ) {
+            file.merge_missing(default_file);
+        }
+        // 2. Fill missing attributes/identifiers from defaults
+        if let Some(default_attr) = self.defaults.as_ref().and_then(|d| d.attributes.as_ref()) {
+            if let Some(attrs) = self.attributes.as_mut() {
+                for (_k, v) in attrs.iter_mut() {
+                    v.merge_missing(default_attr);
+                }
+            }
+        }
+        if let Some(default_id) = self.defaults.as_ref().and_then(|d| d.identifiers.as_ref()) {
+            if let Some(ids) = self.identifiers.as_mut() {
+                for (_k, v) in ids.iter_mut() {
+                    v.merge_missing(default_id);
+                }
+            }
+        }
+        // 3. Apply file keys as defaults to all attributes
+        if let Some(file) = self.file.as_ref() {
+            if let Some(attrs) = self.attributes.as_mut() {
+                for (_attr_name, attr_cfg) in attrs.iter_mut() {
+                    attr_cfg.apply_file_defaults(file);
+                }
+            }
+        }
+    }
+}
+// --- End default propagation helpers ---
