@@ -121,10 +121,11 @@ fn nodes_from_file(
     write_validated: bool,
     create_taxa: bool,
     xref_label: Option<String>,
+    skip_tsv: bool,
 ) -> Result<(HashMap<String, Vec<Name>>, HashMap<String, Node>), error::Error> {
     let keys = vec!["attributes", "taxon_names", "taxonomy"];
     let mut fixed_names = HashMap::new();
-    ghubs_config.init_csv_reader(Some(keys.clone()));
+    ghubs_config.init_csv_reader(Some(keys.clone()), skip_tsv)?;
     ghubs_config.init_file_writers(write_validated, true);
     if !id_map.is_empty() {
         ghubs_config.init_taxon_id();
@@ -139,7 +140,11 @@ fn nodes_from_file(
 
     let pb = ProgressBar::new_spinner();
 
-    for (row_index, result) in ghubs_config.init_csv_reader(None).records().enumerate() {
+    for (row_index, result) in ghubs_config
+        .init_csv_reader(None, skip_tsv)?
+        .records()
+        .enumerate()
+    {
         pb.set_message(format!("[+] {}", validation_counts.to_jsonl().as_str()));
         pb.inc(1);
         if let Err(err) = result {
@@ -516,6 +521,7 @@ pub fn parse_file(
     write_validated: bool,
     create_taxa: bool,
     xref_label: Option<String>,
+    skip_tsv: bool,
 ) -> Result<(Nodes, HashMap<String, Vec<Name>>, Source), error::Error> {
     // let mut children = HashMap::new();
 
@@ -531,6 +537,7 @@ pub fn parse_file(
         write_validated,
         create_taxa,
         xref_label.clone(),
+        skip_tsv,
     )?;
     let mut nodes = Nodes {
         nodes: HashMap::new(),

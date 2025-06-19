@@ -52,8 +52,14 @@ pub fn validate(options: &cli::ValidateOptions) -> Result<(), anyhow::Error> {
             // match taxa to nodes
             // todo: add support for multiple genomehubs files
             eprintln!("Parsing file: {:?}", genomehubs_file);
-            let (_new_nodes, _new_names, _source) =
-                parse_file(genomehubs_file, &id_map, !options.dry_run, false, None)?;
+            let (_new_nodes, _new_names, _source) = parse_file(
+                genomehubs_file,
+                &id_map,
+                !options.dry_run,
+                false,
+                None,
+                options.skip_tsv,
+            )?;
         }
     }
     Ok(())

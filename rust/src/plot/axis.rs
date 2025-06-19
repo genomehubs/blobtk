@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
 use clap::ValueEnum;
+
+#[cfg(feature = "python-extension")]
 use pyo3::pyclass;
 
 #[derive(Clone, Debug)]
@@ -69,7 +71,7 @@ impl FromStr for Position {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, ValueEnum)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Scale {
     LINEAR,
     #[default]

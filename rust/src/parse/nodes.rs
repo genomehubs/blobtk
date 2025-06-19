@@ -1027,6 +1027,7 @@ impl Nodes {
             false,
             options.create_taxa,
             options.xref_label.clone(),
+            false,
         )
         .map_err(crate::error::Error::from)?;
         // Try to add names to existing nodes

@@ -6,7 +6,10 @@ use std::str::FromStr;
 
 use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use clap_num::number_range;
+
+#[cfg(feature = "python-extension")]
 use pyo3::pyclass;
+
 use rust_decimal::RoundingStrategy;
 use serde;
 use serde::{Deserialize, Serialize};
@@ -87,7 +90,7 @@ pub enum SubCommand {
         .required(false)
         .args(["bam", "cram"]),
 ))]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct DepthOptions {
     /// List of sequence IDs
     // Skipping this attribute because it is set to a default value using serde
@@ -123,7 +126,7 @@ pub struct DepthOptions {
         .required(false)
         .args(["bam", "cram"]),
 ))]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct FilterOptions {
     // TODO: add option to invert list (use BAM header)
     /// List of sequence IDs
@@ -178,7 +181,7 @@ pub struct FilterOptions {
 
 /// Options to pass to `blobtk index`
 #[derive(Parser, Debug)]
-// #[pyclass]
+// #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct IndexOptions {
     /// Path to BlobDir directory containing files to index
     #[arg(long, short = 'b')]
@@ -214,7 +217,7 @@ fn window_size_parser(s: &str) -> Result<f64, String> {
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum View {
     #[default]
     Blob,
@@ -237,7 +240,7 @@ impl FromStr for View {
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Shape {
     #[default]
     Circle,
@@ -256,7 +259,7 @@ impl FromStr for Shape {
 }
 
 #[derive(ValueEnum, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Origin {
     O,
     X,
@@ -276,7 +279,7 @@ impl FromStr for Origin {
 }
 
 #[derive(ValueEnum, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Palette {
     Default,
     Inverse,
@@ -301,7 +304,7 @@ fn less_than_5(s: &str) -> Result<f64, String> {
 
 /// Options to pass to `blobtk plot`
 #[derive(Parser, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct PlotOptions {
     /// Path to BlobDir directory
     #[arg(long, short = 'd')]
@@ -403,7 +406,7 @@ pub struct PlotOptions {
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum RoundingStrategyWrapper {
     #[default]
     #[clap(name = "round")]
@@ -481,7 +484,7 @@ impl std::fmt::Display for TaxonomyFormat {
 
 /// Options to pass to `blobtk taxonomy`
 #[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct TaxonomyOptions {
     /// Path to backbone taxonomy file/directory
     #[arg(long = "taxdump", short = 't')]
@@ -545,7 +548,7 @@ fn default_port() -> u16 {
 
 /// Options to pass to `blobtk validate`
 #[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct ValidateOptions {
     /// Path to backbone taxonomy file/directory
     #[arg(long = "taxdump", short = 't')]
@@ -566,6 +569,9 @@ pub struct ValidateOptions {
     // Dry run flag
     #[arg(long = "dry-run", short = 'd')]
     pub dry_run: bool,
+    // Skip TSV flag
+    #[arg(long = "skip-tsv", short = 'k')]
+    pub skip_tsv: bool,
 }
 
 /// Command line argument parser

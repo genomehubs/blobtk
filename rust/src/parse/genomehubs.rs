@@ -123,6 +123,15 @@ pub enum SkipPartial {
 #[derive(Default, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GHubsFileConfig {
+    /// Comment character
+    /// Default: #
+    /// This is used to skip lines in the input file
+    #[serde(
+        alias = "comment",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "string_to_u8_opt"
+    )]
+    pub comment_char: Option<u8>,
     /// File format
     /// Default: tsv
     pub format: GHubsFileFormat,
@@ -182,6 +191,17 @@ pub struct GHubsFileConfig {
     /// URL to download file
     #[serde(rename = "url", skip_serializing_if = "Option::is_none")]
     pub file_url: Option<String>,
+}
+
+pub fn string_to_u8_opt<'de, D>(deserializer: D) -> Result<Option<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    match opt {
+        Some(s) if !s.is_empty() => Ok(Some(s.as_bytes()[0])),
+        _ => Ok(None),
+    }
 }
 
 impl GHubsFileConfig {
@@ -873,10 +893,14 @@ impl GHubsConfig {
         Ok(())
     }
 
-    pub fn init_csv_reader(&mut self, keys: Option<Vec<&str>>) -> csv::Reader<Box<dyn BufRead>> {
-        if self.file.is_none() {
+    pub fn init_csv_reader(
+        &mut self,
+        keys: Option<Vec<&str>>,
+        skip_file: bool,
+    ) -> Result<csv::Reader<Box<dyn BufRead>>, error::Error> {
+        if self.file.is_none() || skip_file {
             // return an empty reader
-            return csv::Reader::from_reader(io::get_empty_reader());
+            return Ok(csv::Reader::from_reader(io::get_empty_reader()));
         }
         let file_config = self.file.clone().unwrap();
         let config_path = self.file_path.clone();
@@ -886,13 +910,13 @@ impl GHubsConfig {
             GHubsFileFormat::TSV => b'\t',
         };
         if !file_path.exists() {
-            panic!("File does not exist: {:?}", &file_path);
+            return Err(error::Error::FileNotFound(format!("{}", file_path.display())).into());
         }
         let mut rdr = io::get_csv_reader(
             &Some(file_path.clone()),
             delimiter,
             file_config.header,
-            None,
+            file_config.comment_char,
             0,
             false,
         );
@@ -907,7 +931,7 @@ impl GHubsConfig {
                 }
             }
         }
-        rdr
+        Ok(rdr)
     }
 
     pub fn init_file_writers(&mut self, write_validated: bool, write_exceptions: bool) -> () {
@@ -976,7 +1000,14 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(&Some(file_path), delimiter, true, None, 0, false);
+        let mut rdr = io::get_csv_reader(
+            &Some(file_path),
+            delimiter,
+            true,
+            file_config.comment_char,
+            0,
+            false,
+        );
         let expected_headers = vec!["taxon_id", "input", "rank"];
         let headers = rdr.headers().unwrap().clone();
         for (i, header) in headers.iter().enumerate() {
@@ -1683,7 +1714,7 @@ fn process_value(
         .as_ref()
         .map(|s| match s {
             StringOrVec::Single(sep) => sep.as_str(),
-            StringOrVec::Multiple(seps) => seps.get(0).map(|s| s.as_str()).unwrap_or(";"),
+            StringOrVec::Multiple(vec) => vec.get(0).map(|s| s.as_str()).unwrap_or(";"),
         })
         .unwrap_or(";");
     let mut input_values: Vec<String> = value

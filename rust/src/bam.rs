@@ -4,7 +4,10 @@ use std::io::{ErrorKind, Result, Write};
 use std::path::{Path, PathBuf};
 
 use indexmap::IndexMap;
-use pyo3::{self, pyclass};
+
+#[cfg(feature = "python-extension")]
+use pyo3::prelude::*;
+
 use rust_htslib::bam::{index, Header, IndexedReader, Read};
 use rust_htslib::htslib;
 
@@ -123,39 +126,41 @@ fn seq_lengths_from_header(
 }
 
 #[derive(Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct BinnedCov {
-    #[pyo3(get)]
     seq_name: String,
-    #[pyo3(get)]
     bins: Vec<f64>,
-    #[pyo3(get)]
     bin_count: usize,
-    #[pyo3(get)]
     last_bin: usize,
-    #[pyo3(get)]
     seq_length: usize,
-    #[pyo3(get)]
     step: usize,
 }
 
+#[cfg(feature = "python-extension")]
+#[pymethods]
 impl BinnedCov {
-    pub fn seq_name(self) -> String {
-        self.seq_name
+    #[getter]
+    fn seq_name(&self) -> &str {
+        &self.seq_name
     }
-    pub fn bins(self) -> Vec<f64> {
-        self.bins
+    #[getter]
+    fn bins(&self) -> &Vec<f64> {
+        &self.bins
     }
-    pub fn bin_count(self) -> usize {
+    #[getter]
+    fn bin_count(&self) -> usize {
         self.bin_count
     }
-    pub fn seq_length(self) -> usize {
-        self.seq_length
-    }
-    pub fn last_bin(self) -> usize {
+    #[getter]
+    fn last_bin(&self) -> usize {
         self.last_bin
     }
-    pub fn step(self) -> usize {
+    #[getter]
+    fn seq_length(&self) -> usize {
+        self.seq_length
+    }
+    #[getter]
+    fn step(&self) -> usize {
         self.step
     }
 }

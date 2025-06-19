@@ -8,6 +8,8 @@ use std::str::FromStr;
 
 use anyhow;
 use num_integer::sqrt;
+
+#[cfg(feature = "python-extension")]
 use pyo3::pyclass;
 
 use crate::blobdir;
@@ -100,7 +102,7 @@ impl FromStr for Suffix {
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum ShowLegend {
     #[default]
     Default,
