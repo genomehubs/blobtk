@@ -2,7 +2,12 @@
 //! Invoked by calling:
 //! `blobtk taxonomy <args>`
 
+use crate::parse::lookup::build_fast_lookup;
+use crate::taxonomy::api::run_api_server;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
+use tokio::runtime::Runtime;
 
 use anyhow;
 
@@ -119,20 +124,24 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
     let options = load_options(&options)?;
     // If --api is set, start the API server and return
     if options.api {
-        use crate::parse::lookup::build_fast_lookup;
-        use crate::taxonomy::api::run_api_server;
-        use std::sync::{Arc, RwLock};
-        use tokio::runtime::Runtime;
-        // Load taxonomy and id_map ONCE
         let nodes = taxdump_to_nodes(&options, None)?;
-        let id_map = build_fast_lookup(&nodes, &options.name_classes);
+        let id_map = build_fast_lookup(&nodes, &options.name_classes); // <-- this stays!
         let service = Arc::new(RwLock::new(crate::taxonomy::api::TaxonomyService::new(
             nodes, id_map,
         )));
-        // Start the API server on the requested port (blocking)
+
+        let is_ready = Arc::new(AtomicBool::new(false));
+        let api_state = crate::taxonomy::api::ApiState {
+            service: service.clone(),
+            is_ready: is_ready.clone(),
+        };
+
+        // All loading is done, so now set ready:
+        is_ready.store(true, Ordering::SeqCst);
+
         let port = options.port;
         let rt = Runtime::new()?;
-        let _ = rt.block_on(run_api_server(service, port));
+        let _ = rt.block_on(run_api_server(api_state, port));
         return Ok(());
     }
     // 1. Parse the base taxonomy (main path)

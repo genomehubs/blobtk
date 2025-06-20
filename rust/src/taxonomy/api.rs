@@ -8,6 +8,7 @@ use axum::{
 use blart::TreeMap;
 use std::ffi::CString;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
 
@@ -24,6 +25,12 @@ impl TaxonomyService {
     }
 }
 
+#[derive(Clone)]
+pub struct ApiState {
+    pub service: Arc<RwLock<TaxonomyService>>,
+    pub is_ready: Arc<AtomicBool>,
+}
+
 #[derive(serde::Deserialize)]
 pub struct ValidateRequest {
     pub file_path: String, // Only file_path allowed
@@ -36,10 +43,10 @@ pub struct ValidateResponse {
 }
 
 async fn validate_handler(
-    State(service): State<Arc<RwLock<TaxonomyService>>>,
+    State(state): State<ApiState>,
     Json(req): Json<ValidateRequest>,
 ) -> Json<ValidateResponse> {
-    let service = service.read().unwrap();
+    let service = state.service.read().unwrap();
     let result = parse_file(
         std::path::PathBuf::from(&req.file_path),
         &service.id_map,
@@ -66,11 +73,8 @@ pub struct NodeResponse {
     pub node: Option<crate::parse::nodes::Node>,
 }
 
-async fn node_handler(
-    State(service): State<Arc<RwLock<TaxonomyService>>>,
-    Path(id): Path<String>,
-) -> Json<NodeResponse> {
-    let service = service.read().unwrap();
+async fn node_handler(State(state): State<ApiState>, Path(id): Path<String>) -> Json<NodeResponse> {
+    let service = state.service.read().unwrap();
     if let Some(node) = service.nodes.nodes.get(&id) {
         Json(NodeResponse {
             found: true,
@@ -97,10 +101,10 @@ pub struct LookupListRequest {
 }
 
 async fn lookup_handler(
-    State(service): State<Arc<RwLock<TaxonomyService>>>,
+    State(state): State<ApiState>,
     Path(name): Path<String>,
 ) -> Json<LookupResponse> {
-    let service = service.read().unwrap();
+    let service = state.service.read().unwrap();
     let key = CString::new(name.clone()).unwrap_or_default();
     let ids = service
         .id_map
@@ -115,10 +119,10 @@ async fn lookup_handler(
 }
 
 async fn lookup_list_handler(
-    State(service): State<Arc<RwLock<TaxonomyService>>>,
+    State(state): State<ApiState>,
     Json(req): Json<LookupListRequest>,
 ) -> Json<Vec<LookupResponse>> {
-    let service = service.read().unwrap();
+    let service = state.service.read().unwrap();
     let mut results = Vec::new();
     for name in req.names {
         let key = CString::new(name.clone()).unwrap_or_default();
@@ -136,12 +140,22 @@ async fn lookup_list_handler(
     Json(results)
 }
 
-pub async fn run_api_server(service: Arc<RwLock<TaxonomyService>>, port: u16) -> Result<(), Error> {
+async fn status_handler(State(state): State<ApiState>) -> Json<serde_json::Value> {
+    let status = if state.is_ready.load(Ordering::SeqCst) {
+        "ready"
+    } else {
+        "initializing"
+    };
+    Json(serde_json::json!({ "status": status }))
+}
+
+pub async fn run_api_server(service: ApiState, port: u16) -> Result<(), Error> {
     let app = Router::new()
         .route("/validate", post(validate_handler))
         .route("/node/{id}", get(node_handler))
         .route("/lookup/{name}", get(lookup_handler))
         .route("/lookup", post(lookup_list_handler))
+        .route("/status", get(status_handler))
         .with_state(service);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
