@@ -1815,10 +1815,20 @@ fn process_value(
             let norm_v = v.trim().to_lowercase().nfc().collect::<String>();
             if let Some(t) = translate.get(&norm_v) {
                 match t {
-                    StringOrVec::Single(s) => translated.push(s.clone()),
-                    StringOrVec::Multiple(vec) => translated.extend(vec.clone()),
+                    StringOrVec::Single(s) => {
+                        if !s.trim().is_empty() && s.trim().to_lowercase() != "none" {
+                            translated.push(s.clone());
+                        }
+                    }
+                    StringOrVec::Multiple(vec) => {
+                        for s in vec {
+                            if !s.trim().is_empty() && s.trim().to_lowercase() != "none" {
+                                translated.push(s.clone());
+                            }
+                        }
+                    }
                 }
-            } else {
+            } else if !v.trim().is_empty() && v.trim().to_lowercase() != "none" {
                 translated.push(v.clone());
             }
         }
