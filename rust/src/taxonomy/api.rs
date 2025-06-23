@@ -23,6 +23,13 @@ impl TaxonomyService {
     pub fn new(nodes: Nodes, id_map: TreeMap<CString, Vec<TaxonInfo>>) -> Self {
         Self { nodes, id_map }
     }
+
+    pub fn empty() -> Self {
+        Self {
+            nodes: Nodes::default(),
+            id_map: TreeMap::new(),
+        }
+    }
 }
 
 #[derive(Clone)]
