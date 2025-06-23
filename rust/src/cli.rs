@@ -6,7 +6,10 @@ use std::str::FromStr;
 
 use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use clap_num::number_range;
+
+#[cfg(feature = "python-extension")]
 use pyo3::pyclass;
+
 use rust_decimal::RoundingStrategy;
 use serde;
 use serde::{Deserialize, Serialize};
@@ -72,8 +75,8 @@ pub enum SubCommand {
     /// Process a BlobDir and produce static plots.
     /// Called as `blobtk plot`
     Plot(PlotOptions),
-    /// [experimental] Process a taxonomy and lookup lineages.
-    /// Called as `blobtk taxonomy`
+    /// [experimental] Process a taxonomy and lookup lineages, or start the API server with --api
+    /// Called as `blobtk taxonomy [--api] ...`
     Taxonomy(TaxonomyOptions),
     /// [experimental] Validate BlobToolKit and GenomeHubs files.
     /// Called as `blobtk validate`
@@ -87,7 +90,7 @@ pub enum SubCommand {
         .required(false)
         .args(["bam", "cram"]),
 ))]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct DepthOptions {
     /// List of sequence IDs
     // Skipping this attribute because it is set to a default value using serde
@@ -123,7 +126,7 @@ pub struct DepthOptions {
         .required(false)
         .args(["bam", "cram"]),
 ))]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct FilterOptions {
     // TODO: add option to invert list (use BAM header)
     /// List of sequence IDs
@@ -178,7 +181,7 @@ pub struct FilterOptions {
 
 /// Options to pass to `blobtk index`
 #[derive(Parser, Debug)]
-// #[pyclass]
+// #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct IndexOptions {
     /// Path to BlobDir directory containing files to index
     #[arg(long, short = 'b')]
@@ -214,7 +217,7 @@ fn window_size_parser(s: &str) -> Result<f64, String> {
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum View {
     #[default]
     Blob,
@@ -237,7 +240,7 @@ impl FromStr for View {
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Shape {
     #[default]
     Circle,
@@ -256,7 +259,7 @@ impl FromStr for Shape {
 }
 
 #[derive(ValueEnum, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Origin {
     O,
     X,
@@ -276,7 +279,7 @@ impl FromStr for Origin {
 }
 
 #[derive(ValueEnum, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Palette {
     Default,
     Inverse,
@@ -301,7 +304,7 @@ fn less_than_5(s: &str) -> Result<f64, String> {
 
 /// Options to pass to `blobtk plot`
 #[derive(Parser, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct PlotOptions {
     /// Path to BlobDir directory
     #[arg(long, short = 'd')]
@@ -403,7 +406,7 @@ pub struct PlotOptions {
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum RoundingStrategyWrapper {
     #[default]
     #[clap(name = "round")]
@@ -460,11 +463,28 @@ pub enum TaxonomyFormat {
     GBIF,
     /// ENA taxonomy record formatted as JSONL
     ENA,
+    /// OTT (Open Tree of Life) taxonomy containing taxonomy.tsv, synonyms.tsv and forwards.tsv
+    OTT,
+    /// GenomeHubs TSV/YAML file pair
+    GenomeHubs,
+}
+
+impl std::fmt::Display for TaxonomyFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TaxonomyFormat::NCBI => "ncbi",
+            TaxonomyFormat::GBIF => "gbif",
+            TaxonomyFormat::ENA => "ena",
+            TaxonomyFormat::OTT => "ott",
+            TaxonomyFormat::GenomeHubs => "genomehubs",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 /// Options to pass to `blobtk taxonomy`
 #[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct TaxonomyOptions {
     /// Path to backbone taxonomy file/directory
     #[arg(long = "taxdump", short = 't')]
@@ -481,15 +501,9 @@ pub struct TaxonomyOptions {
     /// Base taxon for filtered taxonomy lineages
     #[arg(long = "base-id", short = 'b')]
     pub base_taxon_id: Option<String>,
-    // /// Path to a directory containing files to be mapped to the taxonomy
-    // #[arg(long = "data-dir", short = 'd')]
-    // pub data_dir: Option<Vec<PathBuf>>,
     /// Path to output filtered backbone taxonomy
     #[arg(long = "taxdump-out", short = 'O')]
     pub out: Option<PathBuf>,
-    // /// Path to GBIF backbone taxonomy file (simple text)
-    // #[arg(long = "gbif-backbone", short = 'g')]
-    // pub gbif_backbone: Option<PathBuf>,
     /// Path to YAML format config file
     #[arg(long = "config", short = 'c')]
     pub config_file: Option<PathBuf>,
@@ -510,6 +524,14 @@ pub struct TaxonomyOptions {
     /// Files to match to taxIDs - Experimental
     #[arg(long = "genomehubs_files", short = 'g')]
     pub genomehubs_files: Option<Vec<PathBuf>>,
+    /// [experimental] Start the taxonomy API server instead of running a one-off merge/output
+    #[arg(long = "api")]
+    #[serde(default)]
+    pub api: bool,
+    /// Port to run the API server on (if --api is set)
+    #[arg(long, short = 'p', default_value_t = 3000)]
+    #[serde(default = "default_port")]
+    pub port: u16,
 }
 
 fn default_name_classes() -> Vec<String> {
@@ -520,9 +542,13 @@ fn default_create_taxa() -> bool {
     false
 }
 
+fn default_port() -> u16 {
+    3000
+}
+
 /// Options to pass to `blobtk validate`
 #[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub struct ValidateOptions {
     /// Path to backbone taxonomy file/directory
     #[arg(long = "taxdump", short = 't')]
@@ -543,6 +569,9 @@ pub struct ValidateOptions {
     // Dry run flag
     #[arg(long = "dry-run", short = 'd')]
     pub dry_run: bool,
+    // Skip TSV flag
+    #[arg(long = "skip-tsv", short = 'k')]
+    pub skip_tsv: bool,
 }
 
 /// Command line argument parser

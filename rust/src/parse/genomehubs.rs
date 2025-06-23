@@ -9,10 +9,10 @@ use std::str::FromStr;
 use cpc::{eval, units::Unit};
 use csv::StringRecord;
 
-use regex::Regex;
 use schemars::JsonSchema;
 use serde;
 use serde::{Deserialize, Deserializer, Serialize};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::error;
 use crate::io;
@@ -123,6 +123,28 @@ pub enum SkipPartial {
 #[derive(Default, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GHubsFileConfig {
+    /// Comment character
+    /// Default: #
+    /// This is used to skip lines in the input file
+    #[serde(
+        alias = "comment",
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "string_to_u8_opt"
+    )]
+    pub comment_char: Option<u8>,
+    /// File description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    // Display group
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_group: Option<String>,
+    // Display level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_level: Option<u8>,
+    // Exclusions options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclusions: Option<ExclusionConfig>,
     /// File format
     /// Default: tsv
     pub format: GHubsFileFormat,
@@ -134,6 +156,9 @@ pub struct GHubsFileConfig {
     /// before this file
     #[serde(skip_serializing_if = "Option::is_none")]
     pub needs: Option<PathBufOrVec>,
+    /// Organelle type
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organelle: Option<Organelle>,
     /// Source name
     #[serde(rename = "source", alias = "source_name")]
     pub source_name: Option<String>,
@@ -164,7 +189,8 @@ pub struct GHubsFileConfig {
     #[serde(
         rename = "source_date",
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "date_format"
+        deserialize_with = "date_format",
+        default
     )]
     pub source_date: Option<String>,
     /// Source contact name
@@ -177,10 +203,21 @@ pub struct GHubsFileConfig {
     pub skip_partial: Option<SkipPartial>,
     /// Relative path to a directory containing test files
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub test: Option<PathBuf>,
+    pub tests: Option<PathBuf>,
     /// URL to download file
     #[serde(rename = "url", skip_serializing_if = "Option::is_none")]
     pub file_url: Option<String>,
+}
+
+pub fn string_to_u8_opt<'de, D>(deserializer: D) -> Result<Option<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<String>::deserialize(deserializer)?;
+    match opt {
+        Some(s) if !s.is_empty() => Ok(Some(s.as_bytes()[0])),
+        _ => Ok(None),
+    }
 }
 
 impl GHubsFileConfig {
@@ -552,6 +589,43 @@ pub struct GHubsFieldConfig {
     // Value separator
     #[serde(skip_serializing_if = "Option::is_none")]
     pub separator: Option<StringOrVec>,
+    /// Source name
+    #[serde(rename = "source", alias = "source_name")]
+    pub source_name: Option<String>,
+    /// Source abbreviation
+    #[serde(
+        rename = "source_abbreviation",
+        alias = "abbreviation",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_abbreviation: Option<String>,
+    /// Source URL (Single URL for all values)
+    #[serde(
+        rename = "source_url",
+        alias = "source_link",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub source_url: Option<String>,
+    /// Source URL stub (base URL for values)
+    #[serde(rename = "source_url_stub", skip_serializing_if = "Option::is_none")]
+    pub source_stub: Option<String>,
+    /// Source URL suffix (suffix for values)
+    #[serde(rename = "source_slug", skip_serializing_if = "Option::is_none")]
+    pub source_slug: Option<String>,
+    /// Source description
+    #[serde(rename = "source_description", skip_serializing_if = "Option::is_none")]
+    pub source_description: Option<String>,
+    /// Source last updated date
+    #[serde(
+        rename = "source_date",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "date_format",
+        default
+    )]
+    pub source_date: Option<String>,
+    /// Source contact name
+    #[serde(rename = "source_contact", skip_serializing_if = "Option::is_none")]
+    pub source_contact: Option<String>,
     // Attribute status
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<FieldStatus>,
@@ -602,7 +676,11 @@ pub struct GHubsFieldConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxon_type: Option<String>,
     // List of values to translate
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "deserialize_translate"
+    )]
     pub translate: Option<HashMap<String, StringOrVec>>,
     // Traverse function
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -667,6 +745,14 @@ impl GHubsFieldConfig {
             path: self.path.or(other.path),
             return_type: self.return_type.or(other.return_type),
             separator: self.separator.or(other.separator),
+            source_name: self.source_name.or(other.source_name),
+            source_abbreviation: self.source_abbreviation.or(other.source_abbreviation),
+            source_url: self.source_url.or(other.source_url),
+            source_stub: self.source_stub.or(other.source_stub),
+            source_slug: self.source_slug.or(other.source_slug),
+            source_description: self.source_description.or(other.source_description),
+            source_date: self.source_date.or(other.source_date),
+            source_contact: self.source_contact.or(other.source_contact),
             status: self.status.or(other.status),
             summary: self.summary.or(other.summary),
             synonyms: self.synonyms.or(other.synonyms),
@@ -740,6 +826,9 @@ pub struct GHubsConfig {
     /// Analysis configuration options
     #[serde(skip_serializing_if = "Option::is_none")]
     pub analysis: Option<GHubsAnalysisConfig>,
+    /// Attribute defaults
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub defaults: Option<GHubsDefaultsConfig>,
     /// Attribute fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, GHubsFieldConfig>>,
@@ -748,7 +837,7 @@ pub struct GHubsConfig {
     pub identifiers: Option<HashMap<String, GHubsFieldConfig>>,
     /// Metadata fields
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<GHubsFieldConfig>,
+    pub metadata: Option<HashMap<String, GHubsFieldConfig>>,
     /// Taxon names
     #[serde(skip_serializing_if = "Option::is_none")]
     pub taxon_names: Option<HashMap<String, GHubsFieldConfig>>,
@@ -784,6 +873,24 @@ pub struct GHubsConfig {
     /// to output file
     #[serde(skip)]
     pub output_headers: Vec<(String, String)>,
+}
+
+/// GenomeHubs configuration options
+#[derive(Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GHubsDefaultsConfig {
+    /// File configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<GHubsFileConfig>,
+    /// Analysis configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analysis: Option<GHubsAnalysisConfig>,
+    /// Attribute configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<GHubsFieldConfig>,
+    /// Identifier configuration options
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifiers: Option<GHubsFieldConfig>,
 }
 
 impl GHubsConfig {
@@ -868,10 +975,14 @@ impl GHubsConfig {
         Ok(())
     }
 
-    pub fn init_csv_reader(&mut self, keys: Option<Vec<&str>>) -> csv::Reader<Box<dyn BufRead>> {
-        if self.file.is_none() {
+    pub fn init_csv_reader(
+        &mut self,
+        keys: Option<Vec<&str>>,
+        skip_file: bool,
+    ) -> Result<csv::Reader<Box<dyn BufRead>>, error::Error> {
+        if self.file.is_none() || skip_file {
             // return an empty reader
-            return csv::Reader::from_reader(io::get_empty_reader());
+            return Ok(csv::Reader::from_reader(io::get_empty_reader()));
         }
         let file_config = self.file.clone().unwrap();
         let config_path = self.file_path.clone();
@@ -881,13 +992,13 @@ impl GHubsConfig {
             GHubsFileFormat::TSV => b'\t',
         };
         if !file_path.exists() {
-            panic!("File does not exist: {:?}", &file_path);
+            return Err(error::Error::FileNotFound(format!("{}", file_path.display())).into());
         }
         let mut rdr = io::get_csv_reader(
             &Some(file_path.clone()),
             delimiter,
             file_config.header,
-            None,
+            file_config.comment_char,
             0,
             false,
         );
@@ -902,7 +1013,7 @@ impl GHubsConfig {
                 }
             }
         }
-        rdr
+        Ok(rdr)
     }
 
     pub fn init_file_writers(&mut self, write_validated: bool, write_exceptions: bool) -> () {
@@ -971,7 +1082,14 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(&Some(file_path), delimiter, true, None, 0, false);
+        let mut rdr = io::get_csv_reader(
+            &Some(file_path),
+            delimiter,
+            true,
+            file_config.comment_char,
+            0,
+            false,
+        );
         let expected_headers = vec!["taxon_id", "input", "rank"];
         let headers = rdr.headers().unwrap().clone();
         for (i, header) in headers.iter().enumerate() {
@@ -1219,7 +1337,8 @@ pub struct Source {
     #[serde(
         rename = "source_date",
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "date_format"
+        deserialize_with = "date_format",
+        default
     )]
     pub date: Option<String>,
     /// Source contact name
@@ -1232,14 +1351,18 @@ fn date_format<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let s = String::deserialize(deserializer)?;
-    if chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").is_ok() {
-        Ok(Some(s))
+    let opt = Option::<String>::deserialize(deserializer)?;
+    if let Some(ref s) = opt {
+        if chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").is_ok() {
+            Ok(Some(s.clone()))
+        } else {
+            Err(serde::de::Error::custom(format!(
+                "Invalid date format `{}`. Dates must be `YYYY-MM-DD`",
+                s
+            )))
+        }
     } else {
-        Err(serde::de::Error::custom(format!(
-            "Invalid date format `{}`. Dates must be `YYYY-MM-DD`",
-            s
-        )))
+        Ok(None)
     }
 }
 
@@ -1315,6 +1438,7 @@ fn parse_genomehubs_config(config_file: &PathBuf) -> Result<GHubsConfig, error::
             }
         }
     }
+    ghubs_config.apply_defaults();
     Ok(ghubs_config)
 }
 
@@ -1636,82 +1760,336 @@ fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, Validatio
     }
 }
 
-fn translate_value(field: &GHubsFieldConfig, value: &String) -> Vec<String> {
-    let mut values = vec![];
-    if let Some(ref translate) = field.translate {
-        let translated = translate
-            .get(value)
-            .cloned()
-            .unwrap_or(StringOrVec::Single(value.to_owned()));
-        match translated {
-            StringOrVec::Single(val) => values.push(val),
-            StringOrVec::Multiple(vals) => values.extend(vals),
-        };
-    } else {
-        values.push(value.to_owned());
-    }
-    values
+fn normalize_key(s: &str) -> String {
+    s.trim().to_lowercase().nfc().collect::<String>()
 }
 
+fn deserialize_translate<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<String, StringOrVec>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::<HashMap<String, StringOrVec>>::deserialize(deserializer)?;
+    if let Some(map) = opt {
+        let normalized = map
+            .into_iter()
+            .map(|(k, v)| (normalize_key(&k), v))
+            .collect();
+        Ok(Some(normalized))
+    } else {
+        Ok(None)
+    }
+}
+
+// Process a value: translate, apply function, validate, and return results
 fn process_value(
     value: String,
     field: &GHubsFieldConfig,
-) -> Result<
-    (
-        Vec<(String, ValidationStatus)>,
-        Vec<String>,
-        ValidationStatus,
-    ),
-    error::Error,
-> {
-    let values = translate_value(field, &value);
-    let mut ret_values = vec![];
+) -> Result<(Vec<(String, String)>, Vec<String>, ValidationStatus), error::Error> {
+    use unicode_normalization::UnicodeNormalization;
+    let mut values = vec![];
     let mut invalid_values = vec![];
-    for value in values {
-        if let Some(separator) = &field.separator {
-            let re = match separator {
-                StringOrVec::Single(sep) => Regex::new(sep).unwrap(),
-                StringOrVec::Multiple(separators) => Regex::new(
-                    separators
-                        // .iter()
-                        // .map(|sep| record.get(idx.to_owned()).unwrap_or(""))
-                        // .collect::<Vec<&str>>()
-                        .join(&"|")
-                        .as_str(),
-                )
-                .unwrap(),
-            };
-            for val in re.split(value.as_str()) {
-                validate_value(field, &mut ret_values, &mut invalid_values, val.to_string());
-            }
-        } else {
-            validate_value(field, &mut ret_values, &mut invalid_values, value.clone());
-        }
+    let mut status = ValidationStatus::None;
+    // Use field separator if present, otherwise default to ';'
+    let sep = field
+        .separator
+        .as_ref()
+        .map(|s| match s {
+            StringOrVec::Single(sep) => sep.as_str(),
+            StringOrVec::Multiple(vec) => vec.get(0).map(|s| s.as_str()).unwrap_or(";"),
+        })
+        .unwrap_or(";");
+    let mut input_values: Vec<String> = value
+        .split(sep)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && s != "None" && s != "NA")
+        .collect();
+    if input_values.is_empty() {
+        return Ok((vec![], vec![], ValidationStatus::Blank));
     }
-    let status = if invalid_values.is_empty() {
-        ValidationStatus::Valid
-    } else if invalid_values.len() < ret_values.len() {
-        ValidationStatus::Partial
-    } else {
-        ValidationStatus::Invalid
-    };
-    Ok((ret_values, invalid_values, status))
+    // Translation
+    if let Some(translate) = &field.translate {
+        let mut translated = vec![];
+        for v in input_values.iter() {
+            let norm_v = v.trim().to_lowercase().nfc().collect::<String>();
+            if let Some(t) = translate.get(&norm_v) {
+                match t {
+                    StringOrVec::Single(s) => {
+                        if !s.trim().is_empty() && s.trim().to_lowercase() != "none" {
+                            translated.push(s.clone());
+                        }
+                    }
+                    StringOrVec::Multiple(vec) => {
+                        for s in vec {
+                            if !s.trim().is_empty() && s.trim().to_lowercase() != "none" {
+                                translated.push(s.clone());
+                            }
+                        }
+                    }
+                }
+            } else if !v.trim().is_empty() && v.trim().to_lowercase() != "none" {
+                translated.push(v.clone());
+            }
+        }
+        input_values = translated;
+    }
+    // Apply function and validate
+    for v in input_values.iter() {
+        let (val, val_status) = apply_function(v.clone(), field);
+        if val_status == ValidationStatus::Valid {
+            values.push((val.clone(), v.clone()));
+        } else {
+            invalid_values.push(v.clone());
+        }
+        status = match (status.clone(), val_status) {
+            (ValidationStatus::None, s) => s,
+            (ValidationStatus::Valid, ValidationStatus::Valid) => ValidationStatus::Valid,
+            (ValidationStatus::Valid, ValidationStatus::Invalid) => ValidationStatus::Partial,
+            (ValidationStatus::Partial, _) => ValidationStatus::Partial,
+            (_, ValidationStatus::Partial) => ValidationStatus::Partial,
+            (_, ValidationStatus::Blank) => status,
+            (_, ValidationStatus::Error) => ValidationStatus::Error,
+            (s, _) => s,
+        };
+    }
+    if values.is_empty() && !invalid_values.is_empty() {
+        status = ValidationStatus::Invalid;
+    }
+    Ok((values, invalid_values, status))
 }
 
-fn validate_value(
-    field: &GHubsFieldConfig,
-    ret_values: &mut Vec<(String, ValidationStatus)>,
-    invalid_values: &mut Vec<String>,
-    val: String,
-) {
-    let (v, status) = apply_function(val.to_string(), &field);
-    let is_valid = match status {
-        ValidationStatus::Valid => true,
-        ValidationStatus::Blank => true,
-        _ => false,
-    };
-    if !is_valid {
-        invalid_values.push(val.to_string());
+// --- Default propagation helpers for config merging ---
+impl GHubsFileConfig {
+    pub fn merge_missing(&mut self, other: &GHubsFileConfig) {
+        if self.comment_char.is_none() {
+            self.comment_char = other.comment_char;
+        }
+        if self.description.is_none() {
+            self.description = other.description.clone();
+        }
+        if self.display_group.is_none() {
+            self.display_group = other.display_group.clone();
+        }
+        if self.display_level.is_none() {
+            self.display_level = other.display_level;
+        }
+        if self.exclusions.is_none() {
+            self.exclusions = other.exclusions.clone();
+        }
+        if self.organelle.is_none() {
+            self.organelle = other.organelle.clone();
+        }
+        if self.source_name.is_none() {
+            self.source_name = other.source_name.clone();
+        }
+        if self.source_abbreviation.is_none() {
+            self.source_abbreviation = other.source_abbreviation.clone();
+        }
+        if self.source_url.is_none() {
+            self.source_url = other.source_url.clone();
+        }
+        if self.source_stub.is_none() {
+            self.source_stub = other.source_stub.clone();
+        }
+        if self.source_slug.is_none() {
+            self.source_slug = other.source_slug.clone();
+        }
+        if self.source_description.is_none() {
+            self.source_description = other.source_description.clone();
+        }
+        if self.source_date.is_none() {
+            self.source_date = other.source_date.clone();
+        }
+        if self.source_contact.is_none() {
+            self.source_contact = other.source_contact.clone();
+        }
+        if self.skip_partial.is_none() {
+            self.skip_partial = other.skip_partial.clone();
+        }
+        if self.tests.is_none() {
+            self.tests = other.tests.clone();
+        }
+        if self.file_url.is_none() {
+            self.file_url = other.file_url.clone();
+        }
     }
-    ret_values.push((v, status));
 }
+
+impl GHubsFieldConfig {
+    pub fn merge_missing(&mut self, other: &GHubsFieldConfig) {
+        if self.bins.is_none() {
+            self.bins = other.bins.clone();
+        }
+        if self.comment.is_none() {
+            self.comment = other.comment.clone();
+        }
+        if self.constraint.is_none() {
+            self.constraint = other.constraint.clone();
+        }
+        if self.default.is_none() {
+            self.default = other.default.clone();
+        }
+        if self.description.is_none() {
+            self.description = other.description.clone();
+        }
+        if self.display_group.is_none() {
+            self.display_group = other.display_group.clone();
+        }
+        if self.display_level.is_none() {
+            self.display_level = other.display_level;
+        }
+        if self.display_name.is_none() {
+            self.display_name = other.display_name.clone();
+        }
+        if self.exclusions.is_none() {
+            self.exclusions = other.exclusions.clone();
+        }
+        if self.function.is_none() {
+            self.function = other.function.clone();
+        }
+        if self.h3res.is_none() {
+            self.h3res = other.h3res;
+        }
+        if self.header.is_none() {
+            self.header = other.header.clone();
+        }
+        if self.index.is_none() {
+            self.index = other.index.clone();
+        }
+        if self.is_primary_value.is_none() {
+            self.is_primary_value = other.is_primary_value;
+        }
+        if self.join.is_none() {
+            self.join = other.join.clone();
+        }
+        if self.key.is_none() {
+            self.key = other.key.clone();
+        }
+        if self.list_key.is_none() {
+            self.list_key = other.list_key.clone();
+        }
+        if self.long_description.is_none() {
+            self.long_description = other.long_description.clone();
+        }
+        if self.metadata.is_none() {
+            self.metadata = other.metadata.clone();
+        }
+        if self.name.is_none() {
+            self.name = other.name.clone();
+        }
+        if self.order.is_none() {
+            self.order = other.order.clone();
+        }
+        if self.organelle.is_none() {
+            self.organelle = other.organelle.clone();
+        }
+        if self.path.is_none() {
+            self.path = other.path.clone();
+        }
+        if self.return_type.is_none() {
+            self.return_type = other.return_type.clone();
+        }
+        if self.separator.is_none() {
+            self.separator = other.separator.clone();
+        }
+        if self.source_name.is_none() {
+            self.source_name = other.source_name.clone();
+        }
+        if self.source_abbreviation.is_none() {
+            self.source_abbreviation = other.source_abbreviation.clone();
+        }
+        if self.source_url.is_none() {
+            self.source_url = other.source_url.clone();
+        }
+        if self.source_stub.is_none() {
+            self.source_stub = other.source_stub.clone();
+        }
+        if self.source_slug.is_none() {
+            self.source_slug = other.source_slug.clone();
+        }
+        if self.source_description.is_none() {
+            self.source_description = other.source_description.clone();
+        }
+        if self.source_date.is_none() {
+            self.source_date = other.source_date.clone();
+        }
+        if self.source_contact.is_none() {
+            self.source_contact = other.source_contact.clone();
+        }
+    }
+    pub fn apply_file_defaults(&mut self, file: &GHubsFileConfig) {
+        if self.display_group.is_none() {
+            self.display_group = file.display_group.clone();
+        }
+        if self.display_level.is_none() {
+            self.display_level = file.display_level;
+        }
+        if self.exclusions.is_none() {
+            self.exclusions = file.exclusions.clone();
+        }
+        if self.organelle.is_none() {
+            self.organelle = file.organelle.clone();
+        }
+        if self.source_name.is_none() {
+            self.source_name = file.source_name.clone();
+        }
+        if self.source_abbreviation.is_none() {
+            self.source_abbreviation = file.source_abbreviation.clone();
+        }
+        if self.source_url.is_none() {
+            self.source_url = file.source_url.clone();
+        }
+        if self.source_stub.is_none() {
+            self.source_stub = file.source_stub.clone();
+        }
+        if self.source_slug.is_none() {
+            self.source_slug = file.source_slug.clone();
+        }
+        if self.source_description.is_none() {
+            self.source_description = file.source_description.clone();
+        }
+        if self.source_date.is_none() {
+            self.source_date = file.source_date.clone();
+        }
+        if self.source_contact.is_none() {
+            self.source_contact = file.source_contact.clone();
+        }
+    }
+}
+
+impl GHubsConfig {
+    pub fn apply_defaults(&mut self) {
+        // 1. Fill missing file fields from defaults.file
+        if let (Some(default_file), Some(file)) = (
+            self.defaults.as_ref().and_then(|d| d.file.as_ref()),
+            self.file.as_mut(),
+        ) {
+            file.merge_missing(default_file);
+        }
+        // 2. Fill missing attributes/identifiers from defaults
+        if let Some(default_attr) = self.defaults.as_ref().and_then(|d| d.attributes.as_ref()) {
+            if let Some(attrs) = self.attributes.as_mut() {
+                for (_k, v) in attrs.iter_mut() {
+                    v.merge_missing(default_attr);
+                }
+            }
+        }
+        if let Some(default_id) = self.defaults.as_ref().and_then(|d| d.identifiers.as_ref()) {
+            if let Some(ids) = self.identifiers.as_mut() {
+                for (_k, v) in ids.iter_mut() {
+                    v.merge_missing(default_id);
+                }
+            }
+        }
+        // 3. Apply file keys as defaults to all attributes
+        if let Some(file) = self.file.as_ref() {
+            if let Some(attrs) = self.attributes.as_mut() {
+                for (_attr_name, attr_cfg) in attrs.iter_mut() {
+                    attr_cfg.apply_file_defaults(file);
+                }
+            }
+        }
+    }
+}
+// --- End default propagation helpers ---

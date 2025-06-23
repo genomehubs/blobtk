@@ -1,20 +1,16 @@
-use std::ffi::CString;
-use std::process::exit;
-
 use anyhow;
 use schemars::schema_for;
 
 use crate::cli;
 use crate::io::get_file_writer;
 use crate::parse::genomehubs::GHubsConfig;
-use crate::parse::lookup::{build_fast_lookup, clean_name};
+use crate::parse::lookup::build_fast_lookup;
 use crate::parse::nodes::Nodes;
 use crate::parse::parse_file;
 use crate::taxonomy;
 
 pub use cli::TaxonomyOptions;
 
-use blart::TreeMap;
 pub use taxonomy::taxdump_to_nodes;
 
 /// Execute the `validate` subcommand from `blobtk`.
@@ -56,8 +52,14 @@ pub fn validate(options: &cli::ValidateOptions) -> Result<(), anyhow::Error> {
             // match taxa to nodes
             // todo: add support for multiple genomehubs files
             eprintln!("Parsing file: {:?}", genomehubs_file);
-            let (_new_nodes, _new_names, _source) =
-                parse_file(genomehubs_file, &id_map, !options.dry_run)?;
+            let (_new_nodes, _new_names, _source) = parse_file(
+                genomehubs_file,
+                &id_map,
+                !options.dry_run,
+                false,
+                None,
+                options.skip_tsv,
+            )?;
         }
     }
     Ok(())

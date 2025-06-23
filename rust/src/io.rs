@@ -210,6 +210,23 @@ pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
     let file = File::open(&path)?;
 
     if path.extension() == Some(OsStr::new("gz")) {
+        // Check gzip magic bytes
+        let mut magic = [0u8; 2];
+        let mut f = file.try_clone()?;
+        use std::io::Read;
+        f.read_exact(&mut magic)?;
+        if magic != [0x1F, 0x8B] {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "File {} has .gz extension but is not a valid gzip file (magic bytes: {:x?})",
+                    path.display(),
+                    magic
+                ),
+            ));
+        }
+        // Re-open for actual reading
+        let file = File::open(&path)?;
         Ok(Box::new(BufReader::new(GzDecoder::new(file))))
     } else {
         Ok(Box::new(BufReader::new(file)))

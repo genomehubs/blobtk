@@ -1,5 +1,8 @@
 use clap::ValueEnum;
+
+#[cfg(feature = "python-extension")]
 use pyo3::pyclass;
+
 use std::str::FromStr;
 use svg::node::element::path::Data;
 
@@ -7,7 +10,7 @@ use super::axis::{AxisName, AxisOptions, Position};
 use super::category::Category;
 
 #[derive(Clone, Debug, Default, ValueEnum)]
-#[pyclass]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Reducer {
     #[default]
     Sum,

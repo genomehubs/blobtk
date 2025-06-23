@@ -93,10 +93,10 @@ pub fn build_lineage_lookup(nodes: &Nodes, root_id: &String) -> HashMap<String, 
 pub fn lookup_nodes(
     new_nodes: &Nodes,
     nodes: &mut Nodes,
-    new_name_classes: &Vec<String>,
+    _new_name_classes: &Vec<String>,
     name_classes: &Vec<String>,
     xref_label: Option<String>,
-    create_taxa: bool,
+    _create_taxa: bool,
 ) {
     let id_map = build_fast_lookup(&nodes, &name_classes);
     let node_count = new_nodes.nodes.len();
@@ -104,7 +104,7 @@ pub fn lookup_nodes(
     for node in new_nodes.nodes.values() {
         progress_bar.inc(1);
         let mut taxonomy_section = node.to_taxonomy_section(&new_nodes);
-        let (assigned_taxon, taxon_match) =
+        let (assigned_taxon, _taxon_match) =
             match_taxonomy_section(&mut taxonomy_section, &id_map, None);
         if let Some(taxon) = assigned_taxon {
             let tax_id = taxon.tax_id.clone().unwrap();
@@ -129,177 +129,24 @@ pub fn lookup_nodes(
                     });
                 }
             }
-            names.push(Name {
-                tax_id: tax_id.clone(),
-                name: node.tax_id(),
-                unique_name: format!("{}:{}", &label, node.tax_id()),
-                class: Some("xref".to_string()),
-                //class: xref_label.clone(),
-            });
+            // Add the new node's tax_id as an xref
+            let prefixed_name = format!("{}:{}", &label, new_tax_id);
+            if !names
+                .iter()
+                .any(|n| n.name == new_tax_id && n.class.as_deref() == Some("xref"))
+            {
+                names.push(Name {
+                    tax_id: tax_id.clone(),
+                    name: prefixed_name.clone(),
+                    unique_name: prefixed_name,
+                    class: Some("xref".to_string()),
+                });
+            }
         }
     }
     progress_bar.finish();
 
     return;
-    let mut table = build_lookup(&nodes, &name_classes, true);
-    let ranks = RANKS[0..4].to_vec();
-    let mut matched: HashMap<String, String> = HashMap::new();
-    let mut unmatched: HashMap<String, Vec<String>> = HashMap::new();
-    let higher_rank_set: HashSet<&str> = HashSet::from_iter(HIGHER_RANKS.iter().cloned());
-    let node_count = new_nodes.nodes.len();
-    let progress_bar = styled_progress_bar(node_count, "Looking up names");
-    let mut hits = vec![];
-
-    // for (tax_id, node) in new_nodes.nodes.iter() {
-    for rank in ranks.into_iter().rev() {
-        for node in new_nodes.nodes_by_rank(rank) {
-            let tax_id = &node.tax_id;
-            progress_bar.inc(1);
-            let lineage = new_nodes.lineage(&"1".to_string(), tax_id);
-            let names = node.names_by_class(Some(name_classes), true);
-            let mut match_tax_id = None;
-            let mut hanger_tax_id = None;
-            for n in lineage.into_iter().rev() {
-                if let Some(match_id) = matched.get(&n.tax_id) {
-                    if hanger_tax_id.is_none() {
-                        hanger_tax_id = Some(match_id.clone());
-                    }
-                }
-                let n_names = n.names_by_class(Some(new_name_classes), true);
-                for name in names.iter() {
-                    for n_name in n_names.iter() {
-                        if higher_rank_set.contains(n.rank.as_str()) {
-                            let key = format!(
-                                "{}:{}:{}:{}",
-                                node.rank_letter(),
-                                name,
-                                n.rank_letter(),
-                                n_name
-                            );
-                            match table.get(&key) {
-                                None => (),
-                                Some(value) => {
-                                    if value.len() == 1 {
-                                        matched.insert(node.tax_id(), value[0].clone());
-                                        match_tax_id = Some(value[0].clone());
-                                        break;
-                                    }
-                                }
-                            };
-                        }
-                    }
-                    if match_tax_id.is_some() {
-                        break;
-                    }
-                }
-            }
-            if let Some(ref_tax_id) = match_tax_id {
-                hits.push(ref_tax_id.clone());
-                // add node.tax_id to names as an xref
-                let names = nodes
-                    .nodes
-                    .get_mut(&ref_tax_id)
-                    .unwrap()
-                    .names
-                    .as_mut()
-                    .unwrap();
-                let label = match xref_label {
-                    Some(ref l) => l.clone(),
-                    None => "".to_string(),
-                };
-                names.push(Name {
-                    tax_id: ref_tax_id.clone(),
-                    name: node.tax_id(),
-                    unique_name: format!("{}:{}", &label, node.tax_id()),
-                    class: xref_label.clone(),
-                });
-                break;
-            } else if create_taxa {
-                if let Some(hanger_id) = hanger_tax_id {
-                    // Create new node and hang on hanger_tax_id
-                    let new_tax_id = match xref_label {
-                        Some(ref l) => format!("{}:{}", l, node.tax_id()),
-                        None => format!(":{}", node.tax_id()),
-                    };
-                    matched.insert(node.tax_id(), new_tax_id.clone());
-
-                    nodes.nodes.insert(
-                        new_tax_id.clone(),
-                        Node {
-                            tax_id: new_tax_id.clone(),
-                            parent_tax_id: hanger_id.clone(),
-                            names: match node.names.clone() {
-                                Some(names) => Some(
-                                    names
-                                        .iter()
-                                        .map(|n| Name {
-                                            tax_id: new_tax_id.clone(),
-                                            ..n.clone()
-                                        })
-                                        .collect(),
-                                ),
-                                None => None,
-                            },
-                            rank: node.rank(),
-                            scientific_name: node.scientific_name.clone(),
-                        },
-                    );
-                    match nodes.children.entry(hanger_id.clone()) {
-                        Entry::Vacant(e) => {
-                            e.insert(vec![new_tax_id.clone()]);
-                        }
-                        Entry::Occupied(mut e) => {
-                            e.get_mut().push(new_tax_id.clone());
-                        }
-                    }
-                    let parent_node = nodes.nodes.get(&hanger_id).unwrap();
-                    let key = format!(
-                        "{}:{}:{}:{}",
-                        node.rank_letter(),
-                        node.lc_scientific_name(),
-                        parent_node.rank_letter(),
-                        parent_node.lc_scientific_name()
-                    );
-                    match table.entry(key) {
-                        Entry::Vacant(e) => {
-                            e.insert(vec![new_tax_id]);
-                        }
-                        Entry::Occupied(mut e) => {
-                            e.get_mut().push(new_tax_id);
-                        }
-                    }
-                } else {
-                    match unmatched.entry(node.rank()) {
-                        Entry::Vacant(e) => {
-                            e.insert(vec![node.lc_tax_id()]);
-                        }
-                        Entry::Occupied(mut e) => {
-                            e.get_mut().push(node.lc_tax_id());
-                        }
-                    }
-                }
-            }
-        }
-    }
-    progress_bar.finish();
-    // for rank in ranks {
-    //     eprintln!(
-    //         "{:?}: {:?}, {:?}",
-    //         rank,
-    //         match matched.entry(rank.to_string()) {
-    //             Entry::Vacant(_) => 0,
-    //             Entry::Occupied(e) => {
-    //                 e.get().len()
-    //             }
-    //         },
-    //         match unmatched.entry(rank.to_string()) {
-    //             Entry::Vacant(_) => 0,
-    //             Entry::Occupied(e) => {
-    //                 e.get().len()
-    //             }
-    //         },
-    //     )
-    // }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -333,13 +180,12 @@ pub fn build_fast_lookup(
 ) -> TreeMap<CString, Vec<TaxonInfo>> {
     let mut id_map: TreeMap<_, _> = TreeMap::new();
 
-    let rank_set: HashSet<&str> = HashSet::from_iter(RANKS.iter().cloned());
+    let _rank_set: HashSet<&str> = HashSet::from_iter(RANKS.iter().cloned());
     let higher_rank_set: HashSet<&str> = HashSet::from_iter(HIGHER_RANKS.iter().cloned());
     let node_count = nodes.nodes.len();
     let progress_bar = styled_progress_bar(node_count, "Building lookup hash");
     for (tax_id, node) in nodes.nodes.iter() {
         progress_bar.inc(1);
-        // if rank_set.contains(node.rank.as_str()) {
         let lineage = nodes.lineage(&"1".to_string(), tax_id);
         let names = node.names_by_class(Some(&name_classes), true);
         let anc_ids: HashSet<String> = lineage
@@ -354,21 +200,128 @@ pub fn build_fast_lookup(
                 rank: node.rank(),
                 anc_ids: anc_ids.clone(),
             };
-            match id_map.entry(CString::new(clean_name(&name)).unwrap()) {
+            let key = CString::new(clean_name(&name)).unwrap();
+            match id_map.entry(key) {
                 blart::map::Entry::Vacant(e) => {
                     e.insert(vec![taxon_info]);
                 }
                 blart::map::Entry::Occupied(mut e) => {
-                    e.get_mut().push(taxon_info);
+                    // Only insert if this tax_id is not already present
+                    if !e.get().iter().any(|ti| ti.tax_id == taxon_info.tax_id) {
+                        e.get_mut().push(taxon_info);
+                    }
                 }
             }
         }
-        // }
+    }
+    progress_bar.finish();
+    id_map
+}
+
+pub fn lookup_nodes_by_id(
+    new_nodes: &Nodes,
+    nodes: &mut Nodes,
+    id_source: &str,
+    xref_label: Option<String>,
+    create_taxa: bool,
+) {
+    fn add_names_to_node(target_node: &mut Node, new_names: &[Name], xref_label: &str) {
+        if let Some(names) = target_node.names.as_mut() {
+            for name in new_names {
+                // Avoid duplicate names
+                if !names
+                    .iter()
+                    .any(|n| n.name == name.name && n.class == name.class)
+                {
+                    let mut new_name = name.clone();
+                    // For xref, update unique_name to include xref_label
+                    if new_name.class.as_deref() == Some("xref") {
+                        new_name.unique_name = format!("{}:{}", xref_label, new_name.name);
+                    }
+                    // Always set the tax_id to the target node's tax_id
+                    new_name.tax_id = target_node.tax_id.clone();
+                    names.push(new_name);
+                }
+            }
+        }
     }
 
-    progress_bar.finish();
+    fn create_and_attach_taxon(
+        nodes: &mut Nodes,
+        new_node: &Node,
+        hanger_id: &str,
+        xref_label: &str,
+    ) {
+        let new_tax_id = format!("{}:{}", xref_label, new_node.tax_id());
+        let mut new_node_clone = new_node.clone();
+        new_node_clone.tax_id = new_tax_id.clone();
+        new_node_clone.parent_tax_id = hanger_id.to_string();
+        if let Some(names) = new_node_clone.names.as_mut() {
+            for name in names.iter_mut() {
+                name.tax_id = new_tax_id.clone();
+            }
+        }
+        nodes.nodes.insert(new_tax_id.clone(), new_node_clone);
+        match nodes.children.entry(hanger_id.to_string()) {
+            Entry::Vacant(e) => {
+                e.insert(vec![new_tax_id.clone()]);
+            }
+            Entry::Occupied(mut e) => {
+                e.get_mut().push(new_tax_id.clone());
+            }
+        }
+    }
 
-    id_map
+    let label = xref_label.unwrap_or_else(|| id_source.to_string());
+    let node_count = new_nodes.nodes.len();
+    let progress_bar = styled_progress_bar(node_count, "Looking up xref IDs");
+    for new_node in new_nodes.nodes.values() {
+        progress_bar.inc(1);
+        let mut matched = false;
+        if let Some(ref new_names) = new_node.names {
+            for name in new_names.iter() {
+                if name.class.as_deref() == Some("xref") && name.name.starts_with(id_source) {
+                    // Remove id_source: prefix
+                    let id = name
+                        .name
+                        .strip_prefix(&format!("{}:", id_source))
+                        .unwrap_or(&name.name);
+                    if let Some(target_node) = nodes.nodes.get_mut(id) {
+                        // Add all names from new_node to target_node, with xref_label
+                        add_names_to_node(target_node, new_names, &label);
+                        // Also add an xref name for the new_node's tax_id
+                        let prefixed_name = format!("{}:{}", &label, new_node.tax_id());
+
+                        if !target_node
+                            .names
+                            .as_ref()
+                            .unwrap()
+                            .iter()
+                            .any(|n| n.name == prefixed_name && n.class.as_deref() == Some("xref"))
+                        {
+                            target_node.names.as_mut().unwrap().push(Name {
+                                tax_id: id.to_string(),
+                                name: prefixed_name.clone(),
+                                unique_name: prefixed_name,
+                                class: Some("xref".to_string()),
+                                ..Default::default()
+                            });
+                        }
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if !matched && create_taxa {
+            // Try to hang on parent if possible
+            let hanger_id = new_node.parent_tax_id();
+            if nodes.nodes.contains_key(&hanger_id) {
+                create_and_attach_taxon(nodes, new_node, &hanger_id, &label);
+            }
+        }
+    }
+    progress_bar.finish();
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
@@ -597,22 +550,6 @@ pub fn match_taxonomy_section(
             continue;
         }
 
-        // // Clean name
-        // let mut name = clean_name(&name);
-
-        // // Check if name is in fixed_names
-        // if let Some(fixed_names) = fixed_names {
-        //     if let Some(fixed) = fixed_names.get(rank) {
-        //         if let Some(taxon_id) = fixed.get(&name) {
-        //             name = taxon_id.clone();
-        //         }
-        //     }
-        // }
-        // Check if name is in id_map
-        // dbg!(&name);
-        // dbg!(clean_name(&name));
-        // dbg!(&CString::new(clean_name(&name)));
-        // dbg!(id_map.get(&CString::new(clean_name(&name)).unwrap()));
         match id_map.get(&CString::new(clean_name(&name)).unwrap()) {
             Some(ids) => {
                 // Check if multiple matches
@@ -689,10 +626,13 @@ pub fn match_taxonomy_section(
                         taxon_match.higher_status = Some(MatchStatus::MultiMatch(candidates));
                     }
                 } else {
+                    // Single match found
+                    // Use first match
                     let ids = ids.first().unwrap();
                     if i == 0 {
                         // Same rank as record
-                        if let Some(tax_id) = taxon_id {
+                        let filtered_id = taxon.tax_id.clone().filter(|s| !s.is_empty());
+                        if let Some(ref tax_id) = filtered_id {
                             // has taxon ID
                             if tax_id.clone() == ids.tax_id {
                                 // Exact match

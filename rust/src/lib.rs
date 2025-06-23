@@ -38,6 +38,7 @@ pub mod parse;
 pub mod plot;
 
 /// Python bindings.
+#[cfg(feature = "python-extension")]
 pub mod python;
 
 /// Parse and subset a taxonomy.
