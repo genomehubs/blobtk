@@ -40,7 +40,7 @@ fn add_new_names(
     }
     let tax_id = taxon.tax_id.clone().unwrap();
     for (name_class, name) in taxon_names.iter() {
-        if name == "None" || name == "NA" {
+        if name == "None" || name == "NA" || name.is_empty() {
             continue;
         }
         // does name already exist in id_map associated with the same class and taxid?

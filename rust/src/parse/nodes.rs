@@ -1082,12 +1082,19 @@ impl Nodes {
     /// Use this when create_taxa is false for large taxonomies (e.g. OTT) to avoid O(N^2) merge cost.
     pub fn merge_names_only(&mut self, new_nodes: &Nodes) -> Result<(), anyhow::Error> {
         let mut name_map: HashMap<String, Vec<Name>> = HashMap::new();
-        for (taxid, node) in &new_nodes.nodes {
+        for (_, node) in &new_nodes.nodes {
             if let Some(names) = &node.names {
-                name_map
-                    .entry(taxid.clone())
-                    .or_insert_with(Vec::new)
-                    .extend(names.clone());
+                // find a name with unique_name starting with "ncbi:" and use that as the key
+                if let Some(name) = names.iter().find(|n| n.unique_name.starts_with("ncbi:")) {
+                    // remove "ncbi:" and use that as the key
+                    let key = name.unique_name.trim_start_matches("ncbi:").to_string();
+                    name_map.entry(key.clone()).or_insert_with(Vec::new).extend(
+                        names.iter().cloned().map(|mut n| {
+                            n.tax_id = key.clone();
+                            n
+                        }),
+                    );
+                }
             }
         }
         self.add_names(&name_map)
