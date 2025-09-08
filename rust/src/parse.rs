@@ -257,203 +257,85 @@ fn nodes_from_file(
             ghubs_config.write_exception(&combined_report);
         }
         if unmatched && create_taxa {
-            // --- BEGIN INTERMEDIATE NODE LOGIC ---
-            if create_taxa {
-                // Only try to create intermediate nodes if we have a putative match with a higher rank
-                if let Some(MatchStatus::PutativeMatch(higher_candidate)) =
-                    &taxon_match.higher_status
+            // Find/add parent genus first
+            let mut parent_tax_id = None;
+            let tax_section = taxonomy_section.unwrap();
+            // Try to get genus from taxonomy_section or from species/subspecies name
+            let genus_name = if let Some(genus) = tax_section.get("genus") {
+                if !genus.is_empty() {
+                    Some(genus.clone())
+                } else {
+                    None
+                }
+            } else if let Some(species) = tax_section.get("species") {
+                species.split_whitespace().next().map(|s| s.to_string())
+            } else if let Some(subspecies) = tax_section.get("subspecies") {
+                subspecies.split_whitespace().next().map(|s| s.to_string())
+            } else {
+                None
+            };
+
+            // Try to find or create genus node
+            if let Some(ref genus) = genus_name {
+                // Look up genus in id_map
+                let genus_tax_id = if let Some(genus_infos) =
+                    id_map.get(&CString::new(clean_name(&genus)).unwrap())
                 {
-                    // Get the lineage from the matched parent to the new node
-                    let mut lineage = vec![];
-                    if let Some(lineage_str) = taxonomy_section.unwrap().get("lineage") {
-                        lineage = lineage_str
-                            .split(';')
-                            .map(|s| s.trim().to_string())
-                            .collect();
-                    }
-                    // Get the ranks for the lineage (assume ordered from root to leaf)
-                    let mut ranks = vec![];
-                    if let Some(ranks_str) = taxonomy_section.unwrap().get("lineage_ranks") {
-                        ranks = ranks_str.split(';').map(|s| s.trim().to_string()).collect();
-                    }
-                    // Find the index of the matched parent and the new node in the lineage
-                    let parent_name = &higher_candidate.name;
-                    let node_name = &taxon_match.taxon.name;
-                    let parent_idx = lineage.iter().position(|n| n == parent_name);
-                    let node_idx = lineage.iter().position(|n| n == node_name);
-                    if let (Some(parent_idx), Some(node_idx)) = (parent_idx, node_idx) {
-                        // Walk from parent_idx+1 to node_idx-1 to find missing intermediates
-                        let mut prev_tax_id = higher_candidate.tax_id.clone().unwrap();
-                        for i in (parent_idx + 1)..node_idx {
-                            let inter_name = &lineage[i];
-                            let inter_rank = ranks
-                                .get(i)
-                                .cloned()
-                                .unwrap_or_else(|| "no rank".to_string());
-                            // Synthesize a tax_id (e.g., hash or prefix+name)
-                            let inter_tax_id =
-                                format!("anc_{}_{}", inter_rank, inter_name.replace(' ', "_"));
-                            // Only add if not already present
-                            if !nodes.contains_key(&inter_tax_id) {
-                                let inter_unique_name = match xref_label {
-                                    Some(ref label) => format!("{}:{}", label, inter_name),
-                                    None => "".to_string(),
-                                };
-                                let inter_node = Node {
-                                    tax_id: inter_tax_id.clone(),
-                                    parent_tax_id: prev_tax_id.clone(),
-                                    rank: inter_rank.clone(),
-                                    scientific_name: Some(inter_name.clone()),
-                                    names: Some(vec![Name {
-                                        tax_id: inter_tax_id.clone(),
-                                        name: inter_name.clone(),
-                                        unique_name: inter_unique_name,
-                                        class: Some("scientific name".to_string()),
-                                        ..Default::default()
-                                    }]),
-                                    ..Default::default()
-                                };
-                                nodes.insert(inter_tax_id.clone(), inter_node);
-                            }
-                            prev_tax_id = inter_tax_id;
+                    // Use first match if available
+                    genus_infos.first().map(|info| info.tax_id.clone())
+                } else {
+                    None
+                };
+                if let Some(gtid) = genus_tax_id {
+                    parent_tax_id = Some(gtid);
+                } else {
+                    // Create new genus node
+                    let genus_tax_id = format!("anc_{}", genus);
+                    // Set parent_tax_id to higher taxon match if available, else root
+                    let genus_parent_tax_id = match &taxon_match.higher_status {
+                        Some(MatchStatus::Match(parent))
+                        | Some(MatchStatus::MergeMatch(parent))
+                        | Some(MatchStatus::PutativeMatch(parent)) => {
+                            parent.tax_id.clone().unwrap_or_else(|| "1".to_string())
                         }
-                        // Now add the final node, parented to the last intermediate (or matched parent)
-                        let node = Node {
-                            tax_id: taxon_match
-                                .taxon
-                                .tax_id
-                                .clone()
-                                .unwrap_or_else(|| node_name.clone()),
-                            parent_tax_id: prev_tax_id.clone(),
-                            rank: taxon_match.taxon.rank.clone(),
-                            scientific_name: Some(node_name.clone()),
-                            names: None,
+                        _ => "1".to_string(),
+                    };
+                    let genus_node = Node {
+                        tax_id: genus_tax_id.clone(),
+                        parent_tax_id: genus_parent_tax_id,
+                        rank: "genus".to_string(),
+                        scientific_name: Some(genus.clone()),
+                        names: Some(vec![Name {
+                            tax_id: genus_tax_id.clone(),
+                            name: genus.clone(),
+                            unique_name: genus.clone(),
+                            class: Some("scientific name".to_string()),
                             ..Default::default()
-                        };
-                        nodes.insert(node.tax_id.clone(), node.clone());
-                        if let Some(taxon_names) = taxon_names_section {
-                            add_new_names(
-                                &Candidate {
-                                    tax_id: Some(node.tax_id.clone()),
-                                    ..Default::default()
-                                },
-                                taxon_names,
-                                &mut names,
-                                &id_map,
-                                &xref_label,
-                            );
-                        }
-                        ghubs_config.write_modified_row(
-                            &processed,
-                            "taxonomy",
-                            "taxon_id".to_string(),
-                            node.tax_id.clone(),
-                        )?;
-                        continue; // skip the old unmatched logic
-                    }
+                        }]),
+                        row_index: Some(row_index),
+                        raw_row: Some(raw_row.clone()),
+                        ..Default::default()
+                    };
+                    nodes.insert(genus_tax_id.clone(), genus_node);
+                    parent_tax_id = Some(genus_tax_id);
                 }
             }
-            // --- END INTERMEDIATE NODE LOGIC ---
-            // --- BEGIN GENUS INTERMEDIATE NODE LOGIC ---
-            if create_taxa {
-                if let Some(MatchStatus::PutativeMatch(higher_candidate)) =
-                    &taxon_match.higher_status
-                {
-                    let node_rank = taxon_match.taxon.rank.as_str();
-                    let node_name = &taxon_match.taxon.name;
-                    // Only apply this logic for species or subspecies
-                    if node_rank == "species" || node_rank == "subspecies" {
-                        // Extract genus from species name (first word)
-                        if let Some(genus_name) = node_name.split_whitespace().next() {
-                            // Check if node.tax_id matches tolId pattern: 1-2 lower, 1 upper, 2 lower, 1 upper, 2-3 lower
-                            let tolid_re =
-                                regex::Regex::new(r"^[a-z]{1,2}[A-Z][a-z]{2,3}[A-Z]").unwrap();
-                            let genus_tax_id = {
-                                let alt_id = taxonomy_section
-                                    .unwrap()
-                                    .get("alt_taxon_id")
-                                    .cloned()
-                                    .unwrap_or_else(|| {
-                                        format!("anc_genus_{}", genus_name.replace(' ', "_"))
-                                    });
-                                if tolid_re.is_match(&alt_id) {
-                                    // Find index of second uppercase letter
-                                    let mut upper_indices = alt_id
-                                        .char_indices()
-                                        .filter(|&(_, c)| c.is_ascii_uppercase());
-                                    let _ = upper_indices.next(); // skip first
-                                    if let Some((second_upper_idx, _)) = upper_indices.next() {
-                                        alt_id[..second_upper_idx].to_string()
-                                    } else {
-                                        format!("anc_genus_{}", genus_name.replace(' ', "_"))
-                                    }
-                                } else {
-                                    format!("anc_genus_{}", genus_name.replace(' ', "_"))
-                                }
-                            };
-                            // Insert genus node if not already present
-                            if !nodes.contains_key(&genus_tax_id) {
-                                let genus_unique_name = match xref_label {
-                                    Some(ref label) => format!("{}:{}", label, genus_name),
-                                    None => "".to_string(),
-                                };
-                                let genus_node = Node {
-                                    tax_id: genus_tax_id.clone(),
-                                    parent_tax_id: higher_candidate.tax_id.clone().unwrap(),
-                                    rank: "genus".to_string(),
-                                    scientific_name: Some(genus_name.to_string()),
-                                    names: Some(vec![Name {
-                                        tax_id: genus_tax_id.clone(),
-                                        name: genus_name.to_string(),
-                                        unique_name: genus_unique_name,
-                                        class: Some("scientific name".to_string()),
-                                        ..Default::default()
-                                    }]),
-                                    ..Default::default()
-                                };
-                                nodes.insert(genus_tax_id.clone(), genus_node);
-                            }
-                            // Now add the species/subspecies node, parented to the genus
-                            let node = Node {
-                                tax_id: taxon_match
-                                    .taxon
-                                    .tax_id
-                                    .clone()
-                                    .unwrap_or_else(|| node_name.clone()),
-                                parent_tax_id: genus_tax_id.clone(),
-                                rank: taxon_match.taxon.rank.clone(),
-                                scientific_name: Some(node_name.clone()),
-                                names: None,
-                                ..Default::default()
-                            };
-                            nodes.insert(node.tax_id.clone(), node.clone());
-                            if let Some(taxon_names) = taxon_names_section {
-                                add_new_names(
-                                    &Candidate {
-                                        tax_id: Some(node.tax_id.clone()),
-                                        ..Default::default()
-                                    },
-                                    taxon_names,
-                                    &mut names,
-                                    &id_map,
-                                    &xref_label,
-                                );
-                            }
-                            ghubs_config.write_modified_row(
-                                &processed,
-                                "taxonomy",
-                                "taxon_id".to_string(),
-                                node.tax_id.clone(),
-                            )?;
-                            continue; // skip the old unmatched logic
-                        }
-                    }
-                }
+
+            // Now create the species/subspecies node, using genus as parent if found/created
+            let mut new_taxon_match = taxon_match.clone();
+            if let Some(ref parent_id) = parent_tax_id {
+                // Set higher_status to point to genus
+                new_taxon_match.higher_status = Some(MatchStatus::PutativeMatch(Candidate {
+                    tax_id: Some(parent_id.clone()),
+                    rank: "genus".to_string(),
+                    name: genus_name.clone().unwrap_or_default(),
+                    anc_ids: None,
+                }));
             }
-            // --- END GENUS INTERMEDIATE NODE LOGIC ---
+
             if let Some(node) = add_new_taxid(
-                &taxon_match,
-                taxonomy_section.unwrap(),
+                &new_taxon_match,
+                tax_section,
                 &id_map,
                 Some(row_index),
                 Some(raw_row.clone()),
@@ -477,7 +359,6 @@ fn nodes_from_file(
                     "taxon_id".to_string(),
                     node.tax_id.clone(),
                 )?;
-
                 // TODO: add new taxid to id_map and increment counter
             }
         }

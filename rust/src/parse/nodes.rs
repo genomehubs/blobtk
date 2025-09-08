@@ -86,15 +86,31 @@ impl fmt::Display for Name {
 }
 
 /// A taxonomy node
-#[derive(Clone, Debug, Default, Eq, Iterable, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Eq, Iterable, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Node {
     pub tax_id: String,
     pub parent_tax_id: String,
     pub rank: String,
+    pub columns: Vec<String>,
     pub names: Option<Vec<Name>>,
     pub scientific_name: Option<String>,
     pub row_index: Option<usize>,
     pub raw_row: Option<String>,
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node {
+            tax_id: String::new(),
+            parent_tax_id: String::new(),
+            rank: String::new(),
+            columns: vec!["".to_string(); 13],
+            names: None,
+            scientific_name: None,
+            row_index: None,
+            raw_row: None,
+        }
+    }
 }
 
 const RANKS: [&str; 8] = [
@@ -114,11 +130,16 @@ impl Node {
         // This parser outputs a Vec(&str).
         let parse_node = separated_list0(tag("\t|\t"), take_until("\t|"));
         // Map the Vec(&str) into a Node.
-        map(parse_node, |v: Vec<&str>| Node {
-            tax_id: v[0].to_string(),
-            parent_tax_id: v[1].to_string(),
-            rank: v[2].to_string(),
-            ..Default::default()
+        map(parse_node, |v: Vec<&str>| {
+            let mut columns: Vec<String> = v.iter().map(|s| s.to_string()).collect();
+            columns.resize(13, "".to_string());
+            Node {
+                tax_id: columns[0].clone(),
+                parent_tax_id: columns[1].clone(),
+                rank: columns[2].clone(),
+                columns,
+                ..Default::default()
+            }
         })(input)
     }
 
@@ -200,28 +221,20 @@ impl Node {
 
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let ignore = vec!["names", "scientific_name"];
-        let mut values = vec![];
-        for (field_name, field_value) in self.iter() {
-            if !ignore.contains(&field_name) {
-                //     values.push(format!("{:?}", field_value.to_string()));
-                // }
-                if let Some(string_opt) = field_value.downcast_ref::<Option<String>>() {
-                    if let Some(string) = string_opt.as_deref() {
-                        values.push(format!("{:?}", string));
-                    } else {
-                        values.push("".to_string());
-                    }
-                } else if let Some(string_opt) = field_value.downcast_ref::<u32>() {
-                    values.push(format!("{:?}", string_opt));
-                } else if let Some(string_opt) = field_value.downcast_ref::<String>() {
-                    values.push(string_opt.clone());
-                } else {
-                    values.push("".to_string());
-                }
-            }
+        let mut cols = self.columns.clone();
+        if cols.len() < 13 {
+            cols.resize(13, "".to_string());
         }
-        write!(f, "{}\t|", values.join("\t|\t"))
+        if !cols.is_empty() {
+            cols[0] = self.tax_id.clone();
+        }
+        if cols.len() > 1 {
+            cols[1] = self.parent_tax_id.clone();
+        }
+        if cols.len() > 2 {
+            cols[2] = self.rank.clone();
+        }
+        write!(f, "{}\t|", cols.join("\t|\t"))
     }
 }
 
