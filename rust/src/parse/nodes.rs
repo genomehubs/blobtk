@@ -160,46 +160,100 @@ impl Node {
             "xref".to_string(),
         ];
 
+        #[derive(Default)]
         struct NameSource {
-            pub source: String,
-            pub source_url: String,
+            pub source: Option<String>,
+            pub source_url: Option<String>,
+            pub source_url_stub: Option<String>,
         }
 
         let name_sources = HashMap::from([
             (
                 "ncbi",
                 NameSource {
-                    source: "NCBI Taxonomy".to_string(),
-                    source_url: "https://www.ncbi.nlm.nih.gov/taxonomy".to_string(),
+                    source: Some("NCBI Taxonomy".to_string()),
+                    source_url: Some("https://www.ncbi.nlm.nih.gov/datasets/taxonomy".to_string()),
+                    source_url_stub: Some(
+                        "https://www.ncbi.nlm.nih.gov/datasets/taxonomy/".to_string(),
+                    ),
+                    ..Default::default()
                 },
             ),
             (
                 "gbif",
                 NameSource {
-                    source: "GBIF Backbone Taxonomy".to_string(),
-                    source_url: "https://www.gbif.org/dataset/d7dddbf4-2cf0-4f39-9b2a-bb099caae36c"
-                        .to_string(),
+                    source: Some("GBIF Backbone Taxonomy".to_string()),
+                    source_url: Some("https://www.gbif.org/".to_string()),
+                    source_url_stub: Some("https://www.gbif.org/species/".to_string()),
+                    ..Default::default()
                 },
             ),
             (
                 "ott",
                 NameSource {
-                    source: "Open Tree of Life".to_string(),
-                    source_url: "https://tree.opentreeoflife.org/about/taxonomy".to_string(),
+                    source: Some("Open Tree of Life".to_string()),
+                    source_url: Some("https://tree.opentreeoflife.org/about/taxonomy".to_string()),
+                    source_url_stub: Some(
+                        "https://tree.opentreeoflife.org/taxonomy/browse?id=".to_string(),
+                    ),
+                    ..Default::default()
                 },
             ),
             (
                 "tolid",
                 NameSource {
-                    source: "Tree of Life ID".to_string(),
-                    source_url: "https://treeoflife.id/".to_string(),
+                    source: Some("Tree of Life ID".to_string()),
+                    source_url: Some("https://id.tol.sanger.ac.uk".to_string()),
+                    ..Default::default()
                 },
             ),
             (
                 "ena",
                 NameSource {
-                    source: "ENA Taxonomy".to_string(),
-                    source_url: "https://www.ebi.ac.uk/ena/browser/home".to_string(),
+                    source: Some("ENA Taxonomy".to_string()),
+                    source_url: Some("https://www.ebi.ac.uk/ena/browser/home".to_string()),
+                    source_url_stub: Some(
+                        "https://www.ebi.ac.uk/ena/browser/view/Taxon:".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "worms",
+                NameSource {
+                    source: Some("WoRMS".to_string()),
+                    source_url: Some("https://www.marinespecies.org/".to_string()),
+                    source_url_stub: Some(
+                        "https://www.marinespecies.org/aphia.php?p=taxdetails&id=".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "silva",
+                NameSource {
+                    source: Some("SILVA".to_string()),
+                    source_url: Some("https://www.arb-silva.de/".to_string()),
+                    ..Default::default()
+                },
+            ),
+            (
+                "irmng",
+                NameSource {
+                    source: Some("IRMNG".to_string()),
+                    source_url: Some("https://www.irmng.org/".to_string()),
+                    source_url_stub: Some(
+                        "https://www.irmng.org/aphia.php?p=taxdetails&id=".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "fung",
+                NameSource {
+                    source: Some("Fungidb".to_string()),
+                    source_url: Some("https://fungidb.org/".to_string()),
+                    ..Default::default()
                 },
             ),
         ]);
@@ -212,6 +266,7 @@ impl Node {
             class: Option<String>,
             source: Option<String>,
             source_url: Option<String>,
+            source_url_stub: Option<String>,
         }
 
         let taxon_names: Option<Vec<TaxonName>> = if !taxon_names.is_empty() {
@@ -223,25 +278,31 @@ impl Node {
                         class: name.class,
                         source: None,
                         source_url: None,
+                        source_url_stub: None,
                     });
                     continue;
                 }
                 // split on : to find source
                 let parts: Vec<&str> = name.unique_name.splitn(2, ':').collect();
-                let (source, source_url) = if parts.len() == 2 {
+                let (source, source_url, source_url_stub) = if parts.len() == 2 {
                     if let Some(ns) = name_sources.get(parts[0]) {
-                        (Some(ns.source.clone()), Some(ns.source_url.clone()))
+                        (
+                            ns.source.clone(),
+                            ns.source_url.clone(),
+                            ns.source_url_stub.clone(),
+                        )
                     } else {
-                        (None, None)
+                        (None, None, None)
                     }
                 } else {
-                    (None, None)
+                    (None, None, None)
                 };
                 names_out.push(TaxonName {
                     name: name.name,
                     class: name.class,
                     source,
                     source_url,
+                    source_url_stub,
                 });
             }
             Some(names_out)
