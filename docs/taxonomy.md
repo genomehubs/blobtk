@@ -42,6 +42,7 @@ curl -L https://hosted-datasets.gbif.org/datasets/backbone/current/simple.txt.gz
 $INPUT_DIR/gbif-backbone/simple.txt.gz
 
 # ENA taxonomy extra
+mkdir -p $INPUT_DIR/ena-taxonomy
 $HOME/projects/genomehubs/goat-data/scripts/update-resources/get-ena-taxonomy-extra.py 6447
 ```
 

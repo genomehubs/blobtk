@@ -65,7 +65,7 @@ fn add_new_names(
             tax_id: tax_id.clone(),
             name: name.clone(),
             unique_name,
-            class: Some(name_class.clone()),
+            class: Some(name_class.replace('_', " ")),
             ..Default::default()
         };
 

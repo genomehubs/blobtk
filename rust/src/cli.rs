@@ -513,6 +513,9 @@ pub struct TaxonomyOptions {
     /// Path to output filtered backbone taxonomy
     #[arg(long = "taxdump-out", short = 'O')]
     pub out: Option<PathBuf>,
+    /// Output format for filtered backbone taxonomy
+    #[arg(long = "output-format", short = 'F')]
+    pub output_format: Option<Vec<TaxonomyFormat>>,
     /// Path to YAML format config file
     #[arg(long = "config", short = 'c')]
     pub config_file: Option<PathBuf>,
