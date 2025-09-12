@@ -6,7 +6,7 @@ file:
   source_url: https://gitlab.com/wtsi-grit/darwin-tree-of-life-sample-naming
   tests: tests
 taxon_names:
-  tol_id:
+  tolid_prefix:
     index: 0
   common_name:
     index: 3

@@ -16,7 +16,7 @@ use serde::Serialize;
 use serde_json::Value;
 use struct_iterable::Iterable;
 
-use crate::cli::TaxonomyOptions;
+use crate::cli::{TaxonomyFormat, TaxonomyOptions};
 use crate::io;
 use crate::io::file_reader;
 use crate::parse::lookup::build_fast_lookup;
@@ -86,15 +86,240 @@ impl fmt::Display for Name {
 }
 
 /// A taxonomy node
-#[derive(Clone, Debug, Default, Eq, Iterable, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Eq, Iterable, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Node {
     pub tax_id: String,
     pub parent_tax_id: String,
     pub rank: String,
+    pub columns: Vec<String>,
     pub names: Option<Vec<Name>>,
     pub scientific_name: Option<String>,
     pub row_index: Option<usize>,
     pub raw_row: Option<String>,
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node {
+            tax_id: String::new(),
+            parent_tax_id: String::new(),
+            rank: String::new(),
+            columns: vec!["".to_string(); 13],
+            names: None,
+            scientific_name: None,
+            row_index: None,
+            raw_row: None,
+        }
+    }
+}
+
+impl Node {
+    pub fn to_json(&self, nodes: &Nodes) -> Value {
+        let lineage = nodes.lineage(&"1".to_string(), &self.tax_id);
+        // return
+        // parent, taxon_rank, taxon_names, taxon_id, scientific_name and lineage as json
+        #[derive(Serialize)]
+        struct NodeJson {
+            parent: String,
+            taxon_rank: String,
+            taxon_names: Option<Vec<TaxonName>>,
+            taxon_id: String,
+            scientific_name: Option<String>,
+            lineage: Vec<LineageNode>,
+        }
+        #[derive(Serialize)]
+        struct LineageNode {
+            taxon_id: String,
+            scientific_name: Option<String>,
+            taxon_rank: String,
+            node_depth: u16,
+        }
+        let mut lineage_json: Vec<LineageNode> = Vec::new();
+        lineage_json.push(LineageNode {
+            taxon_id: self.tax_id.clone(),
+            scientific_name: self.scientific_name.clone(),
+            taxon_rank: self.rank.clone(),
+            node_depth: 0u16,
+        });
+        for (i, n) in lineage.iter().rev().enumerate() {
+            lineage_json.push(LineageNode {
+                taxon_id: n.tax_id.clone(),
+                scientific_name: n.scientific_name.clone(),
+                taxon_rank: n.rank.clone(),
+                node_depth: i as u16 + 1u16,
+            });
+        }
+
+        let name_classes: Vec<String> = vec![
+            "scientific name".to_string(),
+            "common name".to_string(),
+            "synonym".to_string(),
+            "genbank common name".to_string(),
+            "merged taxon id".to_string(),
+            "tolid prefix".to_string(),
+            "xref".to_string(),
+        ];
+
+        #[derive(Default)]
+        struct NameSource {
+            pub source: Option<String>,
+            pub source_url: Option<String>,
+            pub source_url_stub: Option<String>,
+        }
+
+        let name_sources = HashMap::from([
+            (
+                "ncbi",
+                NameSource {
+                    source: Some("NCBI Taxonomy".to_string()),
+                    source_url: Some("https://www.ncbi.nlm.nih.gov/datasets/taxonomy".to_string()),
+                    source_url_stub: Some(
+                        "https://www.ncbi.nlm.nih.gov/datasets/taxonomy/".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "gbif",
+                NameSource {
+                    source: Some("GBIF Backbone Taxonomy".to_string()),
+                    source_url: Some("https://www.gbif.org/".to_string()),
+                    source_url_stub: Some("https://www.gbif.org/species/".to_string()),
+                    ..Default::default()
+                },
+            ),
+            (
+                "ott",
+                NameSource {
+                    source: Some("Open Tree of Life".to_string()),
+                    source_url: Some("https://tree.opentreeoflife.org/about/taxonomy".to_string()),
+                    source_url_stub: Some(
+                        "https://tree.opentreeoflife.org/taxonomy/browse?id=".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "tolid",
+                NameSource {
+                    source: Some("Tree of Life ID".to_string()),
+                    source_url: Some("https://id.tol.sanger.ac.uk".to_string()),
+                    ..Default::default()
+                },
+            ),
+            (
+                "ena",
+                NameSource {
+                    source: Some("ENA Taxonomy".to_string()),
+                    source_url: Some("https://www.ebi.ac.uk/ena/browser/home".to_string()),
+                    source_url_stub: Some(
+                        "https://www.ebi.ac.uk/ena/browser/view/Taxon:".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "worms",
+                NameSource {
+                    source: Some("WoRMS".to_string()),
+                    source_url: Some("https://www.marinespecies.org/".to_string()),
+                    source_url_stub: Some(
+                        "https://www.marinespecies.org/aphia.php?p=taxdetails&id=".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "silva",
+                NameSource {
+                    source: Some("SILVA".to_string()),
+                    source_url: Some("https://www.arb-silva.de/".to_string()),
+                    ..Default::default()
+                },
+            ),
+            (
+                "irmng",
+                NameSource {
+                    source: Some("IRMNG".to_string()),
+                    source_url: Some("https://www.irmng.org/".to_string()),
+                    source_url_stub: Some(
+                        "https://www.irmng.org/aphia.php?p=taxdetails&id=".to_string(),
+                    ),
+                    ..Default::default()
+                },
+            ),
+            (
+                "fung",
+                NameSource {
+                    source: Some("Fungidb".to_string()),
+                    source_url: Some("https://fungidb.org/".to_string()),
+                    ..Default::default()
+                },
+            ),
+        ]);
+
+        let taxon_names = self.full_names_by_class(Some(&name_classes));
+
+        #[derive(Serialize)]
+        struct TaxonName {
+            name: String,
+            class: Option<String>,
+            source: Option<String>,
+            source_url: Option<String>,
+            source_url_stub: Option<String>,
+        }
+
+        let taxon_names: Option<Vec<TaxonName>> = if !taxon_names.is_empty() {
+            let mut names_out: Vec<TaxonName> = vec![];
+            for name in taxon_names {
+                if name.unique_name == "" {
+                    names_out.push(TaxonName {
+                        name: name.name,
+                        class: name.class,
+                        source: None,
+                        source_url: None,
+                        source_url_stub: None,
+                    });
+                    continue;
+                }
+                // split on : to find source
+                let parts: Vec<&str> = name.unique_name.splitn(2, ':').collect();
+                let (source, source_url, source_url_stub) = if parts.len() == 2 {
+                    if let Some(ns) = name_sources.get(parts[0]) {
+                        (
+                            ns.source.clone(),
+                            ns.source_url.clone(),
+                            ns.source_url_stub.clone(),
+                        )
+                    } else {
+                        (None, None, None)
+                    }
+                } else {
+                    (None, None, None)
+                };
+                names_out.push(TaxonName {
+                    name: name.name,
+                    class: name.class,
+                    source,
+                    source_url,
+                    source_url_stub,
+                });
+            }
+            Some(names_out)
+        } else {
+            None
+        };
+
+        let node_json = NodeJson {
+            parent: self.parent_tax_id.clone(),
+            taxon_rank: self.rank.clone(),
+            taxon_names,
+            taxon_id: self.tax_id.clone(),
+            scientific_name: self.scientific_name.clone(),
+            lineage: lineage_json,
+        };
+        serde_json::to_value(node_json).unwrap_or(Value::Null)
+    }
 }
 
 const RANKS: [&str; 8] = [
@@ -114,11 +339,16 @@ impl Node {
         // This parser outputs a Vec(&str).
         let parse_node = separated_list0(tag("\t|\t"), take_until("\t|"));
         // Map the Vec(&str) into a Node.
-        map(parse_node, |v: Vec<&str>| Node {
-            tax_id: v[0].to_string(),
-            parent_tax_id: v[1].to_string(),
-            rank: v[2].to_string(),
-            ..Default::default()
+        map(parse_node, |v: Vec<&str>| {
+            let mut columns: Vec<String> = v.iter().map(|s| s.to_string()).collect();
+            columns.resize(13, "".to_string());
+            Node {
+                tax_id: columns[0].clone(),
+                parent_tax_id: columns[1].clone(),
+                rank: columns[2].clone(),
+                columns,
+                ..Default::default()
+            }
         })(input)
     }
 
@@ -180,6 +410,24 @@ impl Node {
         filtered_names
     }
 
+    pub fn full_names_by_class(&self, classes_vec: Option<&Vec<String>>) -> Vec<Name> {
+        let mut filtered_names = vec![];
+        if let Some(names) = self.names.clone() {
+            for name in names {
+                if let Some(classes) = classes_vec {
+                    if let Some(ref class) = name.class {
+                        if classes.contains(class) {
+                            filtered_names.push(name.clone());
+                        }
+                    }
+                } else {
+                    filtered_names.push(name.clone());
+                }
+            }
+        }
+        filtered_names
+    }
+
     pub fn to_taxonomy_section(&self, nodes: &Nodes) -> HashMap<String, String> {
         let mut taxonomy_section = HashMap::new();
         let root_id = "1".to_string();
@@ -200,28 +448,20 @@ impl Node {
 
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let ignore = vec!["names", "scientific_name"];
-        let mut values = vec![];
-        for (field_name, field_value) in self.iter() {
-            if !ignore.contains(&field_name) {
-                //     values.push(format!("{:?}", field_value.to_string()));
-                // }
-                if let Some(string_opt) = field_value.downcast_ref::<Option<String>>() {
-                    if let Some(string) = string_opt.as_deref() {
-                        values.push(format!("{:?}", string));
-                    } else {
-                        values.push("".to_string());
-                    }
-                } else if let Some(string_opt) = field_value.downcast_ref::<u32>() {
-                    values.push(format!("{:?}", string_opt));
-                } else if let Some(string_opt) = field_value.downcast_ref::<String>() {
-                    values.push(string_opt.clone());
-                } else {
-                    values.push("".to_string());
-                }
-            }
+        let mut cols = self.columns.clone();
+        if cols.len() < 13 {
+            cols.resize(13, "".to_string());
         }
-        write!(f, "{}\t|", values.join("\t|\t"))
+        if !cols.is_empty() {
+            cols[0] = self.tax_id.clone();
+        }
+        if cols.len() > 1 {
+            cols[1] = self.parent_tax_id.clone();
+        }
+        if cols.len() > 2 {
+            cols[2] = self.rank.clone();
+        }
+        write!(f, "{}\t|", cols.join("\t|\t"))
     }
 }
 
@@ -288,11 +528,19 @@ impl Nodes {
         leaf_taxon_ids: Option<HashSet<String>>,
         base_id: Option<String>,
         taxdump_path: &PathBuf,
+        format: Vec<TaxonomyFormat>,
         append: bool,
     ) -> () {
         use std::collections::HashSet;
         let nodes_path = io::append_to_path(taxdump_path, "/nodes.dmp");
         let names_path = io::append_to_path(taxdump_path, "/names.dmp");
+        let jsonl_path = io::append_to_path(taxdump_path, "/nodes.jsonl");
+
+        let mut jsonl_writer = if append {
+            io::get_append_writer(&Some(jsonl_path.clone()))
+        } else {
+            io::get_writer(&Some(jsonl_path.clone()))
+        };
 
         let mut nodes_writer = if append {
             io::get_append_writer(&Some(nodes_path.clone()))
@@ -312,8 +560,10 @@ impl Nodes {
             base_id,
             taxdump_path,
             append,
+            &format,
             &mut nodes_writer,
             &mut names_writer,
+            &mut jsonl_writer,
             &mut visited,
         );
     }
@@ -325,8 +575,10 @@ impl Nodes {
         base_id: Option<String>,
         taxdump_path: &PathBuf,
         _append: bool,
+        format: &Vec<TaxonomyFormat>,
         nodes_writer: &mut dyn std::io::Write,
         names_writer: &mut dyn std::io::Write,
+        jsonl_writer: &mut dyn std::io::Write,
         visited: &mut HashSet<String>,
     ) {
         // Find all root nodes if not specified
@@ -358,12 +610,18 @@ impl Nodes {
                 let lineage = self.lineage(&lineage_root_id, &root_id);
                 for anc_node in lineage {
                     if !ancestors.contains(&anc_node.tax_id.clone()) {
-                        writeln!(nodes_writer, "{}", &anc_node).unwrap();
-                        nodes_writer.flush().unwrap();
-                        if let Some(names) = anc_node.names.as_ref() {
-                            for name in names {
-                                writeln!(names_writer, "{}", &name).unwrap();
-                                names_writer.flush().unwrap();
+                        if format.contains(&TaxonomyFormat::JSONL) {
+                            writeln!(jsonl_writer, "{}", anc_node.to_json(self)).unwrap();
+                            jsonl_writer.flush().unwrap();
+                        }
+                        if format.contains(&TaxonomyFormat::NCBI) {
+                            writeln!(nodes_writer, "{}", &anc_node).unwrap();
+                            nodes_writer.flush().unwrap();
+                            if let Some(names) = anc_node.names.as_ref() {
+                                for name in names {
+                                    writeln!(names_writer, "{}", &name).unwrap();
+                                    names_writer.flush().unwrap();
+                                }
                             }
                         }
                         ancestors.insert(anc_node.tax_id.clone());
@@ -371,12 +629,18 @@ impl Nodes {
                 }
             }
             if let Some(root_node) = self.nodes.get(&root_id) {
-                writeln!(nodes_writer, "{}", &root_node).unwrap();
-                nodes_writer.flush().unwrap();
-                if let Some(names) = root_node.names.as_ref() {
-                    for name in names {
-                        writeln!(names_writer, "{}", &name).unwrap();
-                        names_writer.flush().unwrap();
+                if format.contains(&TaxonomyFormat::JSONL) {
+                    writeln!(jsonl_writer, "{}", root_node.to_json(self)).unwrap();
+                    jsonl_writer.flush().unwrap();
+                }
+                if format.contains(&TaxonomyFormat::NCBI) {
+                    writeln!(nodes_writer, "{}", &root_node).unwrap();
+                    nodes_writer.flush().unwrap();
+                    if let Some(names) = root_node.names.as_ref() {
+                        for name in names {
+                            writeln!(names_writer, "{}", &name).unwrap();
+                            names_writer.flush().unwrap();
+                        }
                     }
                 }
                 let mut is_leaf = false;
@@ -400,8 +664,10 @@ impl Nodes {
                             None,
                             taxdump_path,
                             true,
+                            &format,
                             nodes_writer,
                             names_writer,
+                            jsonl_writer,
                             visited,
                         );
                     }
@@ -1082,12 +1348,19 @@ impl Nodes {
     /// Use this when create_taxa is false for large taxonomies (e.g. OTT) to avoid O(N^2) merge cost.
     pub fn merge_names_only(&mut self, new_nodes: &Nodes) -> Result<(), anyhow::Error> {
         let mut name_map: HashMap<String, Vec<Name>> = HashMap::new();
-        for (taxid, node) in &new_nodes.nodes {
+        for (_, node) in &new_nodes.nodes {
             if let Some(names) = &node.names {
-                name_map
-                    .entry(taxid.clone())
-                    .or_insert_with(Vec::new)
-                    .extend(names.clone());
+                // find a name with unique_name starting with "ncbi:" and use that as the key
+                if let Some(name) = names.iter().find(|n| n.unique_name.starts_with("ncbi:")) {
+                    // remove "ncbi:" and use that as the key
+                    let key = name.unique_name.trim_start_matches("ncbi:").to_string();
+                    name_map.entry(key.clone()).or_insert_with(Vec::new).extend(
+                        names.iter().cloned().map(|mut n| {
+                            n.tax_id = key.clone();
+                            n
+                        }),
+                    );
+                }
             }
         }
         self.add_names(&name_map)

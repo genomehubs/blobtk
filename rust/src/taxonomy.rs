@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 
 use anyhow;
 
-use crate::cli;
+use crate::cli::{self};
 use crate::error;
 use crate::io;
 
@@ -69,6 +69,10 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
                 Some(out) => Some(out),
                 None => options.out.clone(),
             },
+            output_format: match taxonomy_options.output_format {
+                Some(output_format) => Some(output_format),
+                None => taxonomy_options.output_format.clone(),
+            },
             xref_label: match taxonomy_options.xref_label {
                 Some(xref_label) => Some(xref_label),
                 None => options.xref_label.clone(),
@@ -111,6 +115,10 @@ pub fn taxdump_to_nodes(
             Some(cli::TaxonomyFormat::GenomeHubs) => {
                 Nodes::from_genomehubs(taxdump, &options, existing)?
             }
+            Some(cli::TaxonomyFormat::NCBI) => {
+                Nodes::from_taxdump(taxdump, options.xref_label.clone())?
+            }
+            Some(cli::TaxonomyFormat::JSONL) => Nodes::new(),
             _ => Nodes::from_taxdump(taxdump, options.xref_label.clone())?,
         };
     } else {
@@ -201,12 +209,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
             // Use fast name-only merge for OTT if create_taxa is false
             if let Some(cli::TaxonomyFormat::OTT) = taxonomy_format {
                 if taxonomy_options.create_taxa == false {
-                    eprintln!(
-                        "Merging nodes by name only for OTT taxonomy: {}",
-                        taxonomy_options.path.as_ref().unwrap().to_string_lossy()
-                    );
                     nodes.merge_names_only(&filtered_new_nodes)?;
-                    dbg!("Merged nodes by name only");
                     continue;
                 }
             }
@@ -281,11 +284,16 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
             .clone()
             .map(|ids| ids.into_iter().collect::<HashSet<_>>());
         let base_taxon_id = options.base_taxon_id.clone();
+        let output_format = options
+            .output_format
+            .clone()
+            .unwrap_or(vec![cli::TaxonomyFormat::NCBI]);
         nodes.write_taxdump(
             root_taxon_ids,
             leaf_taxon_ids,
             base_taxon_id,
             &taxdump_out,
+            output_format,
             false,
         );
     }

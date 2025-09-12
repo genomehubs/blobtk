@@ -55,6 +55,7 @@ fn bin_size_parser(s: &str) -> Result<usize, String> {
 /// Top level arguments to `blobtk`
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
+#[command(subcommand_required = true, arg_required_else_help = true)]
 pub struct Arguments {
     #[clap(subcommand)]
     pub cmd: SubCommand,
@@ -90,6 +91,7 @@ pub enum SubCommand {
         .required(false)
         .args(["bam", "cram"]),
 ))]
+#[command(arg_required_else_help = true)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct DepthOptions {
     /// List of sequence IDs
@@ -126,6 +128,7 @@ pub struct DepthOptions {
         .required(false)
         .args(["bam", "cram"]),
 ))]
+#[command(arg_required_else_help = true)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct FilterOptions {
     // TODO: add option to invert list (use BAM header)
@@ -181,6 +184,7 @@ pub struct FilterOptions {
 
 /// Options to pass to `blobtk index`
 #[derive(Parser, Debug)]
+#[command(arg_required_else_help = true)]
 // #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct IndexOptions {
     /// Path to BlobDir directory containing files to index
@@ -304,6 +308,7 @@ fn less_than_5(s: &str) -> Result<f64, String> {
 
 /// Options to pass to `blobtk plot`
 #[derive(Parser, Debug, Default)]
+#[command(arg_required_else_help = true)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct PlotOptions {
     /// Path to BlobDir directory
@@ -454,7 +459,7 @@ impl RoundingStrategyWrapper {
 }
 
 /// Valid taxonomy formats
-#[derive(ValueEnum, Parser, Serialize, Deserialize, Clone, Debug)]
+#[derive(ValueEnum, Parser, Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TaxonomyFormat {
     /// NCBI taxdump containing nodes.dmp, names.dmp and merged.dmp
@@ -467,6 +472,8 @@ pub enum TaxonomyFormat {
     OTT,
     /// GenomeHubs TSV/YAML file pair
     GenomeHubs,
+    /// GenomeHubs compatible JSONL file
+    JSONL,
 }
 
 impl std::fmt::Display for TaxonomyFormat {
@@ -477,6 +484,7 @@ impl std::fmt::Display for TaxonomyFormat {
             TaxonomyFormat::ENA => "ena",
             TaxonomyFormat::OTT => "ott",
             TaxonomyFormat::GenomeHubs => "genomehubs",
+            TaxonomyFormat::JSONL => "jsonl",
         };
         write!(f, "{}", s)
     }
@@ -484,6 +492,7 @@ impl std::fmt::Display for TaxonomyFormat {
 
 /// Options to pass to `blobtk taxonomy`
 #[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
+#[command(arg_required_else_help = true)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct TaxonomyOptions {
     /// Path to backbone taxonomy file/directory
@@ -504,6 +513,9 @@ pub struct TaxonomyOptions {
     /// Path to output filtered backbone taxonomy
     #[arg(long = "taxdump-out", short = 'O')]
     pub out: Option<PathBuf>,
+    /// Output format for filtered backbone taxonomy
+    #[arg(long = "output-format", short = 'F')]
+    pub output_format: Option<Vec<TaxonomyFormat>>,
     /// Path to YAML format config file
     #[arg(long = "config", short = 'c')]
     pub config_file: Option<PathBuf>,
@@ -548,6 +560,7 @@ fn default_port() -> u16 {
 
 /// Options to pass to `blobtk validate`
 #[derive(Default, Parser, Serialize, Deserialize, Clone, Debug)]
+#[command(arg_required_else_help = true)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct ValidateOptions {
     /// Path to backbone taxonomy file/directory

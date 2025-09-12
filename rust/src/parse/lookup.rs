@@ -722,6 +722,7 @@ pub fn match_taxonomy_section(
             }
         }
     }
+
     let assigned_taxon;
     match taxon_match.rank_status.clone() {
         Some(MatchStatus::Match(taxon)) => {
