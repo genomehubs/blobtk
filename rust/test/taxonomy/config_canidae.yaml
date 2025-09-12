@@ -1,5 +1,8 @@
 path: test/taxonomy/canidae/ncbi
 out: test/taxonomy/canidae/combined
+output_format:
+  - jsonl
+  - ncbi
 taxonomy_format: ncbi
 root_taxon_id:
   - 33208
@@ -12,21 +15,22 @@ taxonomies:
   - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
     taxonomy_format: ena
     xref_label: ena
-  #
   - path: test/taxonomy/canidae/genomehubs/tolids.names.yaml
     taxonomy_format: genomehubs
     name_classes:
       - scientific name
+      - synonym
+      - merged taxon id
     xref_label: tolid
     create_taxa: true
-  - path: test/taxonomy/canidae/gbif
-    taxonomy_format: ncbi
-    root_taxon_id:
-      - 9701
-    base_taxon_id: 1
-    name_classes:
-      - scientific name
-    xref_label: gbif
+  # - path: test/taxonomy/canidae/gbif
+  #   taxonomy_format: ncbi
+  #   root_taxon_id:
+  #     - 9701
+  #   base_taxon_id: 1
+  #   name_classes:
+  #     - scientific name
+  #   xref_label: gbif
   - path: test/taxonomy/ott
     taxonomy_format: ott
     root_taxon_id:
@@ -34,4 +38,6 @@ taxonomies:
     base_taxon_id: 770319
     name_classes:
       - scientific name
+      - synonym
+      - merged taxon id
     xref_label: ott
