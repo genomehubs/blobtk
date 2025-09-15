@@ -258,6 +258,8 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                     .as_ref()
                     .map(|p| p.clone())
                     .unwrap_or_else(|| std::path::PathBuf::from("."));
+                // ensure the output directory exists
+                std::fs::create_dir_all(&out_dir).expect("Unable to create output directory");
                 let format_str = taxonomy_format
                     .as_ref()
                     .map(|f| format!("{}", f).to_lowercase())
