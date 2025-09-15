@@ -34,37 +34,37 @@ pub fn build_lookup(
 
     for (tax_id, node) in nodes.nodes.iter() {
         progress_bar.inc(1);
-        if rank_set.contains(node.rank.as_str()) {
-            let lineage = nodes.lineage(&"1".to_string(), tax_id);
-            let names = node.names_by_class(Some(&name_classes), true).clone();
-            for n in lineage.iter().rev() {
-                let n_names = n.names_by_class(Some(&name_classes), true);
-                for name in names.iter() {
-                    for n_name in n_names.iter() {
-                        if higher_rank_set.contains(n.rank.as_str()) {
-                            let key = match rank_letter {
-                                true => format!(
-                                    "{}:{}:{}:{}",
-                                    node.rank_letter(),
-                                    name,
-                                    n.rank_letter(),
-                                    n_name
-                                ),
-                                false => format!("{}:{}", name, n_name),
-                            };
-                            match table.entry(key) {
-                                Entry::Vacant(e) => {
-                                    e.insert(vec![node.tax_id()]);
-                                }
-                                Entry::Occupied(mut e) => {
-                                    e.get_mut().push(node.tax_id());
-                                }
-                            }
+        // if rank_set.contains(node.rank.as_str()) {
+        let lineage = nodes.lineage(&"1".to_string(), tax_id);
+        let names = node.names_by_class(Some(&name_classes), true).clone();
+        for n in lineage.iter().rev() {
+            let n_names = n.names_by_class(Some(&name_classes), true);
+            for name in names.iter() {
+                for n_name in n_names.iter() {
+                    // if higher_rank_set.contains(n.rank.as_str()) {
+                    let key = match rank_letter {
+                        true => format!(
+                            "{}:{}:{}:{}",
+                            node.rank_letter(),
+                            name,
+                            n.rank_letter(),
+                            n_name
+                        ),
+                        false => format!("{}:{}", name, n_name),
+                    };
+                    match table.entry(key) {
+                        Entry::Vacant(e) => {
+                            e.insert(vec![node.tax_id()]);
+                        }
+                        Entry::Occupied(mut e) => {
+                            e.get_mut().push(node.tax_id());
                         }
                     }
+                    // }
                 }
             }
         }
+        // }
     }
     progress_bar.finish();
     table
