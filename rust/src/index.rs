@@ -591,8 +591,9 @@ fn per_contig_values(
         let mut _busco_counts = HashMap::new();
         for busco in busco_list {
             let field_id = format!("{}_count", busco.2);
-            let busco_values = blobdir::parse_field_int(field_id.clone(), &blobdir_path)?;
-            _busco_counts.insert(field_id.clone(), busco_values);
+            if let Ok(busco_values) = blobdir::parse_field_int(field_id.clone(), &blobdir_path) {
+                _busco_counts.insert(field_id.clone(), busco_values);
+            }
         }
         Some(_busco_counts)
     } else {
@@ -671,8 +672,11 @@ fn per_window_values(
             let field_name = format!("{}_count", busco.2);
             let field_id = get_window_id(&field_name, window_size);
             let busco_values =
-                blobdir::parse_field_int_windows(field_id.clone(), &blobdir_path, None)?;
-            _busco_counts.insert(field_name, busco_values.0);
+                match blobdir::parse_field_int_windows(field_id.clone(), &blobdir_path, None) {
+                    Ok(values) => values.0,
+                    Err(_) => continue,
+                };
+            _busco_counts.insert(field_name, busco_values);
         }
         Some(_busco_counts)
     } else {
@@ -1328,15 +1332,44 @@ fn parse_busco(
 
     let span = sequences.values().map(|f| f.length).sum::<usize>();
     // extract lineage from busco_dir matching pattern (\w+_odb\d+)
-    let regex = regex::Regex::new(r"(\w+_odb\d+)").unwrap();
-    let lineage =
-        if let Some(captures) = regex.captures(busco_dir.file_name().unwrap().to_str().unwrap()) {
-            captures.get(0).unwrap().as_str().to_string()
+    // the lineage may end with _metaeuk and this should be discarded when setting the lineage variable
+    let regex = regex::Regex::new(r"(\w+_odb\d+)(_metaeuk|_augustus)?").unwrap();
+    // If busco_dir ends with "full_table.tsv" or "full_table.tsv.gz", use its parent directory
+    let mut full_table_name = "full_table.tsv.gz";
+    let (busco_dir_name, mut busco_dir_path) = {
+        let file_name = busco_dir.file_name().unwrap().to_str().unwrap();
+        if file_name == "full_table.tsv" || file_name == "full_table.tsv.gz" {
+            full_table_name = file_name;
+            (
+                busco_dir
+                    .parent()
+                    .unwrap()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                busco_dir.parent().unwrap().to_path_buf(),
+            )
         } else {
-            return Err(anyhow::anyhow!("No matching lineage found in busco_dir"));
-        };
+            (file_name.to_string(), busco_dir.clone())
+        }
+    };
+    let lineage;
+    if let Some(captures) = regex.captures(&busco_dir_name) {
+        lineage = captures.get(1).unwrap().as_str().to_string();
+        // if second capture group then add a subdirectory to busco_dir_path
+        if let Some(_subdir) = captures.get(2) {
+            busco_dir_path = busco_dir_path.join(format!("run_{}", lineage));
+        }
+    } else {
+        return Err(anyhow::anyhow!(
+            "No matching lineage found in busco_dir: {:?}",
+            busco_dir
+        ));
+    };
     let full_table_reader = get_csv_reader(
-        &Some(busco_dir.join("full_table.tsv.gz")),
+        &Some(busco_dir_path.join(full_table_name)),
         b'\t',
         true,
         None,
@@ -1351,11 +1384,136 @@ fn parse_busco(
         full_table_reader,
     );
 
-    let summary_path = busco_dir.join("short_summary.json");
-    let summary = file_reader(summary_path)?;
-    let summary_reader = std::io::BufReader::new(summary);
-    let summary: BuscoSummary = serde_json::from_reader(summary_reader)?;
-    // let busco_results = summary.results;
+    let summary_path = busco_dir_path.join("short_summary.json");
+    let summary = match file_reader(summary_path.clone()) {
+        Ok(file) => {
+            let summary_reader = std::io::BufReader::new(file);
+            match serde_json::from_reader(summary_reader) {
+                Ok(summary) => Ok(summary),
+                Err(_) => {
+                    // Try reading short_summary.txt instead
+                    let txt_path = busco_dir_path.join("short_summary.txt");
+                    match file_reader(txt_path) {
+                        Ok(txt_file) => {
+                            let txt_reader = std::io::BufReader::new(txt_file);
+                            parse_busco_txt_summary(txt_reader)
+                        }
+                        Err(e) => Err(anyhow::anyhow!("Failed to read summary.txt: {}", e)),
+                    }
+                }
+            }
+        }
+        Err(_) => {
+            // Try reading short_summary.txt instead
+            let txt_path = busco_dir_path.join("short_summary.txt");
+            match file_reader(txt_path) {
+                Ok(txt_file) => {
+                    let txt_reader = std::io::BufReader::new(txt_file);
+                    parse_busco_txt_summary(txt_reader)
+                }
+                Err(e) => Err(anyhow::anyhow!("Failed to read summary.txt: {}", e)),
+            }
+        }
+    }?;
+
+    // Custom parser for BUSCO txt summary format
+    fn parse_busco_txt_summary<R: BufRead>(mut reader: R) -> Result<BuscoSummary, anyhow::Error> {
+        use regex::Regex;
+        let mut version = String::new();
+        let mut lineage_name = String::new();
+        let mut lineage_creation_date = String::new();
+        let mut lineage_number_of_buscos = 0usize;
+        let mut lineage_number_of_species = 0usize;
+        let mut hmmsearch = String::new();
+        let mut metaeuk = String::new();
+        let mut summary_line = String::new();
+        let mut n_markers = 0usize;
+        let mut complete = 0.0;
+        let mut single_copy = 0.0;
+        let mut multi_copy = 0.0;
+        let mut fragmented = 0.0;
+        let mut missing = 0.0;
+        let mut domain = String::new();
+        let mut number_of_scaffolds = 0usize;
+        let mut number_of_contigs = 0usize;
+        let mut total_length = 0usize;
+        let mut percent_gaps = 0.0;
+        let mut scaffold_n50 = 0usize;
+        let mut contigs_n50 = 0usize;
+
+        let re_version = Regex::new(r"^# BUSCO version is: (.+)").unwrap();
+        let re_lineage = Regex::new(r"^# The lineage dataset is: ([^(]+) \(Creation date: ([^,]+), number of genomes: (\d+), number of BUSCOs: (\d+)\)").unwrap();
+        let re_summary =
+            Regex::new(r"C:([\d.]+)%\[S:([\d.]+)%,D:([\d.]+)%\],F:([\d.]+)%,M:([\d.]+)%,n:(\d+)")
+                .unwrap();
+        let re_hmmsearch = Regex::new(r"hmmsearch: ([^\s]+)").unwrap();
+        let re_metaeuk = Regex::new(r"metaeuk: ([^\s]+)").unwrap();
+
+        for line in reader.lines() {
+            let line = line?;
+            if line.starts_with('#') {
+                if let Some(caps) = re_version.captures(&line) {
+                    version = caps[1].to_string();
+                }
+                if let Some(caps) = re_lineage.captures(&line) {
+                    lineage_name = caps[1].trim().to_string();
+                    lineage_creation_date = caps[2].trim().to_string();
+                    lineage_number_of_species = caps[3].parse().unwrap_or(0);
+                    lineage_number_of_buscos = caps[4].parse().unwrap_or(0);
+                }
+            } else if line.contains("Results:") || line.trim().is_empty() {
+                continue;
+            } else if re_summary.is_match(&line) {
+                summary_line = line.trim().to_string();
+                if let Some(caps) = re_summary.captures(&line) {
+                    complete = caps[1].parse().unwrap_or(0.0);
+                    single_copy = caps[2].parse().unwrap_or(0.0);
+                    multi_copy = caps[3].parse().unwrap_or(0.0);
+                    fragmented = caps[4].parse().unwrap_or(0.0);
+                    missing = caps[5].parse().unwrap_or(0.0);
+                    n_markers = caps[6].parse().unwrap_or(0);
+                }
+            } else if let Some(caps) = re_hmmsearch.captures(&line) {
+                hmmsearch = caps[1].to_string();
+            } else if let Some(caps) = re_metaeuk.captures(&line) {
+                metaeuk = caps[1].to_string();
+            }
+        }
+
+        // Populate BuscoResults
+        let results = BuscoResults {
+            complete,
+            single_copy,
+            multi_copy,
+            fragmented,
+            missing,
+            n_markers,
+            domain: lineage_name.clone(),
+            number_of_scaffolds,
+            number_of_contigs,
+            total_length,
+            percent_gaps,
+            scaffold_n50,
+            contigs_n50,
+        };
+        let lineage_dataset = BuscoLineageDataset {
+            name: lineage_name,
+            creation_date: lineage_creation_date,
+            number_of_buscos: lineage_number_of_buscos,
+            number_of_species: lineage_number_of_species,
+        };
+        let versions = BuscoVersions {
+            hmmsearch,
+            bbtools: String::new(),
+            metaeuk,
+            busco: version,
+        };
+        Ok(BuscoSummary {
+            results,
+            lineage_dataset,
+            versions,
+        })
+    }
 
     let busco_stats = BuscoStats::from_summary(
         taxon_id.clone(),

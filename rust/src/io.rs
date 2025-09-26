@@ -185,16 +185,25 @@ pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
         .spawn()
         .expect("Failed to start SSH command");
 
-    let stdout = process.stdout.expect("Failed to capture stdout");
+    let stdout = process
+        .stdout
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to capture stdout"))?;
     let mut buffer = [0u8; 2];
     let mut stdout_reader = BufReader::new(stdout);
-    io::Read::read_exact(&mut stdout_reader, &mut buffer).unwrap();
-    let is_gzipped = buffer == [0x1F, 0x8B];
-    let stdout = io::Read::chain(std::io::Cursor::new(buffer), stdout_reader);
-    if is_gzipped {
-        Ok(Box::new(BufReader::new(GzDecoder::new(stdout))))
-    } else {
-        Ok(Box::new(BufReader::new(stdout)))
+    match io::Read::read_exact(&mut stdout_reader, &mut buffer) {
+        Ok(_) => {
+            let is_gzipped = buffer == [0x1F, 0x8B];
+            let stdout = io::Read::chain(std::io::Cursor::new(buffer), stdout_reader);
+            if is_gzipped {
+                Ok(Box::new(BufReader::new(GzDecoder::new(stdout))))
+            } else {
+                Ok(Box::new(BufReader::new(stdout)))
+            }
+        }
+        Err(e) => Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            format!("Failed to read from SSH output: {}", e),
+        )),
     }
 }
 
