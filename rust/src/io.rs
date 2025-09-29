@@ -58,6 +58,13 @@ pub fn get_list(file_path: &Option<PathBuf>) -> HashSet<Vec<u8>> {
 }
 
 pub fn get_file_writer(file_path: &PathBuf, append: bool) -> Box<dyn Write> {
+    if let Err(e) = create_dir_all(file_path.parent().unwrap()) {
+        panic!(
+            "couldn't create directory {}: {}",
+            file_path.parent().unwrap().display(),
+            e
+        );
+    }
     let file = if append {
         match OpenOptions::new().append(true).open(file_path) {
             Err(why) => panic!("couldn't open {}: {}", file_path.display(), why),
@@ -216,28 +223,40 @@ pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
         return ssh_file_reader(&path.to_string_lossy());
     }
 
-    let file = File::open(&path)?;
+    let file = File::open(&path);
 
     if path.extension() == Some(OsStr::new("gz")) {
-        // Check gzip magic bytes
-        let mut magic = [0u8; 2];
-        let mut f = file.try_clone()?;
-        use std::io::Read;
-        f.read_exact(&mut magic)?;
-        if magic != [0x1F, 0x8B] {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "File {} has .gz extension but is not a valid gzip file (magic bytes: {:x?})",
-                    path.display(),
-                    magic
-                ),
-            ));
+        match file {
+            Ok(f) => {
+                // Check gzip magic bytes
+                let mut magic = [0u8; 2];
+                let mut f_clone = f.try_clone()?;
+                use std::io::Read;
+                f_clone.read_exact(&mut magic)?;
+                if magic != [0x1F, 0x8B] {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!(
+                            "File {} has .gz extension but is not a valid gzip file (magic bytes: {:x?})",
+                            path.display(),
+                            magic
+                        ),
+                    ));
+                }
+                // Re-open for actual reading
+                let file = File::open(&path)?;
+                Ok(Box::new(BufReader::new(GzDecoder::new(file))))
+            }
+            Err(_) => {
+                // Try unzipped file
+                let mut unzipped_path = path.clone();
+                unzipped_path.set_extension("");
+                let file = File::open(&unzipped_path)?;
+                Ok(Box::new(BufReader::new(file)))
+            }
         }
-        // Re-open for actual reading
-        let file = File::open(&path)?;
-        Ok(Box::new(BufReader::new(GzDecoder::new(file))))
     } else {
+        let file = file?;
         Ok(Box::new(BufReader::new(file)))
     }
 }
