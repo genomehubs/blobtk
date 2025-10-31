@@ -724,7 +724,7 @@ fn set_linear_ticks(
         match status {
             TickStatus::Major => {
                 let mut value = first_tick;
-                while value <= *max_value + step * 0.5 {
+                while value <= *max_value {
                     let label = format_si(&value, 3, None);
                     ticks.push(set_tick(value, label, &domain, &range, &status, &scale));
                     value += step;

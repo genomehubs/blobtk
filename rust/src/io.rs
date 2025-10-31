@@ -277,6 +277,7 @@ pub fn get_csv_reader(
     skip_lines: usize,
     flexible: bool,
 ) -> csv::Reader<Box<dyn BufRead>> {
+    dbg!(&file_path);
     let file_reader =
         file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
     // Skip the first `skip_lines` lines

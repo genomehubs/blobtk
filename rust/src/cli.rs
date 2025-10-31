@@ -408,6 +408,9 @@ pub struct PlotOptions {
     /// [experimental] Flag to show busco numbers instead of percentages in snail plot legend
     #[arg(long = "busco-numbers", default_value_t = false)]
     pub busco_numbers: bool,
+    /// [experimental] Flag to show minimal snail plot as assembly badge
+    #[arg(long = "badge", default_value_t = false)]
+    pub badge: bool,
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
