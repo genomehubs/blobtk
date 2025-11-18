@@ -85,9 +85,12 @@ pub fn save_png(document: &Document, options: &PlotOptions) {
     pixmap.save_png(options.output.as_str()).unwrap();
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Suffix {
     PNG,
     SVG,
+    JSON,
+    YAML,
 }
 
 impl FromStr for Suffix {
@@ -96,6 +99,8 @@ impl FromStr for Suffix {
         match input {
             "png" => Ok(Suffix::PNG),
             "svg" => Ok(Suffix::SVG),
+            "json" => Ok(Suffix::JSON),
+            "yaml" => Ok(Suffix::YAML),
             _ => Err(()),
         }
     }
@@ -168,12 +173,26 @@ pub fn plot_snail(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<()
         record_type,
         &options,
     );
-    let document: Document = snail::svg(&snail_stats, &options);
-    save_by_suffix(options, document)?;
-    Ok(())
+    let suffix = get_suffix(options)?;
+    match suffix {
+        Suffix::JSON => {
+            serde_json::to_writer_pretty(std::fs::File::create(&options.output)?, &snail_stats)?;
+            return Ok(());
+        }
+        Suffix::YAML => {
+            serde_yaml::to_writer(std::fs::File::create(&options.output)?, &snail_stats)?;
+            return Ok(());
+        }
+        _ => {
+            // For SVG/PNG, continue to create the document and save
+            let document: Document = snail::svg(&snail_stats, &options);
+            save_by_suffix(options, document)?;
+            Ok(())
+        }
+    }
 }
 
-fn save_by_suffix(options: &PlotOptions, document: Document) -> Result<(), error::Error> {
+fn get_suffix(options: &PlotOptions) -> Result<Suffix, error::Error> {
     let output_str = options.output.as_str();
     let suffix_str = PathBuf::from(output_str)
         .extension()
@@ -181,11 +200,16 @@ fn save_by_suffix(options: &PlotOptions, document: Document) -> Result<(), error
         .to_str()
         .unwrap()
         .to_string();
-    let suffix = Suffix::from_str(&suffix_str);
+    Suffix::from_str(&suffix_str).map_err(|_| error::Error::InvalidImageSuffix(suffix_str))
+}
+
+fn save_by_suffix(options: &PlotOptions, document: Document) -> Result<(), error::Error> {
+    let suffix = get_suffix(options)?;
+
     match suffix {
-        Ok(Suffix::PNG) => save_png(&document, &options),
-        Ok(Suffix::SVG) => save_svg(&document, &options),
-        Err(_) => return Err(error::Error::InvalidImageSuffix(suffix_str)),
+        Suffix::PNG => save_png(&document, &options),
+        Suffix::SVG => save_svg(&document, &options),
+        _ => return Err(error::Error::InvalidImageSuffix(format!("{:?}", suffix))),
     };
     Ok(())
 }

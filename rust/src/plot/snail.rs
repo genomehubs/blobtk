@@ -53,6 +53,12 @@ pub struct SnailStats {
     span: usize,
     #[serde(rename = "auN")]
     aun: usize,
+    #[serde(rename = "auNn")]
+    aun_n: usize,
+    #[serde(rename = "rauN")]
+    raun: f64,
+    #[serde(rename = "rauNn")]
+    raun_n: f64,
     #[serde(rename = "ATGC")]
     atgc: usize,
     #[serde(rename = "GC", with = "compact_float")]
@@ -84,6 +90,15 @@ impl SnailStats {
     }
     pub fn aun(&self) -> usize {
         self.aun
+    }
+    pub fn aun_n(&self) -> usize {
+        self.aun_n
+    }
+    pub fn raun(&self) -> f64 {
+        self.raun
+    }
+    pub fn raun_n(&self) -> f64 {
+        self.raun_n
     }
     pub fn atgc(&self) -> usize {
         self.atgc
@@ -162,7 +177,16 @@ pub fn snail_stats(
 ) -> SnailStats {
     let span = length_values.iter().sum();
     let sum_of_squares: usize = length_values.iter().map(|&x| x * x).sum();
+    let sum_of_squares_atgc: usize = length_values
+        .iter()
+        .zip(ncount_values.iter())
+        .map(|(&len, &n)| {
+            let atgc = len.saturating_sub(n);
+            atgc * atgc
+        })
+        .sum::<usize>();
     let aun = sum_of_squares / span;
+    let aun_n = sum_of_squares_atgc / span;
     let n = ncount_values.iter().sum();
     let mut new_vals = vec![];
     let busco_total = match busco_total {
@@ -185,6 +209,8 @@ pub fn snail_stats(
     let atgc = span - n;
     let segment = span / options.segments;
     let order = utils::indexed_sort(&length_values);
+    let raun = aun as f64 / length_values[order[0]] as f64;
+    let raun_n = aun_n as f64 / length_values[order[0]] as f64;
     // TODO: check span > segments
     let mut position: usize = 0;
     let mut binned_gcs: Vec<SummaryStats> = vec![];
@@ -254,6 +280,9 @@ pub fn snail_stats(
     SnailStats {
         span,
         aun,
+        aun_n,
+        raun,
+        raun_n,
         atgc,
         gc_proportion: gc_span / span as f64,
         at_proportion: at_span / span as f64,
@@ -311,7 +340,7 @@ pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOption
     });
     entries.push(LegendEntry {
         title: format!(
-            "{} length (total {}; auN {})",
+            "{} length (total {} | auN {})",
             titlecase(record),
             scaffold_length,
             aun
@@ -854,6 +883,18 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
     let scaf_stats_legend = scaffold_stats_legend(&snail_stats, &options)
         .set("transform", format!("translate({},{})", 5, 25));
 
+    let score_legend = if options.show_score {
+        legend_group(
+            format!("Score: {}", format_si(&snail_stats.raun_n(), 3, None)),
+            vec![],
+            None,
+            1,
+        )
+        .set("transform", format!("translate({},{})", 433.7, 35))
+    } else {
+        Group::new()
+    };
+
     let comp_stats_legend = composition_stats_legend(&snail_stats, &options)
         .set("transform", format!("translate({},{})", 835, 900));
 
@@ -949,6 +990,11 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
         })
         .add(if !as_badge {
             scaf_stats_legend
+        } else {
+            Group::new()
+        })
+        .add(if !as_badge {
+            score_legend
         } else {
             Group::new()
         })

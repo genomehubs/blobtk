@@ -7,6 +7,7 @@ import re
 import subprocess
 
 import requests
+import yaml
 
 
 def order_of_magnitude(number):
@@ -109,7 +110,7 @@ def select_representative_assemblies(data, seed=42):
     return representatives
 
 
-def draw_badges(representatives, directory="figure_2"):
+def draw_badges(representatives, directory="figure4"):
     os.makedirs(directory, exist_ok=True)
     for rep in representatives:
         if rep["blobtoolkit_id"] is None:
@@ -132,51 +133,105 @@ def draw_badges(representatives, directory="figure_2"):
             f"{directory}/{rep['assembly_id']}_snail_badge.svg",
         ]
         subprocess.run(cmd)
+        cmd[-1] = f"{directory}/{rep['assembly_id']}_snail_badge.yaml"
+        subprocess.run(cmd)
 
 
-def make_badge_grid(representatives, directory="figure_2"):
+def replace_svg_tag_with_group(svg_content, translate_x, translate_y):
+    # Replace the entire <svg ...> opening tag with <g transform="...">
+    return re.sub(
+        r"<svg[^>]*?>",
+        f'<g transform="translate({translate_x},{translate_y})">',
+        svg_content,
+        count=1,
+    ).replace("</svg>", "</g>")
+
+
+def make_badge_grid(representatives, directory="figure4"):
     os.makedirs(directory, exist_ok=True)
-    grid_svg_path = f"{directory}/figure_2_snail_badge_grid.svg"
+    grid_svg_path = f"{directory}/figure4_snail_badge_grid.svg"
     print(f"Making badge grid at {grid_svg_path}")
-    badge_groups = []
+    with open("figure4_blank_grid_no_letters.svg", "r") as f:
+        blank_grid_svg = f.read()
+    badge_groups = [replace_svg_tag_with_group(blank_grid_svg, 0, 0)]
     table_rows = []
     for rep in representatives:
         badge_path = f"{directory}/{rep['assembly_id']}_snail_badge.svg"
+        yaml_path = f"{directory}/{rep['assembly_id']}_snail_badge.yaml"
         if os.path.exists(badge_path):
             # read badge file and replace svg wrapper with group
             # translate according to bin position
             translate_x = rep["x_bin"] * 1000
-            translate_y = (5 - rep["y_bin"]) * 1000
+            translate_y = (5 - rep["y_bin"]) * 1000 - 25
             with open(badge_path, "r") as f:
                 badge_svg = f.read()
-            # Replace the entire <svg ...> opening tag with <g transform="...">
-            badge_svg = re.sub(
-                r"<svg[^>]*>",
-                f'<g transform="translate({translate_x},{translate_y})">',
-                badge_svg,
-                count=1,
-            )
-            badge_svg = badge_svg.replace("</svg>", "</g>")
+            badge_svg = replace_svg_tag_with_group(badge_svg, translate_x, translate_y)
             badge_groups.append(badge_svg)
+            # read yaml file to get fields for table
+            with open(yaml_path, "r") as f:
+                yaml_content = yaml.safe_load(f)
+            auN = yaml_content.get("auN")
+            longest_scaffold = yaml_content.get("scaffolds")[0]
+            n_proportion = yaml_content.get("n_proportion", 0)
+            scaffold_n90 = yaml_content.get("binned_scaffold_lengths")[900]
+            rauN = yaml_content.get("rauN")
+            auNn = yaml_content.get("auNn")
+            rauNn = yaml_content.get("rauNn")
+
+            # table_rows.append(
+            #     {
+            #         "x_bin": rep["x_bin"],
+            #         "y_bin": rep["y_bin"],
+            #         **rep["fields"],
+            #         "auN": auN,
+            #         "longest_scaffold": longest_scaffold,
+            #         "n_proportion": n_proportion,
+            #         "rauN": rauN,
+            #         "auNn": auNn,
+            #         "rauNn": rauNn,
+            #         "blobtoolkit_id": rep["blobtoolkit_id"],
+            #     }
+            # )
             table_rows.append(
                 {
-                    "x_bin": rep["x_bin"],
-                    "y_bin": rep["y_bin"],
-                    **rep["fields"],
-                    "blobtoolkit_id": rep["blobtoolkit_id"],
+                    "accession": rep["fields"].get("assembly_id"),
+                    "scientific name": rep["fields"].get("scientific_name"),
+                    "assembly level": rep["fields"].get("assembly_level"),
+                    "assembly span (Mbp)": int(rep["fields"].get("assembly_span", 0))
+                    / 1_000_000,
+                    "contig N50 (Mbp)": int(rep["fields"].get("contig_n50", 0))
+                    / 1_000_000,
+                    "scaffold N50 (Mbp)": int(rep["fields"].get("scaffold_n50", 0))
+                    / 1_000_000,
+                    "scaffold N90 (Mbp)": int(
+                        scaffold_n90 if scaffold_n90 is not None else 0
+                    )
+                    / 1_000_000,
+                    "contig bin": rep["y_bin"] + 3,
+                    "scaffold bin": rep["x_bin"] + 4,
+                    "longest_scaffold (Mbp)": longest_scaffold / 1_000_000,
+                    "n_proportion": n_proportion,
+                    "auN (Mbp)": auN / 1_000_000,
+                    "relative auN": rauN,
+                    "auN without Ns (Mbp)": auNn / 1_000_000,
+                    "relative rauN without Ns": rauNn,
+                    "BlobToolKit ID": rep["blobtoolkit_id"],
                 }
             )
 
     # Write the badge grid SVG file
     with open(grid_svg_path, "w") as f:
         f.write(
-            '<svg xmlns="http://www.w3.org/2000/svg" height="6000" width="6000" viewbox="0 0 6000 6000">\n'
+            '<svg xmlns="http://www.w3.org/2000/svg" height="6503.168" width="6615.657"'
+            ' viewbox="0 0 6615.657 6503.168" preserveAspectRatio="xMinYMin meet">\n'
         )
+        f.write('<g transform="translate(609.988, 5.669)">\n')
         f.write("\n".join(badge_groups))
+        f.write("</g>\n")
         f.write("</svg>\n")
 
     # Write the table of assemblies
-    table_path = f"{directory}/figure_2_snail_badge_table.tsv"
+    table_path = f"{directory}/figure4_snail_badge_table.tsv"
     with open(table_path, "w") as f:
         # Write header
         if table_rows:
@@ -189,8 +244,8 @@ def make_badge_grid(representatives, directory="figure_2"):
 def main():
     data = fetch_goat_data()
     representatives = select_representative_assemblies(data, seed=1031)
-    draw_badges(representatives, "figure_2")
-    make_badge_grid(representatives, "figure_2")
+    # draw_badges(representatives, "figure4")
+    make_badge_grid(representatives, "figure4")
 
 
 if __name__ == "__main__":

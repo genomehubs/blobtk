@@ -411,6 +411,9 @@ pub struct PlotOptions {
     /// [experimental] Flag to show minimal snail plot as assembly badge
     #[arg(long = "badge", default_value_t = false)]
     pub badge: bool,
+    /// [experimental] Flag to show snail score in snail plot legend
+    #[arg(long = "show-score", default_value_t = false)]
+    pub show_score: bool,
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
