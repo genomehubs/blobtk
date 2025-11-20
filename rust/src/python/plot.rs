@@ -57,6 +57,8 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
     let palette = extract_to_option_palette(py, &map, "palette");
     let color = extract_to_option_vec_string(py, &map, "color");
     let rounding = extract_to_option_rounding_strategy(py, &map, "rounding");
+    let badge = extract_to_bool(py, &map, "badge");
+    let show_score = extract_to_bool(py, &map, "show_score");
     PlotOptions {
         blobdir,
         view,
@@ -90,6 +92,8 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         palette,
         color,
         rounding,
+        badge,
+        show_score,
     }
 }
 
