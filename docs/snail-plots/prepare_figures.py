@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import math
 import os
 import random
@@ -110,8 +111,26 @@ def select_representative_assemblies(data, seed=42):
     return representatives
 
 
-def draw_badges(representatives, directory="figure4"):
+def draw_plot(blobdir, directory, filename, options=None):
     os.makedirs(directory, exist_ok=True)
+    if options is None:
+        options = []
+    cmd = [
+        "blobtk",
+        "plot",
+        "-v",
+        "snail",
+        "-d",
+        blobdir,
+        "-o",
+        f"{directory}/{filename}",
+    ]
+    if options is not None:
+        cmd.extend(options)
+    subprocess.run(cmd)
+
+
+def draw_badges(representatives, directory="figure4"):
     for rep in representatives:
         if rep["blobtoolkit_id"] is None:
             print(f"Warning: No BlobToolKit ID found for assembly {rep['assembly_id']}")
@@ -119,22 +138,24 @@ def draw_badges(representatives, directory="figure4"):
         print(
             f"Drawing snail badge for assembly {rep['assembly_id']} (BlobToolKit ID: {rep['blobtoolkit_id']})"
         )
-        cmd = [
-            "blobtk",
-            "plot",
-            "-v",
-            "snail",
-            "-d",
+        blobdir = (
             f"https://blobtoolkit.genomehubs.org/api/v1/dataset/id/{rep['blobtoolkit_id']}",
-            "--badge",
-            "--scale-function",
-            "linear",
-            "-o",
-            f"{directory}/{rep['assembly_id']}_snail_badge.svg",
-        ]
-        subprocess.run(cmd)
-        cmd[-1] = f"{directory}/{rep['assembly_id']}_snail_badge.yaml"
-        subprocess.run(cmd)
+        )
+        filename = f"{rep['assembly_id']}_snail_badge.svg"
+        options = ["--badge", "--scale-function", "linear"]
+        draw_plot(
+            blobdir,
+            directory,
+            filename,
+            options,
+        )
+        filename = f"{rep['assembly_id']}_snail_badge.yaml"
+        draw_plot(
+            blobdir,
+            directory,
+            filename,
+            options,
+        )
 
 
 def replace_svg_tag_with_group(svg_content, translate_x, translate_y):
@@ -241,11 +262,103 @@ def make_badge_grid(representatives, directory="figure4"):
                 f.write("\t".join(str(row[h]) for h in header) + "\n")
 
 
-def main():
+def figure1(directory: str):
+    if directory is None:
+        directory = "figure1"
+    print("Drawing snail plot for Figure 1")
+    blobdir = "https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1"
+    filename = "1.svg"
+    draw_plot(
+        blobdir,
+        directory,
+        filename,
+    )
+
+
+def figure2(directory: str):
+    if directory is None:
+        directory = "figure2"
+    print("Drawing snail plots for Figure 2")
+    blobdir = "https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1"
+    filename = "2A.png"
+    draw_plot(
+        blobdir,
+        directory,
+        filename,
+    )
+
+    blobdir = "https://blobtoolkit.genomehubs.org/api/v1/dataset/id/AEKR01"
+    filename = "2B.png"
+    draw_plot(
+        blobdir,
+        directory,
+        filename,
+    )
+
+    filename = "2C.png"
+    options = ["--max-span", "2770968735"]
+    draw_plot(blobdir, directory, filename, options)
+
+    filename = "2D.png"
+    options = ["--max-span", "2770968735", "--max-scaffold", "200127270"]
+    draw_plot(blobdir, directory, filename, options)
+
+
+def figure3(directory: str):
+    if directory is None:
+        directory = "figure3"
+    print("Drawing snail plots for Figure 3")
+    blobdir = "https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1"
+    filename = "3A.png"
+    options = ["--show-numbers"]
+    draw_plot(
+        blobdir,
+        directory,
+        filename,
+        options,
+    )
+    filename = "3B.png"
+    options = ["--show-numbers", "--scale-function", "linear"]
+    draw_plot(
+        blobdir,
+        directory,
+        filename,
+        options,
+    )
+
+
+def figure4(directory: str):
+    if directory is None:
+        directory = "figure4"
     data = fetch_goat_data()
     representatives = select_representative_assemblies(data, seed=1031)
-    # draw_badges(representatives, "figure4")
-    make_badge_grid(representatives, "figure4")
+    draw_badges(representatives, directory)
+    make_badge_grid(representatives, directory)
+
+
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Prepare figures for snail plot paper")
+    parser.add_argument("-f", "--figure", help="Figure number", type=int, required=True)
+    parser.add_argument(
+        "-o", "--output", help="Path to the output directory.", type=str
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    if args.figure == 1:
+        figure1(args.output)
+    if args.figure == 2:
+        figure2(args.output)
+    elif args.figure == 3:
+        figure3(args.output)
+    elif args.figure == 4:
+        figure4(args.output)
+    else:
+        print(f"ERROR: {args.figure} is not a valid figure number")
+        exit(1)
 
 
 if __name__ == "__main__":
