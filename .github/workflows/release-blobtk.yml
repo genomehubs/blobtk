@@ -175,6 +175,9 @@ jobs:
         with:
           args: --release --out dist -i python${{matrix.python}} --target x86_64-apple-darwin -m rust/Cargo.toml
           sccache: "true"
+          rust-toolchain: 1.82.0
+        env:
+          RUSTUP_TOOLCHAIN: 1.82.0
       - name: Build universal wheels
         uses: PyO3/maturin-action@v1
         with:
