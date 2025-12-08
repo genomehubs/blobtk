@@ -2,6 +2,9 @@ use std::str::FromStr;
 
 use clap::ValueEnum;
 
+#[cfg(feature = "python-extension")]
+use pyo3::pyclass;
+
 #[derive(Clone, Debug)]
 pub struct TickOptions {
     pub font_size: f64,
@@ -68,6 +71,7 @@ impl FromStr for Position {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, ValueEnum)]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Scale {
     LINEAR,
     #[default]
@@ -80,8 +84,11 @@ impl FromStr for Scale {
     fn from_str(input: &str) -> Result<Scale, Self::Err> {
         match input {
             "scaleLinear" => Ok(Scale::LINEAR),
+            "linear" => Ok(Scale::LINEAR),
             "scaleSqrt" => Ok(Scale::SQRT),
+            "sqrt" => Ok(Scale::SQRT),
             "scaleLog" => Ok(Scale::LOG),
+            "log" => Ok(Scale::LOG),
             _ => Err(()),
         }
     }

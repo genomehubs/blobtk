@@ -1,4 +1,5 @@
 use std::cmp::max;
+use std::env;
 use std::f64::consts::PI;
 
 use coord_transforms::d2::polar2cartesian;
@@ -8,7 +9,9 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Group, Line, Path, Rectangle, Text};
 use svg::node::Text as nodeText;
 
-use crate::utils::{format_si, linear_scale, linear_scale_float, scale_float, scale_floats};
+use crate::utils::{
+    format_si, linear_scale, linear_scale_float, min_float, scale_float, scale_floats,
+};
 
 use super::axis::{AxisOptions, Position, Scale, TickOptions, TickStatus};
 use super::style::path_open;
@@ -28,6 +31,7 @@ pub struct RadialTick {
 #[derive(Clone, Debug)]
 pub struct Tick {
     pub label: Text,
+    pub label_width: f64,
     pub path: Path,
     pub position: f64,
     pub gridline: Path,
@@ -39,6 +43,7 @@ impl Default for Tick {
         Tick {
             label: Text::new(),
             path: Path::new(),
+            label_width: 0.0,
             position: 0.0,
             gridline: Path::new(),
             status: TickStatus::Major,
@@ -72,17 +77,25 @@ impl Default for LegendEntry {
     }
 }
 
+pub fn font_family(fallback: &str) -> String {
+    match env::var("FONT_FAMILY") {
+        Ok(family) => format!("{}, {}", family, fallback),
+        _ => fallback.to_string(),
+    }
+}
+
 pub fn legend_group(
     title: String,
     entries: Vec<LegendEntry>,
     subtitle: Option<String>,
     columns: u8,
 ) -> Group {
+    let processed_font_family = font_family("Roboto, Open sans, DejaVu Sans, Arial, sans-serif");
     let title_text = if title.is_empty() {
         Text::new()
     } else {
         Text::new()
-            .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+            .set("font-family", processed_font_family.clone())
             .set("font-size", "24")
             .set("text-anchor", "start")
             .set("dominant-baseline", "bottom")
@@ -111,7 +124,7 @@ pub fn legend_group(
             None => ("start", cell + gap, -gap / 2),
         };
         let entry_text = Text::new()
-            .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+            .set("font-family", processed_font_family.clone())
             .set("font-size", cell)
             .set("text-anchor", anchor)
             .set("dominant-baseline", "bottom")
@@ -122,7 +135,7 @@ pub fn legend_group(
             .add(nodeText::new(&entry.title));
         let entry_subtext = if entry.subtitle.is_some() {
             Text::new()
-                .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+                .set("font-family", processed_font_family.clone())
                 .set("font-size", cell as f64 * 0.9)
                 .set("text-anchor", "start")
                 .set("dominant-baseline", "bottom")
@@ -213,7 +226,7 @@ pub fn legend_group(
         None => (),
         Some(subtitle_string) => {
             let subtitle_text = Text::new()
-                .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+                .set("font-family", processed_font_family.clone())
                 .set("font-size", "18")
                 .set("text-anchor", "start")
                 .set("dominant-baseline", "bottom")
@@ -228,21 +241,21 @@ pub fn legend_group(
     group
 }
 
-pub fn path_axis_major(path_data: Data, color: Option<&str>) -> Path {
+pub fn path_axis_major(path_data: Data, color: Option<&str>, width: Option<f64>) -> Path {
     let col = color.unwrap_or("black");
     Path::new()
         .set("stroke", col)
         .set("fill", "none")
-        .set("stroke-width", 3)
+        .set("stroke-width", width.unwrap_or_else(|| 3.0))
         .set("d", path_data)
 }
 
-pub fn path_axis_minor(path_data: Data, color: Option<&str>) -> Path {
+pub fn path_axis_minor(path_data: Data, color: Option<&str>, width: Option<f64>) -> Path {
     let col = color.unwrap_or("black");
     Path::new()
         .set("stroke", col)
         .set("fill", "none")
-        .set("stroke-width", 1)
+        .set("stroke-width", width.unwrap_or_else(|| 1.0))
         .set("d", path_data)
 }
 
@@ -278,27 +291,34 @@ pub fn set_tick(
         TickStatus::Major => path_axis_major(
             Data::new().move_to((-10, offset)).line_to((0, offset)),
             None,
+            None,
         ),
-        TickStatus::Minor => {
-            path_axis_minor(Data::new().move_to((-5, offset)).line_to((0, offset)), None)
-        }
+        TickStatus::Minor => path_axis_minor(
+            Data::new().move_to((-5, offset)).line_to((0, offset)),
+            None,
+            None,
+        ),
     };
     let text = match status {
         TickStatus::Major => Text::new()
-            .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+            .set(
+                "font-family",
+                font_family("Roboto, Open sans, DejaVu Sans, Arial, sans-serif"),
+            )
             .set("font-size", "20")
             .set("text-anchor", "end")
             .set("dominant-baseline", "middle")
             .set("stroke", "none")
             .set("fill", "black")
             .set("transform", format!("translate({:?}, {:?})", -15, offset,))
-            .add(nodeText::new(label)),
+            .add(nodeText::new(label.clone())),
         TickStatus::Minor => Text::new(),
     };
 
     Tick {
         label: text,
         path,
+        label_width: label.len() as f64 * 11.0, // Assuming an average character width of 10.0
         position: offset,
         status: match status {
             TickStatus::Major => TickStatus::Major,
@@ -370,7 +390,7 @@ pub fn create_tick(
                 location,
                 axis_options.offset - tick_options.length,
                 location,
-                axis_height,
+                axis_options.offset + axis_height,
                 location,
                 axis_options.offset - tick_options.length * 1.5,
                 location,
@@ -381,8 +401,16 @@ pub fn create_tick(
         };
     let path_data = Data::new().move_to((x1, y1)).line_to((x2, y2));
     let path = match tick_options.status {
-        TickStatus::Major => path_axis_major(path_data, Some(&axis_options.color)),
-        TickStatus::Minor => path_axis_minor(path_data, Some(&axis_options.color)),
+        TickStatus::Major => path_axis_major(
+            path_data,
+            Some(&axis_options.color),
+            Some(tick_options.weight),
+        ),
+        TickStatus::Minor => path_axis_minor(
+            path_data,
+            Some(&axis_options.color),
+            Some(tick_options.weight),
+        ),
     };
     let gridline = match tick_options.status {
         TickStatus::Major => path_open(
@@ -395,7 +423,10 @@ pub fn create_tick(
     let text = if axis_options.tick_labels && !label.is_empty() {
         // match tick_options.status {
         Text::new()
-            .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+            .set(
+                "font-family",
+                font_family("Roboto, Open sans, DejaVu Sans, Arial, sans-serif"),
+            )
             .set("font-size", tick_options.font_size)
             .set("text-anchor", anchor)
             .set("dominant-baseline", baseline)
@@ -405,15 +436,16 @@ pub fn create_tick(
                 "transform",
                 format!("translate({:?}, {:?}) rotate({:?})", x_text, y_text, angle),
             )
-            .add(nodeText::new(label)) //,
-                                       // TickStatus::Minor => Text::new(),
-                                       // }
+            .add(nodeText::new(&label)) //,
+                                        // TickStatus::Minor => Text::new(),
+                                        // }
     } else {
         Text::new()
     };
 
     Tick {
         label: text,
+        label_width: label.len() as f64 * 11.0, // Assuming an average character width of 10.0
         path,
         position: location,
         gridline,
@@ -465,7 +497,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                     }
                     while i <= domain[1].clone() {
                         let label = if i >= min_value.clone() {
-                            format_si(&i, 3)
+                            format_si(&i, 3, None)
                         } else {
                             String::new()
                         };
@@ -491,7 +523,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                         let mut j = i * 2.0;
                         while j < i * 10.0 && j <= domain[1].clone() {
                             let label = if j >= min_value.clone() {
-                                format_si(&j, 3)
+                                format_si(&j, 3, None)
                             } else {
                                 String::new()
                             };
@@ -538,7 +570,7 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                     let mut i = step * (min_value / step).ceil();
                     while i <= domain[1].clone() {
                         let label = if i >= min_value.clone() {
-                            format_si(&i, 3)
+                            format_si(&i, 3, None)
                         } else {
                             String::new()
                         };
@@ -588,47 +620,142 @@ pub fn set_axis_ticks(
     }
 
     let mut ticks: Vec<Tick> = vec![];
-    match status {
-        TickStatus::Major => {
-            let mut i = 10u32.pow(power.abs() as u32) as f64;
-            if power < 0 {
-                i = 1.0 / i;
+    match scale.as_str() {
+        "scaleLinear" => {
+            // Distribute ticks on nice round numbers for linear scale
+            let tick_count = 6; // You can make this configurable if needed
+            set_linear_ticks(
+                max_value, min_value, status, scale, range, domain, &mut ticks, tick_count,
+            );
+        }
+        "scaleLog" | "scaleSqrt" => match status {
+            TickStatus::Major => {
+                let mut i = 10u32.pow(power.abs() as u32) as f64;
+                if power < 0 {
+                    i = 1.0 / i;
+                }
+                if min_value.clone() < 0.0 {
+                    i = -i
+                }
+                while i <= max_value.clone() {
+                    let label = if i > min_value.clone() {
+                        format_si(&i, 3, None)
+                    } else {
+                        String::new()
+                    };
+                    ticks.push(set_tick(i, label, &domain, &range, &status, &scale));
+                    i = i * 10.0;
+                }
             }
-            if min_value.clone() < 0.0 {
-                i = -i
+            TickStatus::Minor => {
+                let mut i = 10u32.pow((max(0, power.abs() - 1)) as u32) as f64;
+                if power < 0 {
+                    i = 1.0 / i;
+                }
+                if min_value.clone() < 0.0 {
+                    i = -i
+                }
+                while i <= max_value.clone() {
+                    let mut j = i * 2.0;
+                    while j < i * 10.0 && j <= max_value.clone() {
+                        if &(j as f64) >= min_value {
+                            ticks.push(set_tick(
+                                j,
+                                String::new(),
+                                &domain,
+                                &range,
+                                &status,
+                                &scale,
+                            ));
+                        }
+                        j = j + i;
+                    }
+                    ticks.push(set_tick(i, String::new(), &domain, &range, &status, &scale));
+                    i = i * 10.0;
+                }
             }
-            while i <= max_value.clone() {
-                let label = if i > min_value.clone() {
-                    format_si(&i, 3)
-                } else {
-                    String::new()
-                };
-                ticks.push(set_tick(i, label, &domain, &range, &status, &scale));
-                i = i * 10.0;
+        },
+        _ => {}
+    }
+    ticks
+}
+
+fn set_linear_ticks(
+    max_value: &f64,
+    min_value: &f64,
+    status: &TickStatus,
+    scale: &String,
+    range: [f64; 2],
+    domain: [f64; 2],
+    ticks: &mut Vec<Tick>,
+    tick_count: i32,
+) {
+    let diff = max_value - min_value;
+    if diff == 0.0 {
+        // Edge case: no range
+        match status {
+            TickStatus::Major => {
+                ticks.push(set_tick(
+                    *min_value,
+                    format_si(min_value, 3, None),
+                    &domain,
+                    &range,
+                    &status,
+                    &scale,
+                ));
+            }
+            TickStatus::Minor => {}
+        }
+    } else {
+        // Find a "nice" step size
+        let raw_step = diff / tick_count as f64;
+        let magnitude = 10f64.powf(raw_step.abs().log10().floor());
+        let nice_steps = [1.0, 2.0, 2.5, 5.0, 10.0];
+        let mut step = nice_steps[0] * magnitude;
+        for s in &nice_steps {
+            let candidate = s * magnitude;
+            if diff / candidate <= tick_count as f64 {
+                step = candidate;
+                break;
             }
         }
-        TickStatus::Minor => {
-            let mut i = 10u32.pow((max(0, power.abs() - 1)) as u32) as f64;
-            if power < 0 {
-                i = 1.0 / i;
-            }
-            if min_value.clone() < 0.0 {
-                i = -i
-            }
-            while i <= max_value.clone() {
-                let mut j = i * 2.0;
-                while j < i * 10.0 && j <= max_value.clone() {
-                    if &(j as f64) >= min_value {
-                        ticks.push(set_tick(j, String::new(), &domain, &range, &status, &scale));
-                    }
-                    j = j + i;
+        // Find the first tick >= min_value that is a multiple of step
+        let first_tick = (min_value / step).ceil() * step;
+        match status {
+            TickStatus::Major => {
+                let mut value = first_tick;
+                while value <= *max_value + step * 0.5 {
+                    let label = format_si(&value, 3, None);
+                    ticks.push(set_tick(value, label, &domain, &range, &status, &scale));
+                    value += step;
                 }
-                ticks.push(set_tick(i, String::new(), &domain, &range, &status, &scale));
-                i = i * 10.0;
+            }
+            TickStatus::Minor => {
+                // Optionally add minor ticks between major ticks
+                let minor_tick_count = 4;
+                let minor_step = step / (minor_tick_count as f64 + 1.0);
+                let mut value = first_tick - step;
+                while value <= *max_value - step {
+                    for j in 1..=minor_tick_count {
+                        let minor_value = value + j as f64 * minor_step;
+                        if minor_value > *min_value - step * 0.5
+                            && minor_value < *max_value + step * 0.5
+                        {
+                            ticks.push(set_tick(
+                                minor_value,
+                                String::new(),
+                                &domain,
+                                &range,
+                                &status,
+                                &scale,
+                            ));
+                        }
+                    }
+                    value += step;
+                }
             }
         }
     }
-    ticks
 }
 
 pub fn set_tick_circular(
@@ -646,6 +773,7 @@ pub fn set_tick_circular(
     options: &TickOptions,
 ) -> RadialTick {
     let angle = linear_scale_float(index as f64 + offset, &angle_domain, &angle_range);
+    let processed_font_family = font_family("Roboto, Open sans, DejaVu Sans, Arial, sans-serif");
 
     let mut adjusted_tick_range = [tick_range[0], tick_range[1]];
     if offset > 0.0 {
@@ -698,14 +826,14 @@ pub fn set_tick_circular(
             .line_to((tick_points[1][0], tick_points[1][1]))
     };
     let path = match status {
-        TickStatus::Major => path_axis_major(tick_path_data, None),
-        TickStatus::Minor => path_axis_minor(tick_path_data, None),
+        TickStatus::Major => path_axis_major(tick_path_data, None, None),
+        TickStatus::Minor => path_axis_minor(tick_path_data, None, None),
     };
     let text = if label == "100".to_string() && angle > 1.4 * PI {
         Text::new()
     } else {
         Text::new()
-            .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+            .set("font-family", processed_font_family.clone())
             .set("font-size", options.font_size.clone())
             .set("text-anchor", "middle")
             .set("dominant-baseline", "middle")
@@ -724,7 +852,7 @@ pub fn set_tick_circular(
     };
     let outer_text = match status {
         TickStatus::Major => Text::new()
-            .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+            .set("font-family", processed_font_family.clone())
             .set("font-size", "20")
             .set("text-anchor", "middle")
             .set("dominant-baseline", "bottom")
@@ -793,7 +921,11 @@ pub fn set_axis_ticks_circular(
         // }
         for i in (divisor..bin_count + 1).step_by(divisor) {
             let label = format!("{}", ((i) as f64 / bin_count as f64 * 100.0) as u64);
-            let outer_label = format_si(&(span as f64 / tick_count as f64 * ticks.len() as f64), 3);
+            let outer_label = format_si(
+                &(span as f64 / tick_count as f64 * ticks.len() as f64),
+                3,
+                None,
+            );
             ticks.push(set_tick_circular(
                 i,
                 0.0,
@@ -831,7 +963,11 @@ pub fn set_axis_ticks_circular(
             let adj_sum = sum + 0.001;
             let index = adj_sum.floor() as usize;
             let label = format!("{}", (sum / bin_count as f64 * 100.0).round() as u64);
-            let outer_label = format_si(&(span as f64 / tick_count as f64 * ticks.len() as f64), 3);
+            let outer_label = format_si(
+                &(span as f64 / tick_count as f64 * ticks.len() as f64),
+                3,
+                None,
+            );
             ticks.push(set_tick_circular(
                 index,
                 ((sum - index as f64).abs() * 1000.0).round() / 1000.0,
@@ -1039,22 +1175,37 @@ pub fn chart_axis(plot_axis: &AxisOptions) -> (Group, Group) {
     if plot_axis.major_ticks.is_some() {
         let major_ticks = create_axis_ticks(&plot_axis, TickStatus::Major);
         major_tick_count = major_ticks.len();
-        for tick in major_ticks {
-            major_tick_group = major_tick_group.add(tick.path).add(tick.label);
-            major_gridline_group = major_gridline_group.add(tick.gridline);
+        if major_tick_count > 0 {
+            add_ticks_to_axis(
+                major_ticks,
+                &mut major_tick_group,
+                &mut major_gridline_group,
+            );
         }
     };
 
     let mut minor_tick_group = Group::new();
     if plot_axis.minor_ticks.is_some() {
         let minor_ticks = create_axis_ticks(&plot_axis, TickStatus::Minor);
-        for tick in minor_ticks {
-            minor_tick_group = if major_tick_count < 2 {
-                minor_tick_group.add(tick.path).add(tick.label)
-            } else {
-                minor_tick_group.add(tick.path)
-            };
+        if major_tick_count == 0 {
+            add_ticks_to_axis(
+                minor_ticks,
+                &mut minor_tick_group,
+                &mut major_gridline_group,
+            );
+        } else {
+            for tick in minor_ticks {
+                minor_tick_group = minor_tick_group.add(tick.path);
+            }
         }
+        // for tick in minor_ticks {
+        //     minor_tick_group = if major_tick_count == 0 {
+        //         major_gridline_group = major_gridline_group.add(tick.gridline);
+        //         minor_tick_group.add(tick.path).add(tick.label)
+        //     } else {
+        //         minor_tick_group.add(tick.path)
+        //     };
+        // }
     }
 
     let (x1, y1, x2, y2, label_x, label_y, label_rotate) = match plot_axis.position {
@@ -1107,7 +1258,10 @@ pub fn chart_axis(plot_axis: &AxisOptions) -> (Group, Group) {
         .set("y2", y2);
 
     let label = Text::new()
-        .set("font-family", "Roboto, 'Open sans', Arial, sans-serif")
+        .set(
+            "font-family",
+            font_family("Roboto, Open sans, DejaVu Sans, Arial, sans-serif"),
+        )
         .set("font-size", plot_axis.font_size)
         .set("text-anchor", "middle")
         .set("dominant-baseline", "middle")
@@ -1130,4 +1284,37 @@ pub fn chart_axis(plot_axis: &AxisOptions) -> (Group, Group) {
             .add(label),
         Group::new().add(major_gridline_group),
     )
+}
+
+fn add_ticks_to_axis(
+    major_ticks: Vec<Tick>,
+    major_tick_group: &mut Group,
+    major_gridline_group: &mut Group,
+) {
+    let mut first_position = major_ticks[0].position;
+    let mut last_position = major_ticks[major_ticks.len() - 1].position;
+    let mut major_ticks = major_ticks;
+    if first_position > last_position {
+        major_ticks.reverse();
+        last_position = first_position;
+        first_position = major_ticks[0].position;
+    }
+    let mut previous_position = first_position;
+    for (i, tick) in major_ticks.iter().enumerate() {
+        let show_tick = if i == 0 {
+            true
+        } else {
+            let mut diff = tick.position - previous_position;
+            if i < major_ticks.len() - 1 {
+                diff = min_float(diff, last_position - tick.position);
+            }
+            diff > tick.label_width
+        };
+        *major_tick_group = major_tick_group.clone().add(tick.path.clone());
+        if show_tick {
+            previous_position = tick.position;
+            *major_tick_group = major_tick_group.clone().add(tick.label.clone());
+        }
+        *major_gridline_group = major_gridline_group.clone().add(tick.gridline.clone());
+    }
 }

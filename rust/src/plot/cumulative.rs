@@ -30,9 +30,9 @@ pub fn cumulative_lines(
     let x_axis = AxisOptions {
         position: Position::BOTTOM,
         label: "cumulative count".to_string(),
-        height: dimensions.height + dimensions.padding[0] + dimensions.padding[2],
-        padding: [dimensions.padding[3], dimensions.padding[1]],
-        offset: dimensions.height + dimensions.padding[0] + dimensions.padding[2],
+        height: dimensions.height + dimensions.padding.top + dimensions.padding.bottom,
+        padding: [dimensions.padding.left, dimensions.padding.right],
+        offset: dimensions.height + dimensions.padding.top + dimensions.padding.bottom,
         scale: Scale::LINEAR,
         domain: x_domain,
         range: x_range,
@@ -44,8 +44,8 @@ pub fn cumulative_lines(
         position: Position::LEFT,
         label_offset: 83.0,
         label: "cumulative length".to_string(),
-        height: dimensions.width + dimensions.padding[1] + dimensions.padding[3],
-        padding: [dimensions.padding[2], dimensions.padding[0]],
+        height: dimensions.width + dimensions.padding.right + dimensions.padding.left,
+        padding: [dimensions.padding.bottom, dimensions.padding.top],
         scale: Scale::LINEAR,
         domain: y_domain,
         range: y_range,
@@ -117,16 +117,16 @@ pub fn cumulative_lines(
 
 pub fn plot(dimensions: Dimensions, line_data: LineData, options: &cli::PlotOptions) -> Document {
     let height = dimensions.height
-        + dimensions.margin[0]
-        + dimensions.margin[2]
-        + dimensions.padding[0]
-        + dimensions.padding[2];
+        + dimensions.margin.top
+        + dimensions.margin.bottom
+        + dimensions.padding.top
+        + dimensions.padding.bottom;
 
     let width = dimensions.width
-        + dimensions.margin[1]
-        + dimensions.margin[3]
-        + dimensions.padding[1]
-        + dimensions.padding[3];
+        + dimensions.margin.right
+        + dimensions.margin.left
+        + dimensions.padding.right
+        + dimensions.padding.left;
     let x_opts = line_data.x.clone();
     let y_opts = line_data.y.clone();
 
@@ -155,11 +155,11 @@ pub fn plot(dimensions: Dimensions, line_data: LineData, options: &cli::PlotOpti
                 .set("width", width)
                 .set("height", height),
         )
-        .add(cumulative.svg().set(
+        .add(cumulative.svg(0.0, 0.0, None).set(
             "transform",
             format!(
                 "translate({}, {})",
-                dimensions.margin[3], dimensions.margin[0]
+                dimensions.margin.left, dimensions.margin.top
             ),
         ))
         .add(
@@ -169,8 +169,8 @@ pub fn plot(dimensions: Dimensions, line_data: LineData, options: &cli::PlotOpti
                     "translate({}, {})",
                     legend_x,
                     height
-                        - dimensions.margin[2]
-                        - dimensions.padding[2] * 2.0
+                        - dimensions.margin.bottom
+                        - dimensions.padding.bottom * 2.0
                         - line_data.categories.len() as f64 * 26.0
                 ),
             ),

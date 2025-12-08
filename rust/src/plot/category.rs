@@ -34,13 +34,13 @@ impl Category {
     pub fn subtitle(self) -> String {
         let mut parts = vec![];
         if self.count.is_some() {
-            parts.push(format_si(&(self.count.unwrap() as f64), 3))
+            parts.push(format_si(&(self.count.unwrap() as f64), 3, None))
         }
         if self.span.is_some() {
-            parts.push(format_si(&(self.span.unwrap() as f64), 3))
+            parts.push(format_si(&(self.span.unwrap() as f64), 3, None))
         }
         if self.n50.is_some() {
-            parts.push(format_si(&(self.n50.unwrap() as f64), 3))
+            parts.push(format_si(&(self.n50.unwrap() as f64), 3, None))
         }
         if !parts.is_empty() {
             return format!("[{}]", parts.join("; "));
@@ -55,7 +55,7 @@ pub fn set_cat_order(
     order: &Option<String>,
     count: &usize,
     palette: &Vec<String>,
-) -> (Vec<Category>, Vec<usize>) {
+) -> (Vec<Category>, Vec<Option<usize>>) {
     let mut indices = HashMap::new();
     let mut title_list = vec![];
     for (i, entry) in values.iter().enumerate() {
@@ -152,12 +152,12 @@ pub fn set_cat_order(
             ..Default::default()
         },
     );
-    let mut cat_indices: Vec<usize> = (0..values.len()).collect();
+    let mut cat_indices: Vec<Option<usize>> = (0..values.len()).map(|x| Some(x)).collect();
     for (index, cat) in cat_order.iter_mut().enumerate() {
         // use this loop for span, count and n50
         let mut lengths = vec![];
         for i in cat.indices.iter() {
-            cat_indices[*i] = index;
+            cat_indices[*i] = Some(index);
             lengths.push(z_values[*i]);
         }
         lengths.sort_by(|a, b| b.partial_cmp(a).unwrap());

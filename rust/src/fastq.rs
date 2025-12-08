@@ -21,7 +21,7 @@ fn trim_read_id(input: &[u8]) -> Vec<u8> {
         .iter()
         .copied()
         .by_ref()
-        .take_while(|&x| x != b' ' && x != b'/')
+        .take_while(|&x| x != b' ')
         .collect()
 }
 
@@ -95,6 +95,7 @@ fn subsample_single<F: Fn()>(
     while let Some(record) = reader.next() {
         let seqrec = record.as_ref().expect("invalid record");
         let mut seq_id: Vec<u8> = trim_read_id(seqrec.id());
+        // let mut seq_id: Vec<u8> = seqrec.id().to_owned();
         if read_names.contains(&seq_id) {
             seq_id.extend(&read_suffix[0]);
             write_fastq(

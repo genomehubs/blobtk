@@ -1,0 +1,53 @@
+file:
+  format: tsv
+  header: true
+  name: apidae.tsv
+  needs:
+    - ATTR_genome_size.types.yaml
+    - ATTR_karyotype.types.yaml
+  source: Bee Chromosome Database
+  source_date: 2023-05-30
+  source_url: http://www.bees.ufop.br
+  source_description: The Apidae Chromosome Database is an online resource to gather information on chromosome number and nuclear genome size on bee species from all over the world.
+attributes:
+  chromosome_number:
+    header: diploid2n
+    separator:
+      - "-"
+      - "/"
+      - " or "
+    type: short
+  haploid_number:
+    header: haploidn
+    separator:
+      - "-"
+      - "/"
+      - " or "
+    type: short
+  ploidy:
+    header: ploidy
+    separator:
+      - "-"
+      - "/"
+      - " or "
+      - ","
+    taxon_traverse_limit: order
+    type: integer
+  genome_size:
+    function: "{} * 978000000"
+    header: "genome_size_pg"
+    separator:
+      - ","
+      - "-"
+      - " - "
+    type: long
+taxonomy:
+  species:
+    header: [genus, species]
+    join: " "
+  subfamily:
+    header: subfamily
+  tribe:
+    header: tribe
+  family:
+    header: family

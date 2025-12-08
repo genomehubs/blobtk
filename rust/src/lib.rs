@@ -25,13 +25,20 @@ pub mod fastq;
 /// Filter files based on a list of sequence IDs.
 pub mod filter;
 
+/// Index files for a GenomeHubs instance.
+pub mod index;
+
 /// Functions for file/terminal IO.
 pub mod io;
+
+/// Functions for parsing files
+pub mod parse;
 
 /// Generate a plot.
 pub mod plot;
 
 /// Python bindings.
+#[cfg(feature = "python-extension")]
 pub mod python;
 
 /// Parse and subset a taxonomy.
@@ -39,3 +46,6 @@ pub mod taxonomy;
 
 /// Utility functions.
 pub mod utils;
+
+/// Validate files.
+pub mod validate;

@@ -1,0 +1,19 @@
+path: /Users/rchallis/projects/genomehubs/boat-resources/taxdump/ncbi_20241203
+out: test/taxonomy/all/combined
+taxonomy_format: ncbi
+root_taxon_id:
+  - 1
+base_taxon_id: 1
+name_classes:
+  - scientific name
+  - synonym
+  - merged taxon id
+# taxonomies:
+#   - path: /Users/rchallis/Downloads/backbone-simple.txt
+#     taxonomy_format: gbif
+#     root_taxon_id:
+#       - root
+#     base_taxon_id: root
+#     name_classes:
+#       - scientific name
+#     xref_label: gbif

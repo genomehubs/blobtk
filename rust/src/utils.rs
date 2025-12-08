@@ -2,7 +2,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use rust_decimal::prelude::*;
 
-use crate::plot::axis::Scale;
+use crate::{cli::RoundingStrategyWrapper, plot::axis::Scale};
 
 pub mod compact_float {
     //! rounds a float to 3 decimal places, when serialized into a str, such as for JSON
@@ -30,20 +30,20 @@ pub mod compact_float {
 ///
 /// ```
 /// # use crate::blobtk::utils::format_si;
-/// assert_eq!(format_si(&123456.0, 1), "100k");
-/// assert_eq!(format_si(&123456.0, 2), "120k");
-/// assert_eq!(format_si(&123456.0, 3), "123k");
-/// assert_eq!(format_si(&123456.0, 4), "123.5k");
-/// assert_eq!(format_si(&12.3, 3), "12.3");
-/// assert_eq!(format_si(&12.3, 2), "12");
-/// assert_eq!(format_si(&0.02655, 3), "0.03");
-/// assert_eq!(format_si(&0.021, 3), "0.02");
-/// assert_eq!(format_si(&0.02, 1), "0");
-/// assert_eq!(format_si(&0.0002, 3), "200μ");
-/// assert_eq!(format_si(&0.000246, 2), "250μ");
-/// assert_eq!(format_si(&0.00000246, 2), "2.5μ");
+/// assert_eq!(format_si(&123456.0, 1, None), "100k");
+/// assert_eq!(format_si(&123456.0, 2, None), "120k");
+/// assert_eq!(format_si(&123456.0, 3, None), "123k");
+/// assert_eq!(format_si(&123456.0, 4, None), "123.5k");
+/// assert_eq!(format_si(&12.3, 3, None), "12.3");
+/// assert_eq!(format_si(&12.3, 2, None), "12");
+/// assert_eq!(format_si(&0.02655, 3, None), "0.03");
+/// assert_eq!(format_si(&0.021, 3, None), "0.02");
+/// assert_eq!(format_si(&0.02, 1, None), "0");
+/// assert_eq!(format_si(&0.0002, 3, None), "200μ");
+/// assert_eq!(format_si(&0.000246, 2, None), "250μ");
+/// assert_eq!(format_si(&0.00000246, 2, None), "2.5μ");
 /// ```
-pub fn format_si(value: &f64, digits: u32) -> String {
+pub fn format_si(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrapper>) -> String {
     fn set_suffix(thousands: i8) -> String {
         const POSITIVE: [&str; 9] = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
         const NEGATIVE: [&str; 8] = ["", "μ", "p", "n", "f", "a", "z", "y"];
@@ -70,8 +70,16 @@ pub fn format_si(value: &f64, digits: u32) -> String {
         prefix = value.clone() / 10u32.pow(3 * thousands as u32) as f64
     };
     let d = Decimal::from_f64_retain(prefix).unwrap();
+    let rounding_strategy = match rounding {
+        Some(RoundingStrategyWrapper::MidpointAwayFromZero) => {
+            RoundingStrategy::MidpointAwayFromZero
+        }
+        Some(RoundingStrategyWrapper::ToZero) => RoundingStrategy::ToZero,
+        Some(RoundingStrategyWrapper::AwayFromZero) => RoundingStrategy::AwayFromZero,
+        _ => RoundingStrategy::MidpointAwayFromZero,
+    };
     let mut rounded = d
-        .round_sf_with_strategy(digits, RoundingStrategy::MidpointAwayFromZero)
+        .round_sf_with_strategy(digits, rounding_strategy)
         .unwrap()
         .normalize()
         .to_string();
@@ -83,6 +91,22 @@ pub fn format_si(value: &f64, digits: u32) -> String {
 
     let suffix = set_suffix(thousands);
     format!("{}{}", rounded, suffix)
+}
+
+pub fn format_pct(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrapper>) -> String {
+    let mut rounded = Decimal::from_f64_retain(*value).unwrap();
+    let rounding_strategy = match rounding {
+        Some(RoundingStrategyWrapper::MidpointAwayFromZero) => {
+            RoundingStrategy::MidpointAwayFromZero
+        }
+        Some(RoundingStrategyWrapper::ToZero) => RoundingStrategy::ToZero,
+        Some(RoundingStrategyWrapper::AwayFromZero) => RoundingStrategy::AwayFromZero,
+        _ => RoundingStrategy::MidpointAwayFromZero,
+    };
+    rounded = rounded
+        .round_dp_with_strategy(digits, rounding_strategy)
+        .normalize();
+    format!("{}%", rounded)
 }
 
 pub fn indexed_sort<T: Ord>(list: &[T]) -> Vec<usize> {
@@ -138,7 +162,7 @@ pub fn linear_scale_float(value: f64, domain: &[f64; 2], range: &[f64; 2]) -> f6
 
 pub fn log_scale(value: usize, domain: &[usize; 2], range: &[f64; 2]) -> f64 {
     let proportion = ((value as f64).log10() - (domain[0] as f64).log10())
-        / ((domain[1] as f64).log10() - (domain[0] as f64).sqrt());
+        / ((domain[1] as f64).log10() - (domain[0] as f64).log10());
     (range[1] - range[0]) * proportion + range[0]
 }
 

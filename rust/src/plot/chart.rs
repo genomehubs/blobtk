@@ -7,12 +7,31 @@ use super::{
     style::{path_filled, path_open},
 };
 
+#[derive(Clone, Copy, Debug)]
+pub struct TopRightBottomLeft {
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+    pub left: f64,
+}
+
+impl Default for TopRightBottomLeft {
+    fn default() -> TopRightBottomLeft {
+        TopRightBottomLeft {
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 0.0,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Dimensions {
     pub height: f64,
     pub width: f64,
-    pub margin: [f64; 4],
-    pub padding: [f64; 4],
+    pub margin: TopRightBottomLeft,
+    pub padding: TopRightBottomLeft,
 }
 
 impl Default for Dimensions {
@@ -20,8 +39,18 @@ impl Default for Dimensions {
         Dimensions {
             height: 900.0,
             width: 900.0,
-            margin: [10.0, 10.0, 100.0, 100.0],
-            padding: [50.0, 50.0, 50.0, 50.0],
+            margin: TopRightBottomLeft {
+                top: 10.0,
+                right: 10.0,
+                bottom: 100.0,
+                left: 100.0,
+            },
+            padding: TopRightBottomLeft {
+                top: 50.0,
+                right: 50.0,
+                bottom: 50.0,
+                left: 50.0,
+            },
         }
     }
 }
@@ -62,8 +91,11 @@ impl Default for Chart {
 }
 
 impl Chart {
-    pub fn svg(self) -> Group {
-        let opacity = 0.6;
+    pub fn svg(self, x_offset: f64, y_offset: f64, opacity: Option<f64>) -> Group {
+        let opacity = match opacity {
+            Some(o) => o,
+            None => 1.0,
+        };
         let mut group = Group::new();
         let mut axis_group = Group::new();
         let mut gridline_group = Group::new();
@@ -100,8 +132,11 @@ impl Chart {
                         .set("cx", point.x)
                         .set("cy", point.y)
                         .set("r", point.z)
-                        .set("fill", point.color.clone().unwrap())
-                        .set("stroke", "#999999")
+                        .set(
+                            "fill",
+                            point.color.clone().unwrap_or_else(|| "#ffffff".to_string()),
+                        )
+                        .set("stroke", "#aaaaaa")
                         .set("fill-opacity", opacity),
                 );
             }
@@ -109,7 +144,8 @@ impl Chart {
                 "transform",
                 format!(
                     "translate({}, {})",
-                    self.dimensions.padding[3], self.dimensions.padding[2]
+                    self.dimensions.padding.left + x_offset,
+                    self.dimensions.padding.top + y_offset,
                 ),
             ));
         }
@@ -133,7 +169,7 @@ impl Chart {
                 "transform",
                 format!(
                     "translate({}, {})",
-                    self.dimensions.padding[3], self.dimensions.padding[2]
+                    self.dimensions.padding.left, self.dimensions.padding.bottom
                 ),
             ));
         }
@@ -158,7 +194,7 @@ impl Chart {
                 "transform",
                 format!(
                     "translate({}, {})",
-                    self.dimensions.padding[3], self.dimensions.padding[2]
+                    self.dimensions.padding.left, self.dimensions.padding.bottom
                 ),
             ));
         }

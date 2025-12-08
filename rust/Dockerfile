@@ -1,4 +1,4 @@
-FROM rust:1.72 as builder
+FROM rust:1.82 as builder
 WORKDIR /usr/src/blobtk
 COPY . .
 RUN apt-get update && apt-get install -y cmake python3 && rm -rf /var/lib/apt/lists/*

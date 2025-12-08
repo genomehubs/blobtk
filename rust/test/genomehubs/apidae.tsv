@@ -1,0 +1,254 @@
+subfamily	tribe	genus	species	sample_locality	countryies	haploidn	diploid2n	karyotype	notes	genome_size_pg	classic_cytogenetic_data	molecular_cytogenetic_data	references	family	ploidy
+Andreninae	Andrenini	Andrena	dunningi	Guelph, Ontario	Canada					0.50				Apidae	1,2
+Andreninae	Andrenini	Andrena	togashii	Sendai, Miyagi	Japan	3	6	k= 1acrocentric + 2metacentric			C-banding			Apidae	1,2
+Apinae	Anthophorini	Anthophora	plumipes	Matsue, Shimane	Japan	9	18	k= 1acrocentric + 8metacentric	as Anthophora acervorum villosula		C-banding			Apidae	1,2
+Apinae	Apini	Apis	cerana	Bangkok	Thailand					0.19			Ardila-Garciaetal2010	Apidae	1,2
+Apinae	Apini	Apis	cerana	Machida, Tokyo	Japan	16	32	all metacentric or submetacentric	as Apis cerana japonica		C-banding; G-banding		HoshibaandOkada1986,HoshibaandImai1993	Apidae	1,2
+Apinae	Apini	Apis	cerana	Mahabaleshwar	India	16	32	k= 4metacentric + 4submetacentric + 8subtelocentric	as Apis indica					Apidae	1,2
+Apinae	Apini	Apis	cerana	University of Peradeniya	Sri Lanka	16								Apidae	1,2
+Apinae	Apini	Apis	dorsata	University of Peradeniya	Sri Lanka	16								Apidae	1,2
+Apinae	Apini	Apis	florea	University of Peradeniya	Sri Lanka	16								Apidae	1,2
+Apinae	Apini	Apis	mellifera	University of Peradeniya	Sri Lanka	16								Apidae	1,2
+Apinae	Apini	Apis	mellifera	Itabashi-ku, Tokyo	Japan	16	32	all metacentric or submetacentric	as Apis mellifera ligustica		C-banding; G-banding		Hoshiba1984a,Hoshiba1984b,HoshibaandOkada1986,HoshibaandImai1993	Apidae	1,2
+Apinae	Apini	Apis	mellifera	Guelph, Ontario	Canada	16	32			0.24			Ardila-Garciaetal2010	Apidae	1,2
+Apinae	Apini	Apis	mellifera		Germany	16						FISH (ribossomal probe, TTAGG probe)	Saharaetal1999	Apidae	1,2
+Apinae	Apini	Apis	mellifera	Banat, Timok and Syenichko–Peshterski	Serbia		32		as Apis mellifera carnica		G-banding			Apidae	1,2
+Apinae	Bombini	Bombus	affinis		North America	18								Apidae	1,2
+Apinae	Bombini	Bombus	appositus	Alberta	Canada	16								Apidae	1,2
+Apinae	Bombini	Bombus	ardens	Higashimatsuyama, Saitama; Itabashi-ku, Tokyo	Japan	18		k= 7pseudo-acrocentric + 2acrocentric + 9metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	ashtoni		North America	25			as Psithyrus ashtoni					Apidae	1,2
+Apinae	Bombini	Bombus	bimaculatus	Guelph, Ontario	Canada					0.34				Apidae	1,2
+Apinae	Bombini	Bombus	bimaculatus	Ontario	Canada	18							Owenetal1995	Apidae	1,2
+Apinae	Bombini	Bombus	borealis	Ontario	Canada	16	32							Apidae	1,2
+Apinae	Bombini	Bombus	californicus	Alberta	Canada	19								Apidae	1,2
+Apinae	Bombini	Bombus	citrinus	Ontario	Canada	26			as Psithyrus citrinus					Apidae	1,2
+Apinae	Bombini	Bombus	consobrinus	Fuji, Shizuoka	Japan	19	38	presence of polimorphic chromosomes with different C-banding patterns	as Bombus consobrinus wittenburgi		C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	cryptarum	Alberta	Canada	18			As Bombus (Bombus) moderatus					Apidae	1,2
+Apinae	Bombini	Bombus	deuteronymus	Fuji, Shizuoka	Japan	23	46	presence of polimorphic chromosomes with different C-banding patterns	as Bombus deuteronymus maruhanabachi		C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	diversus	Cape Ochiishi, Hokkaido; Lake Yamanaka, Yamanashi	Japan	18		k= 2pseudo-acrocentric + 8acrocentric + 8metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	ephippiatus		North America	18								Apidae	1,2
+Apinae	Bombini	Bombus	fervidus	Ontario	Canada	18	36							Apidae	1,2
+Apinae	Bombini	Bombus	griseocollis	Ontario	Canada	18							Owenetal1995	Apidae	1,2
+Apinae	Bombini	Bombus	hypocrita	Fuji, Shizuoka	Japan	18		k= 5pseudo-acrocentric + 2acrocentric + 11metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	honshuensis	Lake Yamanaka, Yamanashi	Japan	17	34	k= 3pseudo-acrocentric + 3acrocentric + 11metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	huntii	Alberta	Canada	18								Apidae	1,2
+Apinae	Bombini	Bombus	ignitus	Tsu, Mie; Tochigi Pref	Japan	18		k= 4pseudo-acrocentric + 3acrocentric + 11metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	impatiens	Guelph, Ontario	Canada					0.47				Apidae	1,2
+Apinae	Bombini	Bombus	impatiens							0.52				Apidae	1,2
+Apinae	Bombini	Bombus	impatiens	Ontario	Canada	18							Owenetal1995	Apidae	1,2
+Apinae	Bombini	Bombus	melanopygus		North America	18								Apidae	1,2
+Apinae	Bombini	Bombus	mixtus		North America	18								Apidae	1,2
+Apinae	Bombini	Bombus	morio			20								Apidae	1,2
+Apinae	Bombini	Bombus	nevadensis	Alberta	Canada	17-18								Apidae	1,2
+Apinae	Bombini	Bombus	occidentalis							0.46				Apidae	1,2
+Apinae	Bombini	Bombus	occidentalis	Alberta	Canada	18								Apidae	1,2
+Apinae	Bombini	Bombus	pauloensis			20	40		as Bombus (Fervidobombus) atratus				GarófaloandKerr1975	Apidae	1,2
+Apinae	Bombini	Bombus	pennsylvanicus	Ontario	Canada		36							Apidae	1,2
+Apinae	Bombini	Bombus	perplexus	Ontario	Canada	12							Owenetal1995	Apidae	1,2
+Apinae	Bombini	Bombus	pseudobaicalensis	Cape Ochiishi and Kawakami, Hokkaido	Japan	17	34	k= 3pseudo-acrocentric + 2acrocentric + 12metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	rufocinctus	Ontario	Canada	18							Owenetal1995	Apidae	1,2
+Apinae	Bombini	Bombus	schrencki	Cape Ochiishi, Hokkaido	Japan	17	34	k= 17metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	sitkensis		North America	18								Apidae	1,2
+Apinae	Bombini	Bombus	ternarius		North America	18								Apidae	1,2
+Apinae	Bombini	Bombus	terrestris	Tokyo	Japan	18	36							Apidae	1,2
+Apinae	Bombini	Bombus	terrestris	Basel or Winterthur or Zürich	 Switzerland	18				0.42 - 0.64			Wilfertetal2006,Gregoryetal2007,Stolleetal2011	Apidae	1,2
+Apinae	Bombini	Bombus	terricola	Ontario	Canada	18							Owenetal1995	Apidae	1,2
+Apinae	Bombini	Bombus	ussurensis	Fuji, Shizuoka	Japan	18		k= 3pseudo-acrocentric + 2acrocentric + 13metacentric			C-banding			Apidae	1,2
+Apinae	Bombini	Bombus	vagans	Ontario	Canada	18							Owenetal1995	Apidae	1,2
+Apinae	Bombini	Bombus	vosnesenskii		North America	18								Apidae	1,2
+Apinae	Emphorini	Melitoma	segmentaria	Viçosa, Minas Gerais	Brazil	15	30	2k= 28pseudo-acrocentric + 2metacentric			C-banding, Ag-NOR	DAPI/CMA3		Apidae	1,2
+Apinae	Eucerini	Melissodes	desponsa	Guelph, Ontario	Canada					0.52				Apidae	1,2
+Apinae	Eucerini	Melissodes	illata	Guelph, Ontario	Canada					0.37				Apidae	1,2
+Apinae	Euglossini	Eufriesea	violacea	Viçosa, Minas Gerais	Brazil	15	30	2k= 30submetacentric			C-banding, G-banding			Apidae	1,2
+Apinae	Euglossini	Euglossa	cordata	Cataguases, Minas Gerais	Brazil	21	42	2k= 42submetacentric	as Euglossa carolina		C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Euglossini	Euglossa	cyanaspis	Panama City	Panama	21		k= 21submetacentric						Apidae	1,2
+Apinae	Euglossini	Euglossa	hyacinthina	Province Chiriqui	Panama	20	40	k= 20submetacentric						Apidae	1,2
+Apinae	Euglossini	Euglossa	sp.	Viçosa, Minas Gerais	Brazil	21					Ag-NOR			Apidae	1,2
+Apinae	Euglossini	Euglossa	townsendi	Viçosa, Minas Gerais	Brazil	21	42	2k= 42submetacentric			C-banding, G-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Exomalopsini	Exomalopsis	auropilosa	Ribeirão Preto, São Paulo	Brazil	9			as Exomalopsis (Exomalopsis) aureopilosa					Apidae	1,2
+Apinae	Isepeolini 	Isepeolus	viperinus	Curitiba, Paraná	Brazil	16								Apidae	1,2
+Apinae	Meliponini	Austroplebeia	australis	Sidney	Australia		36					FISH (repetitive probe)		Apidae	1,2
+Apinae	Meliponini	Camargoia	nordestina	Brejo da Conceição, Piauí	Brazil		34	2k= 22acrocentric + 12pseudo-acrocentric			C-banding			Apidae	1,2
+Apinae	Meliponini	Celetrigona	longicornis	Nova Xavantina, Mato Grosso	Brazil		30	2k= 18metacentric + 12submetacentric		0.46-0.49			Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Cephalotrigona	capitata	Piranga and Viçosa, Minas Gerais	Brazil		34	2k= 18acrocentric + 16pseudo-acrocentric; 2k= 30metacentric + 4acrocentric			C-banding	DAPI/CMA3	Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Cephalotrigona	femorata	Urbano Santos, Maranhão	Brazil		34	2k= 34pseudo-acrocentric; 2k= 24metacentric + 6submetacentric + 4subtelocentric		0.55	C-banding	DAPI/CMA3	Mirandaetal2013,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Cleptotrigona	cubiceps	Zango and Luanda	Angola	18			as Lestrimelitta cubiceps					Apidae	1,2
+Apinae	Meliponini	Dactylurina	staudingeri	Ilonga	Tanzânia	17								Apidae	1,2
+Apinae	Meliponini	Duckeola	ghiliani	Presidente Figueiredo and Manaus, Amazonas	Brazil	15	30	2k= 14metacentric + 12submetacentric + 4subtelocentric	as Frieseomelitta (Duckeola) ghiliani	0.48	Giemsa		Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Friesella	schrottkyi	Pedregulho and Cunha, São Paulo; Viçosa and Rio Paranaíba, Minas Gerais	Brazil		34	2k= 10metacentric + 12submetacentric + 12subtelocentric		0.42-0.44	C-banding	DAPI/CMA3; FISH (microsatellite and ribosomal probes)	Elizeuetal2021	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	dispar	Ilhéus and Jequié, Bahia	Brazil	15	30	2k= 6metacentric + 4acrocentric + 20pseudo-acrocentric			C-banding	DAPI/CMA3; FISH (microsatellite probes)	Santosetal2018	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	doederleini	Santana do Seridó, Rio Grande do Norte; Canavieiras, Bahia	Brazil		30	2k= 4metacentric + 4acrocentric + 22pseudo-acrocentric			C-banding	DAPI/CMA3	Nascimentoetal2020	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	doederleini	Nova Ibiá, Bahia	Brazil		30	2k = 4metacentric + 4acrocentric + 22pseudo-acrocentric			C-banding	DAPI/CMA3; FISH (microsatellite probes)		Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	francoi	Cairu and Santa Inês, Bahia	Brazil	15	30	2k= 6metacentric + 4acrocentric + 20pseudo-acrocentric			C-banding	DAPI/CMA3; FISH (microsatellite probes)	Santosetal2018	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	languida	Arcos and Divinópolis, Minas Gerais	Brazil		30	2k= 4metacentric + 4acrocentric + 22pseudo-acrocentric; 2k= 14metacentric + 14submetacentric + 2subtelocentric			C-banding		Rochaetal2003a,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	longipes	Belém, Pará	Brazil		34	2k= 8metacentric + 12acrocentric + 14pseudo-acrocentric				DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	meadewaldoi	Nova Ibiá, Bahia	Brazil		30	2k = 8metacentric + 4acrocentric + 18pseudo-acrocentric			C-banding	DAPI/CMA3; FISH (microsatellite probes)	Santosetal2018	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	portoi	Rio Branco, Acre	Brazil		30	2k = 4metacentric + 26acrocentric				DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	sp. n.	Jequié, Bahia	Brazil		30	2k = 4metacentric + 4acrocentric + 22pseudo-acrocentric		0.44	C-banding	DAPI/CMA3; FISH (microsatellite probes)	Santosetal2018	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	sp.	Brasília, Distrito Federal	Brazil		30	2k = 18metacentric + 10submetacentric + 2subtelocentric			Giemsa			Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	sp.1	Presidente Figueiredo, Amazonas	Brazil		30	2k = 20metacentric + 10submetacentric		0.54	Giemsa			Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	sp.2	Iranduba, Amazonas	Brazil		30	2k = 20metacentric + 10submetacentric			Giemsa			Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	trichocerata	Juína, Mato Grosso	Brazil		30	2k = 6metacentric + 20acrocentric + 4pseudo-acrocentric				DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	varia	Divinópolis, Uberlândia,  Lontra and Viçosa, Minas Gerais	Brazil		30	2k= 4metacentric + 4acrocentric + 22pseudo-acrocentric; 2k= 16metacentric + 12submetacentric + 2subtelocentric			C-banding	DAPI/CMA3; FISH (microsatellite probes, repetitive probe)	Santosetal2018,Pereiraetal2020	Apidae	1,2
+Apinae	Meliponini	Frieseomelitta	varia	Ribeirão Preto, São Paulo; Bocaiúva, Minas Gerais	Brazil					0.46-0.48				Apidae	1,2
+Apinae	Meliponini	Geotrigona	mombuca	Ribeirão Preto, São Paulo	Brazil	15		k= 2metacentric + 6acrocentric + 7pseudo-acrocentric			C-banding			Apidae	1,2
+Apinae	Meliponini	Geotrigona	subterranea	Passos and Lontra, Minas Gerais	Brazil		34	k= 14metacentric + 10submetacentric + 10subtelocentric		0.83	Giemsa			Apidae	1,2
+Apinae	Meliponini	Hypotrigona	gribodoi	Luanda; Massinga	Angola; Moçambique	14 or 15			as Hypotrigona brausi				KerrandSilveira1972	Apidae	1,2
+Apinae	Meliponini	Lestrimelitta	limao	Divinópolis, Minas Gerais	Brazil		28	2k= 6metacentric + 6acrocentric + 16pseudo-acrocentric; 2k= 18metacentric + 10submetacentric			C-banding		Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Lestrimelitta	sp.	Domingos Martins, Espírito Santo	Brazil		28	2k= 18metacentric + 10submetacentric		0.463	Giemsa		Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Lestrimelitta	sulina	Lavras, Minas Gerais	Brazil					0.53				Apidae	1,2
+Apinae	Meliponini	Leurotrigona	muelleri	Passos and Senador Mourão, Minas Gerais; Cajuru, São Paulo; Itacajá, Tocantins	Brazil	8	16	2k= 14metacentric + 2acrocentric		0.35	C-banding		Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Leurotrigona	muelleri	Ribeirão Preto, São Paulo	Brazil					0.31-0.32				Apidae	1,2
+Apinae	Meliponini	Leurotrigona	pusilla	Manaus, Amazonas	Brazil		30	2k= 10metacentric + 14submetacentric + 6acrocentric			C-banding			Apidae	1,2
+Apinae	Meliponini	Melipona	amazonica	Iranduba, Amazonas	Brazil		18	2k= 10metacentric + 6submetacentric + 2subtelocentric		0.31	Giemsa			Apidae	1,2
+Apinae	Meliponini	Melipona	asilvai	Pedra de Maria da Cruz, Minas Gerais; Santana do Seridó, Rio Grande do Norte	Brazil	9	18	2k= 6metacentric + 10submetacentric + 2acrocentric			C-banging, Ag-NOR	DAPI/CMA3; FISH (microsatellite probes, ribosomal probe)	Rochaetal2002,Rochaetal2007,Travenzolietal2019a,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	asilvai	São João do Sabugi, Paraíba	Brazil					0.26-0.29			Tavaresetal2012	Apidae	1,2
+Apinae	Meliponini	Melipona	bicolor 	Cunha, São Paulo; Viçosa, Minas Gerais	Brazil	9	18	2k= 6metacentric + 8submetacentric + 4acrocentric		0.25-0.28	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe, repetitive probe)	Rochaetal2002,Tavaresetal2010b,Tavaresetal2012,Andrade-Souzaetal2018,Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	capixaba	Venda Nova do Imigrante, Espírito Santo	Brazil	9	18	high heterochromatin content species			C-banding	DAPI/CMA3	Rochaetal2002	Apidae	1,2
+Apinae	Meliponini	Melipona	capixaba	Domingos Martins, Espírito Santo	Brazil		18	high heterochromatin content species		1.38		FISH (microsatellite probes, ribosomal probe)	Travenzolietal2019a,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	captiosa	Rio Branco, Acre	Brazil	9	18	high heterochromatin content species			C-banding			Apidae	1,2
+Apinae	Meliponini	Melipona	crinita	Rio Branco and Xapuri, Acre	Brazil	9	18	high heterochromatin content species		0.73	C-banding	DAPI/CMA3; FISH (ribosomal probe)	Tavaresetal2010b,Andrade-Souzaetal2018	Apidae	1,2
+Apinae	Meliponini	Melipona	eburnea	Xapuri, Acre	Brazil					1.11				Apidae	1,2
+Apinae	Meliponini	Melipona	fasciculata	São Luis and Urbano Santos, Maranhão; Belém and Altamira, Pará	Brazil	9	18	high heterochromatin content species	as Melipona compressipes in Rochaetal2002	0.82-0.84	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe, repetitive probe)	Lopesetal2011,Tavaresetal2012,Andrade-Souzaetal2018,Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	fasciculata	Piripiri, Piauí	Brazil				as Melipona compressipes	0.78				Apidae	1,2
+Apinae	Meliponini	Melipona	favosa		Suriname	9	18	2k= 12metacentric + 4submetacentric + 2acrocentric	Suriname (referred as Surinum)		C-banding		HoshibaandImai1993	Apidae	1,2
+Apinae	Meliponini	Melipona	flavolineata	Urbano Santos, Maranhão; Belém, Pará; Capixaba, Brasiléia and Xapuri, Acre	Brazil	9	18	high heterochromatin content species		0.98	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe, repetitive probe)	Tavaresetal2012,Andrade-Souzaetal2018,Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	fuliginosa	Urbano Santos, Maranhão	Brazil	9	18	high heterochromatin content species			C-banding	DAPI/CMA3; FISH (microsatellite probes, ribosomal probe)	Travenzolietal2019a,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	fulva	Presidente Figueiredo, Amazonas	Brazil		18	high heterochromatin content species			Giemsa	FISH (C0t-1 probe, ribosomal probe)	Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	fuscopilosa	Rio Branco and Xapuri, Acre	Brazil	9	18	high heterochromatin content species		1.10	C-banding	DAPI/CMA3; FISH (ribosomal probe)	Rochaetal2002,Tavaresetal2010b,Andrade-Souzaetal2018	Apidae	1,2
+Apinae	Meliponini	Melipona	grandis	Xapuri, Acre	Brazil		18	high heterochromatin content species		0.95		DAPI/CMA3; FISH (ribosomal probe)	Andrade-Souzaetal2018	Apidae	1,2
+Apinae	Meliponini	Melipona	interrupta	Manaus, Amazonas	Brazil	9			as Melipona compressipes manaosensis					Apidae	1,2
+Apinae	Meliponini	Melipona	interrupta	Iranduba and Itacoatiara, Amazonas	Brazil		18	high heterochromatin content species		0.80	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe)	Cunhaetal2020,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	lateralis	Presidente Figueiredo, Amazonas	Brazil	11	22	high heterochromatin content species		0.87	Giemsa	FISH (C0t-1 probe)	Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	nebulosa	Xapuri, Acre	Brazil		18	high heterochromatin content species				DAPI/CMA3; FISH (ribosomal probe)		Apidae	1,2
+Apinae	Meliponini	Melipona	mandacaia	Irecê and Uauá, Bahia	Brazil	9	18	2k= 2metacentric + 14submetacentric + 2acrocentric; 2k= 4metacentric + 12submetacentric + 2acrocentric		0.33-0.35	C-banding	DAPI/CMA3; FISH (ribosomal probe)	Tavaresetal2010b,Tavaresetal2012,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	marginata	Caeté and Viçosa, Minas Gerais	Brazil	9	18				C-banding, Ag-NOR	DAPI/CMA3	Maffeietal2001,Rochaetal2002	Apidae	1,2
+Apinae	Meliponini	Melipona	marginata	Cunha, São Paulo	Brazil					0.28				Apidae	1,2
+Apinae	Meliponini	Melipona	mondury	Diogo Vasconcelos, Itamarandiba, Rio Vermelho and Viçosa, Minas Gerais; Rio Bonito, Rio de Janeiro	Brazil	9	18	high heterochromatin content species		0.94-0.95	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe, repetitive probe)	Lopesetal2009,Tavaresetal2012,Andrade-Souzaetal2018,Travenzolietal2019a,Pereiraetal2020,Cunhaetal2020,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	paraensis	Altamira, Pará	Brazil	9	18	high heterochromatin content species			C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe)	Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	puncticollis 	Altamira, Pará	Brazil	9	18	2k= 4metacentric + 12submetacentric + 2acrocentric			C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe, repetitive probe)	Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	quadrifasciata	Pocinhos do Rio Verde, Minas Gerais; Santana de Parnaiba, São Paulo	Brazil	9	18		as Melipona quadrifasciata anthidioides		G-banding		Tambascoetal1979	Apidae	1,2
+Apinae	Meliponini	Melipona	quadrifasciata	Caeté and Viçosa, Minas Gerais; Brejo Grande, Sergipe	Brazil	9	18	2k= 4metacentric + 12submetacentric + 2acrocentric		0.25-0.27	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe, repetitive probe)	Rochaetal2002,Tavaresetal2010b,Silvaetal2012,Tavaresetal2012,Andrade-Souzaetal2018,Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	quinquefasciata	Ceará; Cristalina and Luizlândia, Goiás; Brasília, Distrito Federal; Bicas, Piumhi, Januária and Caeté, Minas Gerais	Brazil	9	18	2k= 10metacentric + 6submetacentric + 2acrocentric; 2k= 8metacentric + 6submetacentric + 4subtelocentric	up to 4 B chromosomes have been described	0.67-0.70	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, ribosomal probe, repetitive probes)	Rochaetal2007,Tavaresetal2010b,Tavaresetal2012,Silvaetal2018,Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	rufiventris 	Guimarânia, Minas Gerais	Brazil	9	18	high heterochromatin content species	1 B chromosome has been described	0.93	C-banding	DAPI/CMA3; FISH (C0t-1 probe, microsatellite probes, chromosome painting, ribosomal probe, repetitive probe)	Lopesetal2009,Lopesetal2014,Travenzolietal2019a,Cunhaetal2020,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	cf. rufiventris 	Iranduba, Amazonas	Brazil		18	high heterochromatin content species			Giemsa			Apidae	1,2
+Apinae	Meliponini	Melipona	scutellaris	Ilhéus and Lençóis, Bahia; Rio Claro, São Paulo	Brazil	9	18	high heterochromatin content species			C-banding	DAPI/CMA3; FISH (C0t-1 probe, ribosomal probe, U2 snDNA probe, microsatellite probes)	Rochaetal2002,Andrade-Souzaetal2018,Piccolietal2018,Travenzolietal2019a,Pereiraetal2021,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	scutellaris	Pilões, Paraíba	Brazil					1.08				Apidae	1,2
+Apinae	Meliponini	Melipona	seminigra	Rio Branco, Acre	Brazil		22	high heterochromatin content species	as Melipona seminigra abunensis			DAPI/CMA3; FISH (ribosomal probe)		Apidae	1,2
+Apinae	Meliponini	Melipona	seminigra	Nova Xavantina, Mato Grosso	Brazil					0.85				Apidae	1,2
+Apinae	Meliponini	Melipona	seminigra	Iranduba and Manaus, Amazonas	Brazil	11	22	high heterochromatin content species	as Melipona seminigra merrillae	0.92	C-banding, Ag-NOR	DAPI/CMA3; FISH (C0t-1 probe, ribosomal probe, microsatellite probes)	Cunhaetal2018,Cunhaetal2020,Barbosaetal2021,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	seminigra	Altamira and Santarém, Pará	Brazil	11	22	high heterochromatin content species	as Melipona seminigra pernigra		C-banding	DAPI/CMA3; FISH (microsatellite probes, ribosomal probe)	Andrade-Souzaetal2018,Travenzolietal2019a,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	subnitida	Mossoro and Santana do Seridó, Rio Grande do Norte	Brazil	9	18	2k= 4metacentric + 10submetacentric + 4acrocentric		0.27	C-banding	DAPI/CMA3; FISH (microsatellite probes, ribosomal probe)	Rochaetal2002,Tavaresetal2010b,Travenzolietal2019a,Pereiraetal2021	Apidae	1,2
+Apinae	Meliponini	Melipona	sp.	Brasília, Distrito Federal	Brazil		18	2k= 10metacentric + 6submetacentric + 2acrocentric			Giemsa			Apidae	1,2
+Apinae	Meliponini	Meliponula	becarii	Massinga	Moçambique	17			as Meliplebeia becarii					Apidae	1,2
+Apinae	Meliponini	Meliponula	bocandei	Dande and Luanda	Angola	18			as Trigona (Meliponula) bocandei					Apidae	1,2
+Apinae	Meliponini	Meliponula	ferruginea	Zango and Luanda	Angola	18	s	s	as Trigona erithra togoensis					Apidae	1,2
+Apinae	Meliponini	Mourella	caerulea	Canguçú, Rio Grande do Sul	Brazil	17	34	k= 11acrocentric + 6pseudo-acrocentric			C-banding			Apidae	1,2
+Apinae	Meliponini	Nannotrigona	punctata	Altamira, Pará	Brazil		34	2k= 12metacentric + 6submetacentric + 16subtelocentric			Giemsa			Apidae	1,2
+Apinae	Meliponini	Nannotrigona	sp.	Porto Seguro, Bahia	Brazil		34	2k= 20acrocentric + 14pseudo-acrocentric			C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Nannotrigona	sp.	Xapuri, Acre	Brazil					0.45				Apidae	1,2
+Apinae	Meliponini	Nannotrigona	testaceicornis	Viçosa and Januária, Minas Gerais	Brazil	17	34	variable among populations		0.49-0.53	C-banding	DAPI/CMA3; FISH (repetitive probe)	Rochaetal2003a,Tavaresetal2012,Pereiraetal2020,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Oxytrigona	flaveola	Tangará da Serra, Mato Grosso	Brazil		34	2k= 8metacentric + 8submetacentric + 16subtelocentric + 2acrocentric	as Oxytrigona cf. flaveola			DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Oxytrigona	tataira	Presidente Venceslau, São Paulo	Brazil	17								Apidae	1,2
+Apinae	Meliponini	Parapartamona	brevipilosa	Baeza and Cosanga, Napo	Ecuador		32	all metacentric or submetacentric						Apidae	1,2
+Apinae	Meliponini	Parapartamona	zonata	Chiriboga and Tandayapa, Pichincha	Ecuador	16	32	all metacentric or submetacentric						Apidae	1,2
+Apinae	Meliponini	Paratrigona	lineata	Passos, Minas Gerais	Brazil					0.49				Apidae	1,2
+Apinae	Meliponini	Paratrigona	sp.	Rio Paranaíba, Minas Gerais	Brazil					0.44				Apidae	1,2
+Apinae	Meliponini	Paratrigona	subnuda	Ribeirão Preto, São Paulo	Brazil		34	2k= 24acrocentric + 10pseudo-acrocentric			C-banding			Apidae	1,2
+Apinae	Meliponini	Paratrigona	subnuda	Viçosa, Minas Gerais	Brazil					0.26				Apidae	1,2
+Apinae	Meliponini	Partamona	ailyae	Nova Xavantina and Juína, Mato Grosso	Brazil	17	34	2k= 22metacentric + 12submetacentric	as Partamona aylae		C-banding	DAPI/CMA3; FISH (ribosomal probe)	Goncalvesetal2020	Apidae	1,2
+Apinae	Meliponini	Partamona	chapadicola	Urbano Santos, Maranhão	Brazil	17	34	2k= 24metacentric + 10submetacentric		0.63	C-banding	DAPI/CMA3; FISH (microsatellite probes, ribosomal probe)	Lopesetal2020	Apidae	1,2
+Apinae	Meliponini	Partamona	cupira	Guimarânia, Minas Gerais	Brazil		34	2k= 10metacentric + 22submetacentric + 2acrocentric	1 B chromosome has been described		C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Partamona	helleri	Cruz das Almas, Itacaré, Jequié, Cravolândia, Bahia; Santa Teresa, Espírito Santo; Araponga, Guaraciaba, Juiz de Fora, Pedra do Anta, Piranga, Porto Firme, Rio Vermelho, São Miguel do Anta, Viçosa, Minas Gerais; Recife, Ceará	Brazil	17	34	mostly metacentric or submetacentric	up to 7 B chromosomes have been described	0.55	C-banging, Ag-NOR	DAPI/CMA3; FISH (chromosome painting, ribosomal probe, repetitive and microsatellite probes)	Britoetal1997,Tostaetal2004,Britoetal2005,Tostaetal2007,Martinsetal2009,Tavaresetal2012,Martinsetal2013,Martinsetal2014, Tostaetal2014,Pereiraetal2020,Lopesetal2020,Goncalvesetal2020	Apidae	1,2
+Apinae	Meliponini	Partamona	mulata	Cuiabá, Mato Grosso	Brazil	17	34	mostly metacentric or submetacentric			C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Partamona	nhambiquara	Nova Xavantina and Tangará da Serra, Mato Grosso	Brazil	17	34	2k= 24metacentric + 10submetacentric			C-banding	DAPI/CMA3; FISH (microsatellite probes, ribosomal probe)	Lopesetal2020	Apidae	1,2
+Apinae	Meliponini	Partamona	peckolti	San Francisco de Las Pampas village, Cotopaxi province	Ecuador		34				C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Partamona	rustica	Januária and Lontra, Minas Gerais	Brazil		34		B chromosomes have been described	0.57-0.59			Tostaetal2014	Apidae	1,2
+Apinae	Meliponini	Partamona	seridoensis	Sant’Ana do Seridó, Rio Grande do Norte	Brazil	17	34	mostly metacentric or submetacentric			C-banding	DAPI/CMA3; FISH (ribosomal probe)		Apidae	1,2
+Apinae	Meliponini	Partamona	sooretamae	Presidente Tancredo Neves and Uruçuca, Bahia	Brazil		34	2k= 20metacentric + 14submetacentric				DAPI/CMA3; FISH (ribosomal probe)		Apidae	1,2
+Apinae	Meliponini	Partamona	vicina	Nova Xavantina, Mato Grosso	Brazil	17	34	mostly metacentric or submetacentric			C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Plebeia	droryana	Santo Antônio do Jacinto, Minas Gerais	Brazil	17	34	k= 12pseudo-acrocentric + 2acrocentric + 3metacentric; 2k 18metacentric + 16submetacentric			C-banding		Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Plebeia	droryana	Viçosa, Minas Gerais	Brazil					0.48-0.49				Apidae	1,2
+Apinae	Meliponini	Plebeia	droryana	Ribeirão Preto, São Paulo	Brazil					0.52				Apidae	1,2
+Apinae	Meliponini	Plebeia	lucii	Viçosa, Minas Gerais	Brazil		34	2k= 22pseudo-acrocentric + 12acrocentric; 2k= 6metacentric + 6submetacentric + 22subtelocentric		0.43	C-banding	DAPI/CMA3	Tavaresetal2012,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Plebeia	phrynostoma	Espírito Santo	Brazil		34	2k= 18pseudo-acrocentric + 10acrocentric + 6metacentric			C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Plebeia	sp.1	Viçosa, Minas Gerais	Brazil		34				Ag-NOR			Apidae	1,2
+Apinae	Meliponini	Plebeia	sp.	Xapuri, Acre	Brazil					0.43-0.44				Apidae	1,2
+Apinae	Meliponini	Plebeia	sp. nov.	Presidente Figueiredo, Amazonas	Brazil		34	2k= 6metacentric + 2submetacentric + 26subtelocentric		0.40	Giemsa			Apidae	1,2
+Apinae	Meliponini	Plebeina	hildebrandti	Moamba	Moçambique	18			as Plebeia (Plebeia) denoiti					Apidae	1,2
+Apinae	Meliponini	Ptilotrigona	lurida	Manaus, Amazonas	Brazil	11		k= 6metacentric + 3acrocentric + 2pseudo-acrocentric			C-banding			Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	barrocoloradensis	Although cited as “from Brazil”, this species does not occur in this Country	Brazil	17	34	k= 6pseudo-acrocentric + 8acrocentric + 3metacentric	as Trigona barrocoloralensis		C-banding			Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	bipunctata	Ribeirão Preto, São Paulo	Brazil					0.40-0.44				Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	depilis	Ribeirão Preto, São Paulo	Brazil		34	2k= 26acrocentric + 8pseudo-acrocentric		0.39-0.41	C-banding		Tavaresetal2012	Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	cf. polysticta	Presidente Figueiredo, Amazonas	Brazil		34	2k= 8metacentric + 6submetacentris + 20subtelocentric		0.52	Giemsa			Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	postica	Ribeirão Preto, São Paulo	Brazil		34	2k= 22acrocentric + 12pseudo-acrocentric			C-banding			Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	tubiba	Urbano Santos, Maranhão	Brazil					0.45				Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	xanthotricha	Camacan and Valença, Bahia; Piranga and Viçosa, Minas Gerais	Brazil	17	34	variable among populations		0.42-0.44	C-banding, Ag-NOR	DAPI/CMA3	Duarteetal2009,Lopesetal2009,Tavaresetal2012,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	sp.	São José do Sabugi, Paraíba	Brazil		34	2k= 18acrocentric + 16pseudo-acrocentric			C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Scaptotrigona	sp.	Pará	Brazil		34	2k= 10metacentric + 6submetacentric + 18 subtelocentric			Giemsa			Apidae	1,2
+Apinae	Meliponini	Scaura	latitarsis	Ribeirão Preto, São Paulo	Brazil		34	2k= 14acrocentric + 20pseudo-acrocentric		0.43-0.44	C-banding		Tavaresetal2012	Apidae	1,2
+Apinae	Meliponini	Schwarziana	quadripunctata	Viçosa, Minas Gerais	Brazil		34	2k= 18acrocentric + 16pseudo-acrocentric; 2k= 14metacentric + 8submetacentric + 12subtelocentric		0.67	C-banding		Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Schwarziana	sp.	Domingos Martins, Espírito Santo	Brazil					0.65				Apidae	1,2
+Apinae	Meliponini	Tetragona	clavipes	Viçosa, Minas Gerais	Brazil		34	2k= 6acrocentric + 28pseudo-acrocentric			C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Tetragonisca	angustula		Brazil	17	34	k= 14pseudo-acrocentric + 2acrocentric + 1metacentric	as Trigona angustula		C-banding			Apidae	1,2
+Apinae	Meliponini	Tetragonisca	angustula	Tangará da Serra, Mato Grosso; Viçosa and Mutum, Minas Gerais	Brazil	17	34	2k= 34pseudo-acrocentric		0.90	C-banding	DAPI/CMA3; FISH (repetitive probe)	Barthetal2011,Tavaresetal2012,Pereiraetal2020	Apidae	1,2
+Apinae	Meliponini	Tetragonisca	fiebrigi	Tangará da Serra, Mato Grosso	Brazil	17	34	2k= 34pseudo-acrocentric	up to 2 B chromosomes have been described		C-banding	DAPI/CMA3; FISH (Chromosome Painting, repetitive probe)	 Lopesetal2014,Pereiraetal2020	Apidae	1,2
+Apinae	Meliponini	Tetragonula	minangkabau	Although cited as “from Brazil”, this species does not occur in this Country	Brazil	20	40	k= 7pseudo-acrocentric + 7acrocentric + 6metacentric	as Trigona minangkabau		C-banding			Apidae	1,2
+Apinae	Meliponini	Trigona	branneri	Cuiabá, Mato Grosso	Brazil	17	34	2k= 16acrocentric + 16pseudo-acrocentric + 2metacentric			C-banding	CMA3		Apidae	1,2
+Apinae	Meliponini	Trigona	braueri	Pedra Branca, Bahia	Brazil		32	2k= 2metacentric + 4acrocentric + 26pseudo-acrocentric	as Trigona fulviventris		C-banding	DAPI/CMA3		Apidae	1,2
+Apinae	Meliponini	Trigona	chanchamayoensis	Cuiabá and Tangará da Serra, Mato Grosso	Brazil	17	34	2k= 20acrocentric + 12pseudo-acrocentric + 2metacentric			C-banding	CMA3	Fernandesetal2013b	Apidae	1,2
+Apinae	Meliponini	Trigona	hyalinata	Cuiabá, Mato Grosso; Viçosa, Minas Gerais	Brazil	17	34	2k= 6acrocentric + 28pseudo-acrocentric; 2k= 26metacentric + 8submetacentric		0.53	C-banding		Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Trigona	pallens	Urbano Santos, Maranhão	Brazil					0.81				Apidae	1,2
+Apinae	Meliponini	Trigona	recursa	Luislândia and Januária, Minas Gerais; Cuiabá, Mato Grosso	Brazil	17	34	variable among populations			C-banding	CMA3	Costaetal2004,Cunhaetal2021	Apidae	1,2
+Apinae	Meliponini	Trigona	sp.	Cônego Marinho, Minas Gerais	Brazil	17		k= 2acrocentric + 15pseudo-acrocentric	as Trigona cfr. fuscipennis		C-banding			Apidae	1,2
+Apinae	Meliponini	Trigona	sp.	Urbano Santos, Maranhão	Brazil				as Trigona fulviventris	0.70				Apidae	1,2
+Apinae	Meliponini	Trigona	spinipes	Bandeira and Viçosa, Minas Gerais; Coaraci, Bahia; Milagres, Ceará	Brazil	17	34	variable among populations		0.42-0.44	C-banding	DAPI/CMA3; FISH (ribosomal probe, repetitive probes)	Tavaresetal2012,BarbozaandCosta2021	Apidae	1,2
+Apinae	Meliponini	Trigonisca	sp.	Urbano Santos, Maranhão	Brazil	15	30	k= 4metacentric + 8submetacentric + 18subtelocentric			Giemsa			Apidae	1,2
+Apinae	Xylocopini	Ceratina	calcarata	Guelph, Ontario	Canada					0.68				Apidae	1,2
+Apinae	Xylocopini	Ceratina	dentipes	Matsue, Shimane	Japan	17	34	k= 15pseudo-acrocentric + 2metacentric			C-banding			Apidae	1,2
+Apinae	Xylocopini	Ceratina	dupla	Guelph, Ontario	Canada					0.59				Apidae	1,2
+Apinae	Xylocopini	Ceratina	flavipes	Itabashi-ku, Tokyo; Matsue, Shimane; Sendai, Miyagi	Japan	17	34	k= 12pseudo-acrocentric + 5metacentric			C-banding			Apidae	1,2
+Apinae	Xylocopini	Ceratina	japonica	Matsue, Shimane	Japan	17	34	k= 16pseudo-acrocentric + 1metacentric			C-banding			Apidae	1,2
+Apinae	Xylocopini	Ceratina	megastigmata	Matsue, Shimane	Japan	17	34	k= 16pseudo-acrocentric + 1metacentric			C-banding			Apidae	1,2
+Apinae	Xylocopini	Ceratina	okinawana	Iriomote, Okinawa	Japan	17	34	presence of polimorphic chromosomes with different C-banding patterns			C-banding			Apidae	1,2
+Apinae	Xylocopini	Ceratina	smaragdula	Matsue, Shimane	Japan	14	28	k= 14pseudo-acrocentric	as Pithitis smaragdula		C-banding			Apidae	1,2
+Apinae	Xylocopini	Exoneura	robusta	Dandenong Ranges of Victoria	Australia		26							Apidae	1,2
+Apinae	Xylocopini	Xylocopa	appendiculata	Kamakura and Sagamihara, Kanagawa	Japan	17	34	k= 13acrocentric + 4metacentric			C-banding			Apidae	1,2
+Apinae	Xylocopini	Xylocopa	fenestrata	Ludhiana	India	16	32		as Xylocopa fenesterata					Apidae	1,2
+Apinae	Xylocopini	Xylocopa	virginica	Orlando, Florida	United States				as Xylocopa virginica krombeini	0.69				Apidae	1,2
+Collectinae	Colletini	Colletes	babai	Rifu, Miyagi	Japan	16	32	k= 16pseudo-acrocentric			C-banding			Apidae	1,2
+Collectinae	Colletini	Colletes	esakii	Daisen, Tottori	Japan	16		k= 15pseudo-acrocentric + 1acrocentric			C-banding			Apidae	1,2
+Collectinae	Hylaeini	Hylaeus	affinis	Lake Placid, Florida	United States					0.64				Apidae	1,2
+Collectinae	Hylaeini	Hylaeus	nippon	Matsue, Shimane	Japan	8		k= 1pseudo-acrocentric + 7metacentric			C-banding			Apidae	1,2
+Collectinae	Hylaeini	Hylaeus	sp. 1	Rifu, Miyagi	Japan	18		k= 18metacentric			C-banding			Apidae	1,2
+Collectinae	Hylaeini	Hylaeus	sp. 2	Rifu, Miyagi	Japan	28		k= 26pseudo-acrocentric + 2metacentric			C-banding			Apidae	1,2
+Halictinae	Augochlorini	Augochlora	pura	Etna (Ithaca), New York	United States	11	22	k= 9metacentric + 2submetacentric						Apidae	1,2
+Halictinae	Augochlorini	Augochlorella	urania	Curitiba, Paraná	Brazil	16			as Augochlorella michaelis					Apidae	1,2
+Halictinae	Augochlorini	Augochloropsis	metallica	Guelph, Ontario	Canada					0.90				Apidae	1,2
+Halictinae	Augochlorini	Augochloropsis	sparsilis	Curitiba, Paraná	Brazil	16								Apidae	1,2
+Halictinae	Augochlorini	Pseudaugochlora	graminea	Curitiba, Paraná	Brazil	8			as Pseudaugochloropsis graminea					Apidae	1,2
+Halictinae	Halictini	Agapostemon	splendens	Orlando, Florida	United States					0.66				Apidae	1,2
+Halictinae	Halictini	Agapostemon	virescens	Ithaca, New York	United States	17	34	mostly acrocentric or subacrocentric						Apidae	1,2
+Halictinae	Halictini	Halictus	aerarius	Fujisawa, Kanagawa; Rifu, Miyagi	Japan	14	28	k= 5pseudo-acrocentric + 9metacentric			C-banding			Apidae	1,2
+Halictinae	Halictini	Halictus	ligatus	Guelph, Ontario	Canada					0.60				Apidae	1,2
+Halictinae	Halictini	Halictus	ligatus	Orlando, Florida	United States					0.49				Apidae	1,2
+Halictinae	Halictini	Halictus	poeyi	Lake Placid, Florida	United States					0.40				Apidae	1,2
+Halictinae	Halictini	Lasioglossum	allodalum	Rifu, Miyagi	Japan	20		k= 13pseudo-acrocentric + 7metacentric			C-banding			Apidae	1,2
+Halictinae	Halictini	Lasioglossum	cooleyi	Vancouver	Canada	18			as Lasioglossum (Evylaeus) cooleyi					Apidae	1,2
+Halictinae	Halictini	Lasioglossum	duplex	Fujisawa, Kanagawa; Rifu, Miyagi	Japan	9	18	k= 9metacentric			C-banding			Apidae	1,2
+Halictinae	Halictini	Lasioglossum	lineatulus	Ithaca, New York	United States	12	24	all metacentric or submetacentric	Dialictus lineatulus					Apidae	1,2
+Halictinae	Halictini	Lasioglossum	malachurum	Frankfurt	Germany	8	16		as Halictus malachurus					Apidae	1,2
+Halictinae	Halictini	Lasioglossum	rhytidophorus	Curitiba, Paraná	Brazil	6			as Lasioglossum (Dialictus) rhytidophorum					Apidae	1,2
+Halictinae	Halictini	Lasioglossum	taeniolellum	Sagamihara, Kanagawa	Japan	16	32	k= 7pseudo-acrocentric + 3acrocentric + 6metacentric			C-banding			Apidae	1,2
+Halictinae	Halictini	Lasioglossum	zephyrum	Ithaca, New York	United States	13	26	all metacentric or submetacentric	Dialictus zephyrus					Apidae	1,2
+Megachilinae	Anthidiini	Loyolanthidium	notatum	Orlando, Florida	United States				as Anthidiellum notatum rufimaculatum	0.48				Apidae	1,2
+Megachilinae	Megachilini	Megachile	ainu	Matsue, Shimane	Japan	16		k= 16pseudo-acrocentric			C-banding			Apidae	1,2
+Megachilinae	Megachilini	Megachile	albitarsis	Orlando, Florida	United States					0.80				Apidae	1,2
+Megachilinae	Megachilini	Megachile	pseudomonticola	Matsue, Shimane	Japan	16		k= 7pseudo-acrocentric + 9metacentric			C-banding			Apidae	1,2
+Megachilinae	Megachilini	Megachile	rotundata	Guelph, Ontario	Canada					0.83				Apidae	1,2
+Megachilinae	Megachilini	Megachile	sculpturalis	Matsue, Shimane; Higashimatsuyama, Saitama	Japan	16		k= 4pseudo-acrocentric + 12metacentric	as Chalicodoma sculpturalis		C-banding			Apidae	1,2
+Megachilinae	Megachilini	Megachile	spissula	Sendai, Miyagi	Japan	16		k= 14pseudo-acrocentric + 2metacentric	as Chalicodoma spissula		C-banding			Apidae	1,2
+Megachilinae	Osmini	Osmia	cornifrons	Matsue, Shimane	Japan	16		k= 7pseudo-acrocentric + 9metacentric			C-banding			Apidae	1,2
+Megachilinae	Osmini	Osmia	cornuta			16	32						KerrandLaidlaw1956	Apidae	1,2
+Megachilinae	Osmini	Osmia	lignaria	Matsue, Shimane	Japan	16		k= 16pseudo-acrocentric	as Osmia lignaria propinqua		C-banding			Apidae	1,2
+Megachilinae	Osmini	Osmia	taurus	Matsue, Shimane	Japan	16		k= 16pseudo-acrocentric			C-banding			Apidae	1,2

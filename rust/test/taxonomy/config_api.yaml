@@ -1,0 +1,9 @@
+path: test/taxonomy/all/combined
+taxonomy_format: ncbi
+root_taxon_id:
+  - 1
+base_taxon_id: 1
+name_classes:
+  - scientific name
+  - synonym
+xref_label: ncbi

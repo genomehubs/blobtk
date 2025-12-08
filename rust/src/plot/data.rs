@@ -1,10 +1,16 @@
 use clap::ValueEnum;
+
+#[cfg(feature = "python-extension")]
+use pyo3::pyclass;
+
+use std::str::FromStr;
 use svg::node::element::path::Data;
 
 use super::axis::{AxisName, AxisOptions, Position};
 use super::category::Category;
 
 #[derive(Clone, Debug, Default, ValueEnum)]
+#[cfg_attr(feature = "python-extension", pyclass)]
 pub enum Reducer {
     #[default]
     Sum,
@@ -12,6 +18,20 @@ pub enum Reducer {
     Min,
     Count,
     Mean,
+}
+
+impl FromStr for Reducer {
+    type Err = ();
+    fn from_str(input: &str) -> Result<Reducer, Self::Err> {
+        match input {
+            "sum" => Ok(Reducer::Sum),
+            "max" => Ok(Reducer::Max),
+            "min" => Ok(Reducer::Min),
+            "count" => Ok(Reducer::Count),
+            "mean" => Ok(Reducer::Mean),
+            _ => Ok(Reducer::Sum),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

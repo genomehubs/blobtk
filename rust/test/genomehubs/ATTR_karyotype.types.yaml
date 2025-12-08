@@ -1,0 +1,122 @@
+attributes:
+  chromosome_number:
+    display_group: karyotype
+    bins:
+      min: 0
+      max: 10
+      count: 10
+      scale: log2
+    constraint:
+      max: 2000
+      min: 1
+    description: Chromosome number
+    display_level: 1
+    display_name: Chromosome number
+    summary:
+      - mode_high
+      - mode_list
+      - median_high
+      - mode
+      - max
+      - min
+    traverse: mode
+    traverse_direction: both
+    type: short
+  haploid_number:
+    display_group: karyotype
+    bins:
+      min: 0
+      max: 10
+      count: 10
+      scale: log2
+    constraint:
+      max: 2000
+      min: 1
+    description: Haploid number
+    display_level: 1
+    display_name: Haploid number
+    summary:
+      - mode_low
+      - mode_list
+      - median_high
+      - mode
+      - max
+      - min
+    traverse: mode_low
+    traverse_direction: both
+    type: short
+  sex_determination:
+    status: temporary
+    display_group: karyotype
+    description: Sex chromosomes and sex karyotype features - temporary attribute
+    display_level: 2
+    display_name: Sex karyotype features
+    summary: list
+    traverse: list
+    traverse_direction: up
+    type: keyword
+  ploidy:
+    display_group: karyotype
+    bins:
+      min: 0
+      max: 10
+      count: 10
+      scale: linear
+    constraint:
+      max: 200
+      min: 1
+    description: Ploidy - numeric value
+    display_level: 2
+    display_name: Ploidy
+    summary:
+      - mode_list
+      - mode
+      - median_high
+      - max
+      - min
+    traverse: mode
+    traverse_direction: both
+    type: short
+  ploidy_inferred:
+    display_group: karyotype
+    bins:
+      min: 0
+      max: 10
+      count: 10
+      scale: linear
+    constraint:
+      max: 200
+      min: 1
+    description: "Numeric ploidy inferred from chromosome count and/or phylogeny"
+    display_level: 2
+    display_name: Estimated ploidy
+    summary:
+      - mode_list
+      - mode
+      - median_high
+      - max
+      - min
+    traverse: mode
+    traverse_direction: both
+    type: short
+  ploidy_descriptive:
+    status: temporary
+    display_group: karyotype
+    description: Ploidy - descriptive to include polyploids of uncertain ploidy
+    display_level: 2
+    display_name: Ploidy descriptive
+    summary: list
+    traverse: list
+    traverse_direction: up
+    type: keyword
+  programmed_dna_elimination:
+    status: temporary
+    display_group: karyotype
+    description: "Programmed DNA elimination present, number of additional chromosomes in somatic cells given as +n"
+    display_level: 2
+    display_name: Programmed DNA elimination present
+    summary: list
+    traverse: list
+    traverse_direction: up
+    taxon_traverse_limit: phylum
+    type: keyword
