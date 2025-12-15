@@ -197,11 +197,15 @@ jobs:
       - name: Build universal wheels
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --out dist -i python${{matrix.python}} -m rust/Cargo.toml -- --universal2
+          args: --release --out dist -i python${{matrix.python}} -m rust/Cargo.toml
           sccache: "true"
           rust-toolchain: 1.91.0
         env:
           RUSTUP_TOOLCHAIN: 1.91.0
+          # Build for both Archs
+          ARCHFLAGS: "-arch x86_64 -arch arm64"
+          # Set an appropriate macOS deployment target (adjust if you need a different min version)
+          MACOSX_DEPLOYMENT_TARGET: "10.9"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
