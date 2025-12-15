@@ -124,7 +124,18 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          before-script-linux: yum install -y perl-IPC-Cmd
+          before-script-linux: |
+            # install Perl modules and build deps so openssl-src can build OpenSSL
+            yum install -y \
+              perl \
+              perl-ExtUtils-MakeMaker \
+              perl-IPC-Cmd \
+              perl-Time-Piece \
+              perl-Text-Template \
+              openssl-devel \
+              zlib-devel \
+              make \
+              gcc
           args: --release --out dist -i python${{ matrix.python }} --target x86_64-unknown-linux-gnu -m rust/Cargo.toml
           sccache: "true"
           rust-toolchain: 1.91.0
@@ -186,7 +197,7 @@ jobs:
       - name: Build universal wheels
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --out dist -i python${{matrix.python}} --universal2 -m rust/Cargo.toml
+          args: --release --out dist -i python${{matrix.python}} -m rust/Cargo.toml -- --universal2
           sccache: "true"
           rust-toolchain: 1.91.0
         env:
