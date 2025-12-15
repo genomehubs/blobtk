@@ -4,7 +4,7 @@ on:
   push:
     branches:
       # - main
-      - feature/fix-docker-build_
+      - feature/fix-docker-build
     tags:
       - "*"
 
