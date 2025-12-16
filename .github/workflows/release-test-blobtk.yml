@@ -341,7 +341,7 @@ jobs:
           toolchain: 1.91.0
       - name: Publish
         working-directory: ./rust
-        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --no-verify
 
   upload-to-pypi:
     name: Upload to PyPI
@@ -366,6 +366,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           cp -r ./dist/wheels-*/* ./
+          rm -r dist
           ls -l
           pip install --upgrade twine
           twine upload --skip-existing *
