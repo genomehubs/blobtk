@@ -530,7 +530,11 @@ mod tests {
                     tax_id: String::from("1"),
                     parent_tax_id: String::from("1"),
                     rank: String::from("no rank"),
-                    ..Default::default()
+                    columns: vec!["1".to_string(), "1".to_string(), "no rank".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
+                    names: None,
+                    scientific_name: None,
+                    row_index: None,
+                    raw_row: None,
                 }
             )
         );
@@ -543,7 +547,11 @@ mod tests {
                     tax_id: String::from("2"),
                     parent_tax_id: String::from("131567"),
                     rank: String::from("superkingdom"),
-                    ..Default::default()
+                    columns: vec!["2".to_string(), "131567".to_string(), "superkingdom".to_string(), "".to_string(), "0".to_string(), "0".to_string(), "11".to_string(), "0".to_string(), "0".to_string(), "0".to_string(), "0".to_string(), "0".to_string(), "".to_string()],
+                    names: None,
+                    scientific_name: None,
+                    row_index: None,
+                    raw_row: None,
                 }
             )
         );

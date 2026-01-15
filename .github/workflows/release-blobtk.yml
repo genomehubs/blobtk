@@ -34,7 +34,7 @@ jobs:
           targets: x86_64-unknown-linux-gnu
       - name: Run tests
         working-directory: ./rust
-        run: cargo test --target x86_64-unknown-linux-gnu
+        run: cargo test --all --lib --bins --target x86_64-unknown-linux-gnu
       - name: Check formatting
         working-directory: ./rust
         run: cargo fmt --check

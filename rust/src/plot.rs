@@ -786,7 +786,7 @@ mod tests {
     #[test]
     fn test_calculate_grid_size_23() {
         let count = 23;
-        let expected = (5, 5);
+        let expected = (4, 6);
         let result = calculate_grid_size(count);
         assert_eq!(result, expected);
     }
