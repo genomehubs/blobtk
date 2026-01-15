@@ -22,7 +22,7 @@ jobs:
           toolchain: 1.91.0
       - name: Run tests
         working-directory: ./rust
-        run: cargo test --all
+        run: cargo test --all --lib --bins
       - name: Check formatting
         working-directory: ./rust
         run: cargo fmt --check
@@ -246,7 +246,7 @@ jobs:
 
   build-and-push-docker-develop:
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    if: github.ref == 'refs/heads/develop'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
