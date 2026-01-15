@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "blobtk"
-version = "0.7.9"
+version = "0.7.10"
 dependencies = [
  "aligned",
  "anyhow",
