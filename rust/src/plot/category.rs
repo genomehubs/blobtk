@@ -152,7 +152,7 @@ pub fn set_cat_order(
             ..Default::default()
         },
     );
-    let mut cat_indices: Vec<Option<usize>> = (0..values.len()).map(|x| Some(x)).collect();
+    let mut cat_indices: Vec<Option<usize>> = (0..values.len()).map(Some).collect();
     for (index, cat) in cat_order.iter_mut().enumerate() {
         // use this loop for span, count and n50
         let mut lengths = vec![];
@@ -167,7 +167,7 @@ pub fn set_cat_order(
         for length in lengths.iter() {
             cumulative += length;
             if cumulative >= span / 2.0 {
-                cat.n50 = Some(length.clone() as usize);
+                cat.n50 = Some(*length as usize);
                 break;
             }
         }

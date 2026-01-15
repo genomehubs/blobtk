@@ -40,7 +40,7 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
                 return Err(error::Error::SerdeError(format!(
                     "{} {}",
                     &config_file.to_string_lossy(),
-                    err.to_string()
+                    err
                 )))
             }
         };
@@ -77,12 +77,12 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
                 Some(xref_label) => Some(xref_label),
                 None => options.xref_label.clone(),
             },
-            name_classes: if taxonomy_options.name_classes.len() > 0 {
+            name_classes: if !taxonomy_options.name_classes.is_empty() {
                 taxonomy_options.name_classes.clone()
             } else {
                 options.name_classes.clone()
             },
-            create_taxa: taxonomy_options.create_taxa.clone(),
+            create_taxa: taxonomy_options.create_taxa,
             taxonomies: taxonomy_options.taxonomies.clone(),
             genomehubs_files: match taxonomy_options.genomehubs_files {
                 Some(genomehubs_files) => Some(genomehubs_files),
@@ -105,7 +105,7 @@ pub fn taxdump_to_nodes(
     options: &cli::TaxonomyOptions,
     existing: Option<&mut Nodes>,
 ) -> Result<Nodes, error::Error> {
-    let options = load_options(&options)?;
+    let options = load_options(options)?;
     let nodes;
     if let Some(taxdump) = options.path.clone() {
         nodes = match options.taxonomy_format {
@@ -122,14 +122,14 @@ pub fn taxdump_to_nodes(
             _ => Nodes::from_taxdump(taxdump, options.xref_label.clone())?,
         };
     } else {
-        return Err(error::Error::NotDefined(format!("taxdump")));
+        return Err(error::Error::NotDefined("taxdump".to_string()));
     }
     Ok(nodes)
 }
 
 /// Execute the `taxonomy` subcommand from `blobtk`.
 pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
-    let options = load_options(&options)?;
+    let options = load_options(options)?;
     // If --api is set, start the API server and return
     if options.api {
         let is_ready = Arc::new(AtomicBool::new(false));
@@ -142,7 +142,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
         let port = options.port;
         let api_handle = std::thread::spawn(move || {
             let rt = Runtime::new().unwrap();
-            let _ = rt.block_on(run_api_server(api_state, port)).unwrap();
+            rt.block_on(run_api_server(api_state, port)).unwrap();
         });
 
         let nodes = taxdump_to_nodes(&options, None)?;
@@ -208,7 +208,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
             }
             // Use fast name-only merge for OTT if create_taxa is false
             if let Some(cli::TaxonomyFormat::OTT) = taxonomy_format {
-                if taxonomy_options.create_taxa == false {
+                if !taxonomy_options.create_taxa {
                     nodes.merge_names_only(&filtered_new_nodes)?;
                     continue;
                 }
@@ -238,7 +238,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                     lookup_nodes_by_id(
                         &filtered_new_nodes,
                         &mut nodes,
-                        &"ncbi",
+                        "ncbi",
                         taxonomy_options.xref_label.clone(),
                         taxonomy_options.create_taxa,
                     );
@@ -255,8 +255,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                 use std::io::Write;
                 let out_dir = options
                     .out
-                    .as_ref()
-                    .map(|p| p.clone())
+                    .clone()
                     .unwrap_or_else(|| std::path::PathBuf::from("."));
                 // ensure the output directory exists
                 std::fs::create_dir_all(&out_dir).expect("Unable to create output directory");

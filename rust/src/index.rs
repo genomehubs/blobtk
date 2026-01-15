@@ -250,41 +250,15 @@ impl Features {
                 1
             };
             let length = lengths[i];
-            let gc = if let Some(gcs) = &gcs {
-                Some(gcs[i])
-            } else {
-                None
-            };
-            let coverage = if let Some(coverages) = &coverages {
-                Some(coverages[i])
-            } else {
-                None
-            };
-            let masked = if let Some(maskeds) = &maskeds {
-                Some(maskeds[i])
-            } else {
-                None
-            };
-            let name = if let Some(names) = &names {
-                Some(names[i].clone())
-            } else {
-                None
-            };
-            let sequence_name = if let Some(sequence_names) = &sequence_names {
-                Some(sequence_names[i].clone())
-            } else {
-                None
-            };
-            let score = if let Some(scores) = &scores {
-                Some(scores[i])
-            } else {
-                None
-            };
-            let status = if let Some(statuses) = &statuses {
-                Some(statuses[i].clone())
-            } else {
-                None
-            };
+            let gc = gcs.as_ref().map(|gcs| gcs[i]);
+            let coverage = coverages.as_ref().map(|coverages| coverages[i]);
+            let masked = maskeds.as_ref().map(|maskeds| maskeds[i]);
+            let name = names.as_ref().map(|names| names[i].clone());
+            let sequence_name = sequence_names
+                .as_ref()
+                .map(|sequence_names| sequence_names[i].clone());
+            let score = scores.as_ref().map(|scores| scores[i]);
+            let status = statuses.as_ref().map(|statuses| statuses[i].clone());
             let feature_busco_counts = if let Some(all_busco_counts) = &busco_counts {
                 // make a hashmap of busco counts for this feature
                 let mut _busco_counts = HashMap::new();
@@ -319,11 +293,7 @@ impl Features {
                 busco_counts: feature_busco_counts,
             });
         }
-        let busco_count = if let Some(busco_counts) = &busco_counts {
-            Some(busco_counts.len())
-        } else {
-            None
-        };
+        let busco_count = busco_counts.as_ref().map(|busco_counts| busco_counts.len());
         Self::new(taxon_id, assembly_id, 1.0, features, busco_count)
     }
 
@@ -350,7 +320,7 @@ impl Features {
             let mut start = 1;
             let span = lengths[i].iter().sum::<usize>();
             for (j, length) in lengths[i].iter().enumerate() {
-                let length = length.clone();
+                let length = *length;
                 let end = start + length - 1;
                 let feature_id = format!(
                     "{}:{}-{}:{}",
@@ -367,41 +337,15 @@ impl Features {
                 } else {
                     1
                 };
-                let gc = if let Some(gcs) = &gcs {
-                    Some(gcs[i][j])
-                } else {
-                    None
-                };
-                let coverage = if let Some(coverages) = &coverages {
-                    Some(coverages[i][j])
-                } else {
-                    None
-                };
-                let masked = if let Some(maskeds) = &maskeds {
-                    Some(maskeds[i][j])
-                } else {
-                    None
-                };
-                let name = if let Some(names) = &names {
-                    Some(names[i][j].clone())
-                } else {
-                    None
-                };
-                let sequence_name = if let Some(sequence_names) = &sequence_names {
-                    Some(sequence_names[i][j].clone())
-                } else {
-                    None
-                };
-                let score = if let Some(scores) = &scores {
-                    Some(scores[i][j])
-                } else {
-                    None
-                };
-                let status = if let Some(statuses) = &statuses {
-                    Some(statuses[i][j].clone())
-                } else {
-                    None
-                };
+                let gc = gcs.as_ref().map(|gcs| gcs[i][j]);
+                let coverage = coverages.as_ref().map(|coverages| coverages[i][j]);
+                let masked = maskeds.as_ref().map(|maskeds| maskeds[i][j]);
+                let name = names.as_ref().map(|names| names[i][j].clone());
+                let sequence_name = sequence_names
+                    .as_ref()
+                    .map(|sequence_names| sequence_names[i][j].clone());
+                let score = scores.as_ref().map(|scores| scores[i][j]);
+                let status = statuses.as_ref().map(|statuses| statuses[i][j].clone());
                 let feature_busco_counts = if let Some(all_busco_counts) = &busco_counts {
                     // make a hashmap of busco counts for this feature
                     let mut _busco_counts = HashMap::new();
@@ -438,11 +382,7 @@ impl Features {
                 start += length;
             }
         }
-        let busco_count = if let Some(busco_counts) = &busco_counts {
-            Some(busco_counts.len())
-        } else {
-            None
-        };
+        let busco_count = busco_counts.as_ref().map(|busco_counts| busco_counts.len());
         Self::new(taxon_id, assembly_id, window_size, features, busco_count)
     }
 
@@ -512,10 +452,7 @@ impl Features {
                 field.to_string(),
                 GHubsFieldConfig {
                     header: Some(StringOrVec::Single(field.to_string())),
-                    separator: match separator {
-                        Some(s) => Some(StringOrVec::Single(s.to_string())),
-                        None => None,
-                    },
+                    separator: separator.map(|s| StringOrVec::Single(s.to_string())),
                     field_type,
                     ..Default::default()
                 },
@@ -545,18 +482,15 @@ impl Features {
             },
         );
         let config = GHubsConfig {
-            file: match file {
-                Some(f) => Some(GHubsFileConfig {
-                    format: GHubsFileFormat::TSV,
-                    header: true,
-                    name: PathBuf::from(f.file_name().unwrap()),
-                    needs: Some(PathBufOrVec::Single(PathBuf::from(
-                        "ATTR_feature.types.yaml".to_string(),
-                    ))),
-                    ..Default::default()
-                }),
-                None => None,
-            },
+            file: file.map(|f| GHubsFileConfig {
+                format: GHubsFileFormat::TSV,
+                header: true,
+                name: PathBuf::from(f.file_name().unwrap()),
+                needs: Some(PathBufOrVec::Single(PathBuf::from(
+                    "ATTR_feature.types.yaml".to_string(),
+                ))),
+                ..Default::default()
+            }),
             attributes: Some(attributes),
             taxonomy: Some(taxonomy),
             features: Some(features),
@@ -575,23 +509,20 @@ fn per_contig_values(
     let taxon_id = meta.taxon.taxid.clone();
     let assembly_id = meta.assembly.accession.clone();
     let plot_meta = meta.plot.clone();
-    let identifiers = blobdir::parse_field_identifiers("identifiers".to_string(), &blobdir_path)?;
-    let gc_values = blobdir::parse_field_float("gc".to_string(), &blobdir_path)?;
-    let length_values = blobdir::parse_field_int("length".to_string(), &blobdir_path)?;
+    let identifiers = blobdir::parse_field_identifiers("identifiers".to_string(), blobdir_path)?;
+    let gc_values = blobdir::parse_field_float("gc".to_string(), blobdir_path)?;
+    let length_values = blobdir::parse_field_int("length".to_string(), blobdir_path)?;
     let coverage_values = if let Some(coverage) = plot_meta.y {
-        blobdir::parse_field_float(coverage, &blobdir_path)?
+        blobdir::parse_field_float(coverage, blobdir_path)?
     } else {
         vec![0.0; length_values.len()]
     };
-    let masked_values = match blobdir::parse_field_float("masked".to_string(), &blobdir_path) {
-        Ok(masked_values) => Some(masked_values),
-        Err(_) => None,
-    };
+    let masked_values = blobdir::parse_field_float("masked".to_string(), blobdir_path).ok();
     let busco_counts = if let Some(busco_list) = &meta.busco_list {
         let mut _busco_counts = HashMap::new();
         for busco in busco_list {
             let field_id = format!("{}_count", busco.2);
-            if let Ok(busco_values) = blobdir::parse_field_int(field_id.clone(), &blobdir_path) {
+            if let Ok(busco_values) = blobdir::parse_field_int(field_id.clone(), blobdir_path) {
                 _busco_counts.insert(field_id.clone(), busco_values);
             }
         }
@@ -620,7 +551,7 @@ fn per_contig_values(
 
 fn get_window_id(id: &str, window_size: &f64) -> String {
     if window_size == &1.0 {
-        format!("{}", id)
+        id.to_string()
     } else if window_size == &0.1 {
         format!("{}_windows", id)
     } else {
@@ -638,19 +569,16 @@ fn per_window_values(
     let taxon_id = meta.taxon.taxid.clone();
     let assembly_id = meta.assembly.accession.clone();
 
-    let identifiers = blobdir::parse_field_identifiers("identifiers".to_string(), &blobdir_path)?;
+    let identifiers = blobdir::parse_field_identifiers("identifiers".to_string(), blobdir_path)?;
     let gc_values =
-        blobdir::parse_field_float_windows(get_window_id("gc", window_size), &blobdir_path, None)?;
-    let length_values = blobdir::parse_field_int_windows(
-        get_window_id("length", window_size),
-        &blobdir_path,
-        None,
-    )?;
+        blobdir::parse_field_float_windows(get_window_id("gc", window_size), blobdir_path, None)?;
+    let length_values =
+        blobdir::parse_field_int_windows(get_window_id("length", window_size), blobdir_path, None)?;
     let coverage_values = if let Some(coverage) = plot_meta.y {
         Some(
             blobdir::parse_field_float_windows(
                 get_window_id(&coverage, window_size),
-                &blobdir_path,
+                blobdir_path,
                 None,
             )?
             .0,
@@ -660,7 +588,7 @@ fn per_window_values(
     };
     let masked_values = match blobdir::parse_field_float_windows(
         get_window_id("masked", window_size),
-        &blobdir_path,
+        blobdir_path,
         None,
     ) {
         Ok(masked_values) => Some(masked_values.0),
@@ -672,7 +600,7 @@ fn per_window_values(
             let field_name = format!("{}_count", busco.2);
             let field_id = get_window_id(&field_name, window_size);
             let busco_values =
-                match blobdir::parse_field_int_windows(field_id.clone(), &blobdir_path, None) {
+                match blobdir::parse_field_int_windows(field_id.clone(), blobdir_path, None) {
                     Ok(values) => values.0,
                     Err(_) => continue,
                 };
@@ -1255,7 +1183,7 @@ impl BuscoStats {
             },
         );
         let lineage = self.lineage.to_lowercase();
-        for status in vec!["complete", "fragmented", "missing", "duplicated", "single"] {
+        for status in ["complete", "fragmented", "missing", "duplicated", "single"] {
             let list_config = BuscoLists::to_field_config(lineage.clone(), status.to_string());
             if let Some(header) = &list_config.header {
                 attributes.insert(header.to_string(), list_config);
@@ -1417,7 +1345,7 @@ fn parse_busco(
     }?;
 
     // Custom parser for BUSCO txt summary format
-    fn parse_busco_txt_summary<R: BufRead>(mut reader: R) -> Result<BuscoSummary, anyhow::Error> {
+    fn parse_busco_txt_summary<R: BufRead>(reader: R) -> Result<BuscoSummary, anyhow::Error> {
         use regex::Regex;
         let mut version = String::new();
         let mut lineage_name = String::new();
@@ -1433,13 +1361,13 @@ fn parse_busco(
         let mut multi_copy = 0.0;
         let mut fragmented = 0.0;
         let mut missing = 0.0;
-        let mut domain = String::new();
-        let mut number_of_scaffolds = 0usize;
-        let mut number_of_contigs = 0usize;
-        let mut total_length = 0usize;
-        let mut percent_gaps = 0.0;
-        let mut scaffold_n50 = 0usize;
-        let mut contigs_n50 = 0usize;
+        let domain = String::new();
+        let number_of_scaffolds = 0usize;
+        let number_of_contigs = 0usize;
+        let total_length = 0usize;
+        let percent_gaps = 0.0;
+        let scaffold_n50 = 0usize;
+        let contigs_n50 = 0usize;
 
         let re_version = Regex::new(r"^# BUSCO version is: (.+)").unwrap();
         let re_lineage = Regex::new(r"^# The lineage dataset is: ([^(]+) \(Creation date: ([^,]+), number of genomes: (\d+), number of BUSCOs: (\d+)\)").unwrap();
@@ -1559,7 +1487,7 @@ fn parse_busco_full_table(
             let feature = Feature::new(
                 format!("{}:{}-{}:{}", sequence, start, end, &id),
                 sequence,
-                vec![
+                [
                     format!("{}-busco-gene", lineage),
                     "busco-gene".to_string(),
                     "gene".to_string(),
@@ -1648,10 +1576,7 @@ impl DatasetsSequenceReport {
         let end = self.length;
         let strand = 1;
         let length = self.length;
-        let gc = match self.gc_percent {
-            Some(gc_percent) => Some(gc_percent / 100.0),
-            None => None,
-        };
+        let gc = self.gc_percent.map(|gc_percent| gc_percent / 100.0);
         let coverage = None;
         let masked = None;
         let midpoint = length / 2;
@@ -1704,7 +1629,7 @@ fn parse_datasets_sequence_report(
     }
 
     let output = Command::new("datasets")
-        .args(&[
+        .args([
             "summary",
             "genome",
             "accession",
@@ -1772,21 +1697,17 @@ fn find_blobtoolkit_url(accession: &str) -> Option<PathBuf> {
         accession
     );
     // fetch the blobtoolkit url and parse the json
-    if let Some(output) = Command::new("curl")
-        .args(&["-s", &blobtoolkit_url])
-        .output()
-        .ok()
-    {
+    if let Ok(output) = Command::new("curl").args(["-s", &blobtoolkit_url]).output() {
         if !output.status.success() {
             return None;
         }
 
-        if let Some(json) = String::from_utf8(output.stdout).ok() {
+        if let Ok(json) = String::from_utf8(output.stdout) {
             let wrapped_json = format!("{{\"results\":{}}}", json);
             if let Ok(search_results) =
                 serde_json::from_str::<BlobToolKitSearchResults>(&wrapped_json)
             {
-                if search_results.results.len() == 0 {
+                if search_results.results.is_empty() {
                     return None;
                 }
                 let blobtoolkit_id = &search_results.results[0].id;
@@ -1809,7 +1730,7 @@ fn lookup_goat_lineages(taxon_id: String) -> Result<Vec<String>, anyhow::Error> 
         "https://goat.genomehubs.org/api/v2/search?query=tax_lineage%28{}%29&result=taxon&fields=odb10_lineage&includeEstimates=true&taxonomy=ncbi",
         taxon_id
     );
-    let output = Command::new("curl").args(&["-s", &url]).output()?;
+    let output = Command::new("curl").args(["-s", &url]).output()?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
             "Error fetching lineages: {}",
@@ -1943,10 +1864,7 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
             let _window_analysis = window_analysis(&meta, window);
             window_values.append_to_file(&options.out)?;
         }
-        busco_count = match meta.busco_list.as_ref() {
-            Some(busco_list) => Some(busco_list.len()),
-            None => None,
-        };
+        busco_count = meta.busco_list.as_ref().map(|busco_list| busco_list.len());
     }
     if !contig_values.features.is_empty() {
         let yaml_path = options.out.as_ref().unwrap().with_extension("types.yaml");
@@ -1955,14 +1873,12 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
                 "assembly-{}",
                 accession.clone().unwrap_or("None".to_string())
             ),
-            assembly_id: match accession {
-                Some(ref acc) => Some(StringOrVec::Single(acc.clone())),
-                None => None,
-            },
-            taxon_id: match taxon_id {
-                Some(ref taxid) => Some(StringOrVec::Single(taxid.clone())),
-                None => None,
-            },
+            assembly_id: accession
+                .as_ref()
+                .map(|acc| StringOrVec::Single(acc.clone())),
+            taxon_id: taxon_id
+                .as_ref()
+                .map(|taxid| StringOrVec::Single(taxid.clone())),
             description: Some(format!(
                 "Public assembly {}",
                 accession.clone().unwrap_or("None".to_string())

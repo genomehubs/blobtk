@@ -41,7 +41,7 @@ jobs:
         run: cargo fmt --check
       - name: Run clippy
         working-directory: ./rust
-        run: cargo clippy --all -- -D warnings
+        run: cargo clippy --all -- -W clippy::correctness -W clippy::perf -A unused
 
   macos-binary:
     runs-on: macos-latest

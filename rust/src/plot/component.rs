@@ -246,7 +246,7 @@ pub fn path_axis_major(path_data: Data, color: Option<&str>, width: Option<f64>)
     Path::new()
         .set("stroke", col)
         .set("fill", "none")
-        .set("stroke-width", width.unwrap_or_else(|| 3.0))
+        .set("stroke-width", width.unwrap_or(3.0))
         .set("d", path_data)
 }
 
@@ -255,7 +255,7 @@ pub fn path_axis_minor(path_data: Data, color: Option<&str>, width: Option<f64>)
     Path::new()
         .set("stroke", col)
         .set("fill", "none")
-        .set("stroke-width", width.unwrap_or_else(|| 1.0))
+        .set("stroke-width", width.unwrap_or(1.0))
         .set("d", path_data)
 }
 
@@ -286,7 +286,7 @@ pub fn set_tick(
     status: &TickStatus,
     scale: &String,
 ) -> Tick {
-    let offset = scale_float(value, &domain, &range, &scale, None);
+    let offset = scale_float(value, domain, range, scale, None);
     let path = match status {
         TickStatus::Major => path_axis_major(
             Data::new().move_to((-10, offset)).line_to((0, offset)),
@@ -338,7 +338,7 @@ pub fn create_tick(
     let location = scale_floats(
         value,
         &axis_options.domain,
-        &range,
+        range,
         &axis_options.scale,
         None,
     );
@@ -462,11 +462,11 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
     let domain = options.domain;
 
     let mut power: i32 = 0;
-    let mut min_value = domain[0].clone().abs();
-    let mut min_val = domain[0].clone().abs();
+    let mut min_value = domain[0].abs();
+    let mut min_val = domain[0].abs();
     if min_val == 0.0 && options.clamp.is_some() {
-        min_value = options.clamp.unwrap().clone();
-        min_val = options.clamp.unwrap().clone();
+        min_value = options.clamp.unwrap();
+        min_val = options.clamp.unwrap();
     }
 
     if min_val > 1.0 {
@@ -488,15 +488,15 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
             let step = if diff > 11.0 { 100.0 } else { 10.0 };
             match status {
                 TickStatus::Major => {
-                    let mut i = 10u32.pow(power.abs() as u32) as f64;
+                    let mut i = 10u32.pow(power.unsigned_abs()) as f64;
                     if power < 0 {
                         i = 1.0 / i;
                     }
-                    if min_value.clone() < 0.0 {
+                    if min_value < 0.0 {
                         i = -i
                     }
-                    while i <= domain[1].clone() {
-                        let label = if i >= min_value.clone() {
+                    while i <= domain[1] {
+                        let label = if i >= min_value {
                             format_si(&i, 3, None)
                         } else {
                             String::new()
@@ -505,10 +505,10 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                             i,
                             label,
                             &range,
-                            &options,
-                            &options.major_ticks.as_ref().unwrap(),
+                            options,
+                            options.major_ticks.as_ref().unwrap(),
                         ));
-                        i = i * step;
+                        i *= step;
                     }
                 }
                 TickStatus::Minor => {
@@ -516,13 +516,13 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                     if power < 0 {
                         i = 1.0 / i;
                     }
-                    if min_value.clone() < 0.0 {
+                    if min_value < 0.0 {
                         i = -i
                     }
-                    while i <= domain[1].clone() {
+                    while i <= domain[1] {
                         let mut j = i * 2.0;
-                        while j < i * 10.0 && j <= domain[1].clone() {
-                            let label = if j >= min_value.clone() {
+                        while j < i * 10.0 && j <= domain[1] {
+                            let label = if j >= min_value {
                                 format_si(&j, 3, None)
                             } else {
                                 String::new()
@@ -532,13 +532,13 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                                     j,
                                     label,
                                     &range,
-                                    &options,
-                                    &options.minor_ticks.as_ref().unwrap(),
+                                    options,
+                                    options.minor_ticks.as_ref().unwrap(),
                                 ));
                             }
-                            j = j + i;
+                            j += i;
                         }
-                        i = i * 10.0;
+                        i *= 10.0;
                     }
                 }
             }
@@ -548,11 +548,11 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
             // let round_step =
             let divisor = 0.1
                 * if power < 0 {
-                    1.0 / 10u32.pow(power.abs() as u32) as f64
+                    1.0 / 10u32.pow(power.unsigned_abs()) as f64
                 } else {
-                    10u32.pow(power.abs() as u32) as f64
+                    10u32.pow(power.unsigned_abs()) as f64
                 };
-            let mut step = divisor.clone();
+            let mut step = divisor;
             let steps = [2.0, 2.5, 5.0, 10.0];
             let mut multiple = 1.0;
             while diff / step > target {
@@ -568,8 +568,8 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
             match status {
                 TickStatus::Major => {
                     let mut i = step * (min_value / step).ceil();
-                    while i <= domain[1].clone() {
-                        let label = if i >= min_value.clone() {
+                    while i <= domain[1] {
+                        let label = if i >= min_value {
                             format_si(&i, 3, None)
                         } else {
                             String::new()
@@ -578,8 +578,8 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
                             i,
                             label,
                             &range,
-                            &options,
-                            &options.major_ticks.as_ref().unwrap(),
+                            options,
+                            options.major_ticks.as_ref().unwrap(),
                         ));
                         i += step;
                     }
@@ -600,12 +600,11 @@ pub fn set_axis_ticks(
     dimension: &f64,
     scale: &String,
 ) -> Vec<Tick> {
-    let range = [-dimension.clone(), 0.0];
-    let domain = [min_value.clone(), max_value.clone()];
+    let range = [-*dimension, 0.0];
+    let domain = [*min_value, *max_value];
 
-    if scale == &"scaleLog".to_string() {}
     let mut power: i32 = 0;
-    let mut min_val = min_value.clone().abs();
+    let mut min_val = (*min_value).abs();
 
     if min_val > 1.0 {
         while min_val > 1.0 {
@@ -630,21 +629,21 @@ pub fn set_axis_ticks(
         }
         "scaleLog" | "scaleSqrt" => match status {
             TickStatus::Major => {
-                let mut i = 10u32.pow(power.abs() as u32) as f64;
+                let mut i = 10u32.pow(power.unsigned_abs()) as f64;
                 if power < 0 {
                     i = 1.0 / i;
                 }
-                if min_value.clone() < 0.0 {
+                if *min_value < 0.0 {
                     i = -i
                 }
-                while i <= max_value.clone() {
-                    let label = if i > min_value.clone() {
+                while i <= *max_value {
+                    let label = if i > *min_value {
                         format_si(&i, 3, None)
                     } else {
                         String::new()
                     };
-                    ticks.push(set_tick(i, label, &domain, &range, &status, &scale));
-                    i = i * 10.0;
+                    ticks.push(set_tick(i, label, &domain, &range, status, scale));
+                    i *= 10.0;
                 }
             }
             TickStatus::Minor => {
@@ -652,26 +651,19 @@ pub fn set_axis_ticks(
                 if power < 0 {
                     i = 1.0 / i;
                 }
-                if min_value.clone() < 0.0 {
+                if *min_value < 0.0 {
                     i = -i
                 }
-                while i <= max_value.clone() {
+                while i <= *max_value {
                     let mut j = i * 2.0;
-                    while j < i * 10.0 && j <= max_value.clone() {
+                    while j < i * 10.0 && j <= *max_value {
                         if &(j as f64) >= min_value {
-                            ticks.push(set_tick(
-                                j,
-                                String::new(),
-                                &domain,
-                                &range,
-                                &status,
-                                &scale,
-                            ));
+                            ticks.push(set_tick(j, String::new(), &domain, &range, status, scale));
                         }
-                        j = j + i;
+                        j += i;
                     }
-                    ticks.push(set_tick(i, String::new(), &domain, &range, &status, &scale));
-                    i = i * 10.0;
+                    ticks.push(set_tick(i, String::new(), &domain, &range, status, scale));
+                    i *= 10.0;
                 }
             }
         },
@@ -700,8 +692,8 @@ fn set_linear_ticks(
                     format_si(min_value, 3, None),
                     &domain,
                     &range,
-                    &status,
-                    &scale,
+                    status,
+                    scale,
                 ));
             }
             TickStatus::Minor => {}
@@ -726,7 +718,7 @@ fn set_linear_ticks(
                 let mut value = first_tick;
                 while value <= *max_value {
                     let label = format_si(&value, 3, None);
-                    ticks.push(set_tick(value, label, &domain, &range, &status, &scale));
+                    ticks.push(set_tick(value, label, &domain, &range, status, scale));
                     value += step;
                 }
             }
@@ -746,8 +738,8 @@ fn set_linear_ticks(
                                 String::new(),
                                 &domain,
                                 &range,
-                                &status,
-                                &scale,
+                                status,
+                                scale,
                             ));
                         }
                     }
@@ -772,19 +764,19 @@ pub fn set_tick_circular(
     status: &TickStatus,
     options: &TickOptions,
 ) -> RadialTick {
-    let angle = linear_scale_float(index as f64 + offset, &angle_domain, &angle_range);
+    let angle = linear_scale_float(index as f64 + offset, angle_domain, angle_range);
     let processed_font_family = font_family("Roboto, Open sans, DejaVu Sans, Arial, sans-serif");
 
     let mut adjusted_tick_range = [tick_range[0], tick_range[1]];
     if offset > 0.0 {
         let segment = max_radians / 2.0 / bin_count as f64;
-        let theta = PI - segment - PI / 2 as f64;
-        let inradius = tick_range[0] as f64 * theta.sin();
+        let theta = PI - segment - PI / 2_f64;
+        let inradius = tick_range[0] * theta.sin();
         let diff = (0.5 - offset).abs();
         let diff_segment = segment * diff * 2.0;
         let adjusted_radius = inradius / diff_segment.cos();
 
-        let outer_inradius = tick_range[1] as f64 * theta.sin();
+        let outer_inradius = tick_range[1] * theta.sin();
         let outer_adjusted_radius = outer_inradius / diff_segment.cos();
         adjusted_tick_range = [adjusted_radius, outer_adjusted_radius];
     }
@@ -794,14 +786,14 @@ pub fn set_tick_circular(
         TickStatus::Minor => 3,
     };
     let tick_distances = [
-        linear_scale(0, &tick_domain, &adjusted_tick_range),
-        linear_scale(tick_size, &tick_domain, &adjusted_tick_range),
+        linear_scale(0, tick_domain, &adjusted_tick_range),
+        linear_scale(tick_size, tick_domain, &adjusted_tick_range),
         linear_scale(
             tick_domain[1] - tick_size,
-            &tick_domain,
+            tick_domain,
             &adjusted_tick_range,
         ),
-        linear_scale(tick_domain[1], &tick_domain, &adjusted_tick_range),
+        linear_scale(tick_domain[1], tick_domain, &adjusted_tick_range),
     ];
     let midpoint = polar2cartesian(&Vector2::new(
         (adjusted_tick_range[1] - adjusted_tick_range[0]) / 2.0 + adjusted_tick_range[0],
@@ -829,12 +821,12 @@ pub fn set_tick_circular(
         TickStatus::Major => path_axis_major(tick_path_data, None, None),
         TickStatus::Minor => path_axis_minor(tick_path_data, None, None),
     };
-    let text = if label == "100".to_string() && angle > 1.4 * PI {
+    let text = if label == "100" && angle > 1.4 * PI {
         Text::new()
     } else {
         Text::new()
             .set("font-family", processed_font_family.clone())
-            .set("font-size", options.font_size.clone())
+            .set("font-size", options.font_size)
             .set("text-anchor", "middle")
             .set("dominant-baseline", "middle")
             .set("stroke", "none")
@@ -1058,7 +1050,7 @@ pub fn polar_to_path(
     }
 
     for i in (0..length).rev() {
-        let angle = if polar_coords.len() > 0 {
+        let angle = if !polar_coords.is_empty() {
             polar_coords[i][1]
         } else {
             max_radians * (i + 1) as f64 / length as f64 - PI / 2.0
@@ -1095,7 +1087,7 @@ pub fn polar_to_path(
             .line_to((cartesian_start[0], cartesian_start[1]))
             .line_to((cartesian_end[0], cartesian_end[1]));
     }
-    if polar_coords.len() > 0 {
+    if !polar_coords.is_empty() {
         path_data = path_data.close();
     }
     path_data
@@ -1162,7 +1154,7 @@ pub fn polar_to_path_bounded(
             .line_to((cartesian_start[0], cartesian_start[1]))
             .line_to((cartesian_end[0], cartesian_end[1]));
     }
-    if polar_coords.len() > 0 {
+    if !polar_coords.is_empty() {
         path_data = path_data.close();
     }
     path_data
@@ -1173,7 +1165,7 @@ pub fn chart_axis(plot_axis: &AxisOptions) -> (Group, Group) {
     let mut major_gridline_group = Group::new();
     let mut major_tick_count = 0;
     if plot_axis.major_ticks.is_some() {
-        let major_ticks = create_axis_ticks(&plot_axis, TickStatus::Major);
+        let major_ticks = create_axis_ticks(plot_axis, TickStatus::Major);
         major_tick_count = major_ticks.len();
         if major_tick_count > 0 {
             add_ticks_to_axis(
@@ -1186,7 +1178,7 @@ pub fn chart_axis(plot_axis: &AxisOptions) -> (Group, Group) {
 
     let mut minor_tick_group = Group::new();
     if plot_axis.minor_ticks.is_some() {
-        let minor_ticks = create_axis_ticks(&plot_axis, TickStatus::Minor);
+        let minor_ticks = create_axis_ticks(plot_axis, TickStatus::Minor);
         if major_tick_count == 0 {
             add_ticks_to_axis(
                 minor_ticks,

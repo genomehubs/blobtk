@@ -40,10 +40,10 @@ impl Name {
         map(parse_name, |v: Vec<&str>| Name {
             tax_id: v[0].to_string(),
             name: v[1].to_string(),
-            unique_name: if v[2] > "" {
+            unique_name: if !v[2].is_empty() {
                 v[2].to_string()
             } else if let Some(label) = &xref_label {
-                format!("{}:{}", label, v[1].to_string())
+                format!("{}:{}", label, v[1])
             } else {
                 "".to_string()
             },
@@ -71,7 +71,7 @@ impl fmt::Display for Name {
         for (_field_name, field_value) in self.iter() {
             if let Some(string_opt) = field_value.downcast_ref::<Option<String>>() {
                 if let Some(string) = string_opt.as_deref() {
-                    values.push(format!("{}", string));
+                    values.push(string.to_string());
                 } else {
                     values.push("".to_string());
                 }
@@ -272,7 +272,7 @@ impl Node {
         let taxon_names: Option<Vec<TaxonName>> = if !taxon_names.is_empty() {
             let mut names_out: Vec<TaxonName> = vec![];
             for name in taxon_names {
-                if name.unique_name == "" {
+                if name.unique_name.is_empty() {
                     names_out.push(TaxonName {
                         name: name.name,
                         class: name.class,
@@ -491,10 +491,7 @@ impl Nodes {
 
     /// Get parent Node.
     pub fn parent(&self, taxon_id: &String) -> Option<&Node> {
-        let node = match self.nodes.get(taxon_id) {
-            Some(n) => n,
-            None => return None,
-        };
+        let node = self.nodes.get(taxon_id)?;
         self.nodes.get(&node.parent_tax_id)
     }
 
@@ -507,7 +504,7 @@ impl Nodes {
         }
         let mut prev_tax_id = tax_id.clone();
         while tax_id != root_id {
-            if let Some(node) = self.parent(&tax_id) {
+            if let Some(node) = self.parent(tax_id) {
                 tax_id = &node.tax_id;
                 nodes.push(node)
             } else {
@@ -530,7 +527,7 @@ impl Nodes {
         taxdump_path: &PathBuf,
         format: Vec<TaxonomyFormat>,
         append: bool,
-    ) -> () {
+    ) {
         use std::collections::HashSet;
         let nodes_path = io::append_to_path(taxdump_path, "/nodes.dmp");
         let names_path = io::append_to_path(taxdump_path, "/names.dmp");
@@ -664,7 +661,7 @@ impl Nodes {
                             None,
                             taxdump_path,
                             true,
-                            &format,
+                            format,
                             nodes_writer,
                             names_writer,
                             jsonl_writer,
@@ -817,24 +814,22 @@ impl Nodes {
 
         // Parse names.dmp file and add to nodes
         if let Ok(lines) = io::read_lines(names_file) {
-            for line in lines {
-                if let Ok(s) = line {
-                    let name = match Name::parse(&s, &xref_label) {
-                        Ok((_, n)) => n,
-                        Err(_) => continue,
-                    };
-                    if let Some(node) = nodes.get_mut(&name.tax_id) {
-                        if let Some(class) = name.clone().class {
-                            if class == "scientific name" {
-                                node.scientific_name = Some(name.clone().name)
-                            }
+            for s in lines.flatten() {
+                let name = match Name::parse(&s, &xref_label) {
+                    Ok((_, n)) => n,
+                    Err(_) => continue,
+                };
+                if let Some(node) = nodes.get_mut(&name.tax_id) {
+                    if let Some(class) = name.clone().class {
+                        if class == "scientific name" {
+                            node.scientific_name = Some(name.clone().name)
                         }
-                        let mut names = node.names.as_mut();
-                        if let Some(names) = names.as_mut() {
-                            names.push(name);
-                        } else {
-                            node.names = Some(vec![name]);
-                        }
+                    }
+                    let mut names = node.names.as_mut();
+                    if let Some(names) = names.as_mut() {
+                        names.push(name);
+                    } else {
+                        node.names = Some(vec![name]);
                     }
                 }
             }
@@ -849,19 +844,17 @@ impl Nodes {
         }
         // Parse merged.dmp file and add to nodes
         if let Ok(lines) = io::read_lines(merged_file) {
-            for line in lines {
-                if let Ok(s) = line {
-                    let name = match Name::parse_merged(&s) {
-                        Ok((_, n)) => n,
-                        Err(_) => continue,
-                    };
-                    if let Some(node) = nodes.get_mut(&name.tax_id) {
-                        let mut names = node.names.as_mut();
-                        if let Some(names) = names.as_mut() {
-                            names.push(name);
-                        } else {
-                            node.names = Some(vec![name]);
-                        }
+            for s in lines.flatten() {
+                let name = match Name::parse_merged(&s) {
+                    Ok((_, n)) => n,
+                    Err(_) => continue,
+                };
+                if let Some(node) = nodes.get_mut(&name.tax_id) {
+                    let mut names = node.names.as_mut();
+                    if let Some(names) = names.as_mut() {
+                        names.push(name);
+                    } else {
+                        node.names = Some(vec![name]);
                     }
                 }
             }
@@ -1183,8 +1176,8 @@ impl Nodes {
             // species name is scientific_name without 2 part suffix
             species_name = Some(
                 scientific_name
-                    .rsplitn(2, ' ')
-                    .nth(1)
+                    .rsplit_once(' ')
+                    .map(|x| x.0)
                     .unwrap_or(scientific_name)
                     .to_string(),
             );
@@ -1368,8 +1361,7 @@ impl Nodes {
             options.create_taxa,
             options.xref_label.clone(),
             false,
-        )
-        .map_err(crate::error::Error::from)?;
+        )?;
         // Try to add names to existing nodes
         let mut nodes_struct = Nodes { nodes, children };
         let _add_names_result = nodes_struct.add_names(&new_names);
@@ -1422,18 +1414,19 @@ impl Nodes {
     /// Use this when create_taxa is false for large taxonomies (e.g. OTT) to avoid O(N^2) merge cost.
     pub fn merge_names_only(&mut self, new_nodes: &Nodes) -> Result<(), anyhow::Error> {
         let mut name_map: HashMap<String, Vec<Name>> = HashMap::new();
-        for (_, node) in &new_nodes.nodes {
+        for node in new_nodes.nodes.values() {
             if let Some(names) = &node.names {
                 // find a name with unique_name starting with "ncbi:" and use that as the key
                 if let Some(name) = names.iter().find(|n| n.unique_name.starts_with("ncbi:")) {
                     // remove "ncbi:" and use that as the key
                     let key = name.unique_name.trim_start_matches("ncbi:").to_string();
-                    name_map.entry(key.clone()).or_insert_with(Vec::new).extend(
-                        names.iter().cloned().map(|mut n| {
+                    name_map
+                        .entry(key.clone())
+                        .or_default()
+                        .extend(names.iter().cloned().map(|mut n| {
                             n.tax_id = key.clone();
                             n
-                        }),
-                    );
+                        }));
                 }
             }
         }
