@@ -1169,6 +1169,78 @@ impl Nodes {
         Ok(Nodes { nodes, children })
     }
 
+    fn add_species_to_lineage(scientific_name: &String, rank: &String, lineage: &mut Vec<String>) {
+        // return early if lineage is empty, contains scientific name or if scientific name begins with "["
+        if lineage.is_empty()
+            || lineage.contains(scientific_name)
+            || scientific_name.starts_with('[')
+        {
+            return;
+        }
+
+        let mut species_name = None;
+        if rank == "biotype" || rank == "genotype" {
+            // species name is scientific_name without 2 part suffix
+            species_name = Some(
+                scientific_name
+                    .rsplitn(2, ' ')
+                    .nth(1)
+                    .unwrap_or(scientific_name)
+                    .to_string(),
+            );
+        } else if rank == "forma" || rank == "forma specialis" {
+            // species name is first part of scientific_name split on f. or f. sp.
+            species_name = Some(
+                scientific_name
+                    .split(" f. ")
+                    .next()
+                    .unwrap_or(scientific_name)
+                    .to_string(),
+            );
+        } else if rank == "isolate"
+            || rank == "morph"
+            || rank == "strain"
+            || rank == "subspecies"
+            || rank == "subvariety"
+        {
+            // species name is first 2 parts of scientific_name
+            // replace cf. between genus and species before splitting
+            // if scientific name matches word word x word word, take first 5 words
+            species_name = if scientific_name.contains(" x ")
+                && scientific_name.split(' ').collect::<Vec<&str>>().len() >= 5
+                && scientific_name
+                    .split(' ')
+                    .collect::<Vec<&str>>()
+                    .get(2)
+                    .unwrap_or(&"")
+                    .chars()
+                    .all(|c| c.is_alphabetic())
+            {
+                Some(
+                    scientific_name
+                        .split(' ')
+                        .take(5)
+                        .collect::<Vec<&str>>()
+                        .join(" "),
+                )
+            } else {
+                Some(
+                    scientific_name
+                        .replace(" cf. ", " ")
+                        .split(' ')
+                        .take(2)
+                        .collect::<Vec<&str>>()
+                        .join(" "),
+                )
+            }
+        }
+        if let Some(name) = species_name {
+            if lineage[lineage.len() - 1] != name {
+                lineage.push(name);
+            }
+        }
+    }
+
     pub fn from_jsonl(
         jsonl_path: PathBuf,
         options: &TaxonomyOptions,
@@ -1191,9 +1263,10 @@ impl Nodes {
                 let rank = v["rank"].as_str().unwrap_or("").to_string();
                 let scientific_name = v["scientificName"].as_str().unwrap_or("").to_string();
                 // Parse lineage as Vec<String>
-                let lineage: Vec<String> = if let Some(lin) = v.get("lineage") {
+                let mut lineage: Vec<String> = if let Some(lin) = v.get("lineage") {
                     if lin.is_string() {
                         if let Some(lin_str) = lin.as_str() {
+                            let lin_str = lin_str.trim_end_matches("; ");
                             lin_str.split(';').map(|s| s.trim().to_string()).collect()
                         } else {
                             vec![]
@@ -1212,6 +1285,7 @@ impl Nodes {
                 } else {
                     vec![]
                 };
+                Self::add_species_to_lineage(&scientific_name, &rank, &mut lineage);
                 // Walk lineage windows to find parent
                 for names in lineage
                     .iter()
