@@ -1,6 +1,6 @@
 [package]
 name = "blobtk"
-version = "0.7.7"
+version = "0.7.9"
 edition = "2021"
 authors = [
     "Rich Challis <rc28@sanger.ac.uk>",
@@ -49,7 +49,7 @@ csv = "1.2.2"
 env_logger = "0.11.8"
 flate2 = "1.0.25"
 glob = "0.3.1"
-image = "0.25.6"
+image = "=0.25.6"
 indexmap = "1.9.2"
 indicatif = "0.17.2"
 log = "0.4.27"
@@ -80,6 +80,9 @@ trie-rs = "0.1.1"
 unicode-normalization = "0.1.24"
 url = { version = "2.3.1", features = ["serde"] }
 usvg = "0.31.0"
+
+# Pin transitive crates that switched to edition = "2024"
+aligned = "=0.4.2"
 
 [build-dependencies]
 pyo3-build-config = "0.25.1"

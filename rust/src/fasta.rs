@@ -40,9 +40,8 @@ fn subsample_fasta<F: Fn()>(
             }
         }
 
-        match callback {
-            Some(cb) => cb(),
-            None => (),
+        if let Some(cb) = callback {
+            cb()
         }
     }
     progress_bar.finish();

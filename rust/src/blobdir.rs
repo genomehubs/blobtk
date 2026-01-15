@@ -162,23 +162,12 @@ impl<T> Field<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Filter {
     pub min: Option<f64>,
     pub max: Option<f64>,
     pub invert: bool,
     pub key: Option<Vec<String>>,
-}
-
-impl Default for Filter {
-    fn default() -> Filter {
-        Filter {
-            min: None,
-            max: None,
-            invert: false,
-            key: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -190,7 +179,10 @@ pub struct BuscoGene {
 pub fn get_path(dir: &PathBuf, prefix: &str) -> Option<String> {
     let mut path = dir.clone();
     path.push(prefix);
-    for e in glob(&format!("{}*", path.to_string_lossy())).expect("Failed to read glob pattern") {
+    if let Some(e) = glob(&format!("{}*", path.to_string_lossy()))
+        .expect("Failed to read glob pattern")
+        .next()
+    {
         return Some(format!("{}", e.unwrap().to_string_lossy()));
     }
     None
@@ -199,7 +191,7 @@ pub fn get_path(dir: &PathBuf, prefix: &str) -> Option<String> {
 pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
     let blobdir = dir.to_str().unwrap();
     if blobdir.starts_with("http") {
-        let mut url = format!("{}", dir.to_str().unwrap());
+        let mut url = dir.to_str().unwrap().to_string();
         if !prefix.starts_with("meta.") {
             url = format!(
                 "{}/{}",
@@ -209,36 +201,30 @@ pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
         }
         let response = reqwest::blocking::get(&url).expect("Failed to fetch file");
         if response.status().is_success() {
-            return Some(Box::new(BufReader::new(response)));
+            Some(Box::new(BufReader::new(response)))
         } else {
-            return None;
+            None
         }
     } else {
-        let path = match get_path(dir, prefix) {
-            Some(string) => string,
-            None => return None,
-        };
+        let path = get_path(dir, prefix)?;
         let file = File::open(&path).expect("no such file");
 
         if path.ends_with(".gz") {
-            return Some(Box::new(BufReader::new(GzDecoder::new(file))));
+            Some(Box::new(BufReader::new(GzDecoder::new(file))))
         } else {
-            return Some(Box::new(BufReader::new(file)));
+            Some(Box::new(BufReader::new(file)))
         }
     }
 }
 
 pub fn local_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
-    let path = match get_path(dir, prefix) {
-        Some(string) => string,
-        None => return None,
-    };
+    let path = get_path(dir, prefix)?;
     let file = File::open(&path).expect("no such file");
 
     if path.ends_with(".gz") {
-        return Some(Box::new(BufReader::new(GzDecoder::new(file))));
+        Some(Box::new(BufReader::new(GzDecoder::new(file))))
     } else {
-        return Some(Box::new(BufReader::new(file)));
+        Some(Box::new(BufReader::new(file)))
     }
 }
 
@@ -274,7 +260,7 @@ pub fn parse_blobdir(blobdir: &PathBuf) -> Result<Meta, error::Error> {
             return Err(error::Error::SerdeError(format!(
                 "{}/meta.json {}",
                 &blobdir.to_str().unwrap(),
-                err.to_string()
+                err
             )))
         }
     };
@@ -304,13 +290,13 @@ pub fn parse_blobdir(blobdir: &PathBuf) -> Result<Meta, error::Error> {
                     tmp.field_type = f.field_type.clone()
                 }
                 if f.range.is_some() {
-                    tmp.range = f.range.clone()
+                    tmp.range = f.range
                 }
                 if f.preload.is_some() {
-                    tmp.preload = f.preload.clone()
+                    tmp.preload = f.preload
                 }
                 if f.active.is_some() {
-                    tmp.active = f.active.clone()
+                    tmp.active = f.active
                 }
                 if f.scale.is_some() {
                     tmp.scale = f.scale.clone()
@@ -319,7 +305,7 @@ pub fn parse_blobdir(blobdir: &PathBuf) -> Result<Meta, error::Error> {
                     tmp.datatype = f.datatype.clone()
                 }
                 if f.count.is_some() {
-                    tmp.count = f.count.clone()
+                    tmp.count = f.count
                 }
                 if f.odb_set.is_some() {
                     tmp.odb_set = f.odb_set.clone()
@@ -328,11 +314,7 @@ pub fn parse_blobdir(blobdir: &PathBuf) -> Result<Meta, error::Error> {
             };
 
             // full = FieldMeta { id: f.id, ..parent };
-            let busco_flag = if f.id == "busco".to_string() {
-                true
-            } else {
-                busco
-            };
+            let busco_flag = if f.id == "busco" { true } else { busco };
             if f.children.is_none() {
                 fields.insert(f.id.clone(), full.clone());
                 if busco_flag {
@@ -366,7 +348,7 @@ pub fn parse_blobdir(blobdir: &PathBuf) -> Result<Meta, error::Error> {
     meta.field_list = Some(fields);
     meta.busco_list = Some(busco_fields);
     if meta.record_type != "scaffold" {
-        meta.record_type = if titlecase(&meta.assembly.level) == "Contig".to_string() {
+        meta.record_type = if titlecase(&meta.assembly.level) == "Contig" {
             "contig".to_string()
         } else {
             "scaffold".to_string()
@@ -377,10 +359,7 @@ pub fn parse_blobdir(blobdir: &PathBuf) -> Result<Meta, error::Error> {
 }
 
 pub fn parse_field_busco(id: String, blobdir: &PathBuf) -> Option<Vec<Vec<BuscoGene>>> {
-    let reader = match file_reader(blobdir, &format!("{}.json", &id)) {
-        Some(reader) => reader,
-        None => return None,
-    };
+    let reader = file_reader(blobdir, &format!("{}.json", &id))?;
     let field: Field<Vec<(String, usize)>> =
         serde_json::from_reader(reader).expect("unable to parse json");
     let mut values: Vec<Vec<BuscoGene>> = vec![];
@@ -455,10 +434,7 @@ pub fn parse_field_cat_windows(
         }
         let mut windows = vec![];
         for arr in seq {
-            let value = match arr[cat_slot] {
-                Some(v) => Some((keys[v].clone(), v)),
-                None => None,
-            };
+            let value = arr[cat_slot].map(|v| (keys[v].clone(), v));
             windows.push(value);
         }
         values.push(windows);
@@ -499,7 +475,7 @@ pub fn parse_field_synonym(
         }
     }
     for value in field.values() {
-        values.push(if value.len() >= name_slot + 1 {
+        values.push(if value.len() > name_slot {
             Some(value[name_slot].clone())
         } else {
             None
@@ -743,15 +719,11 @@ pub fn filter_float_values(values: Vec<f64>, filter: Filter, indices: Vec<usize>
     let mut output = vec![];
     for i in initial {
         let mut keep = true;
-        if filter.max.is_some() {
-            if values[i] > filter.max.unwrap() {
-                keep = false;
-            }
+        if filter.max.is_some() && values[i] > filter.max.unwrap() {
+            keep = false;
         }
-        if filter.min.is_some() {
-            if values[i] < filter.min.unwrap() {
-                keep = false;
-            }
+        if filter.min.is_some() && values[i] < filter.min.unwrap() {
+            keep = false;
         }
         if filter.invert {
             keep = !keep;
@@ -772,15 +744,11 @@ pub fn filter_int_values(values: Vec<usize>, filter: Filter, indices: Vec<usize>
     let mut output = vec![];
     for i in initial {
         let mut keep = true;
-        if filter.max.is_some() {
-            if values[i] as f64 > filter.max.unwrap() {
-                keep = false;
-            }
+        if filter.max.is_some() && values[i] as f64 > filter.max.unwrap() {
+            keep = false;
         }
-        if filter.min.is_some() {
-            if (values[i] as f64) < filter.min.unwrap() {
-                keep = false;
-            }
+        if filter.min.is_some() && (values[i] as f64) < filter.min.unwrap() {
+            keep = false;
         }
         if filter.invert {
             keep = !keep;
@@ -823,10 +791,8 @@ pub fn filter_string_values(
         .collect();
     for i in initial {
         let mut keep = true;
-        if filter.key.is_some() {
-            if set.contains(&ints[i]) {
-                keep = false;
-            }
+        if filter.key.is_some() && set.contains(&ints[i]) {
+            keep = false;
         }
         // if filter.min.is_some() {
         //     if (values[i] as f64) < filter.min.unwrap() {
@@ -848,28 +814,25 @@ pub fn set_filters(filters: HashMap<String, Filter>, meta: &Meta, blobdir: &Path
     let field_list = meta.field_list.clone().unwrap();
     for (id, filter) in filters {
         let field_meta_option = field_list.get(&id);
-        match field_meta_option {
-            Some(field_meta) => {
-                let field = field_meta.clone();
-                match field.datatype {
-                    Some(Datatype::Float) => {
-                        let values = parse_field_float(field_meta.id.clone(), blobdir).unwrap();
-                        indices = filter_float_values(values, filter, indices);
-                    }
-                    Some(Datatype::Integer) => {
-                        let values = parse_field_int(field_meta.id.clone(), blobdir).unwrap();
-                        indices = filter_int_values(values, filter, indices);
-                    }
-                    Some(Datatype::String) => {
-                        let (keys, values) =
-                            parse_field_string(field_meta.id.clone(), blobdir).unwrap();
-                        indices = filter_string_values(values, keys, filter, indices);
-                    }
-                    Some(_) => (),
-                    None => (),
+        if let Some(field_meta) = field_meta_option {
+            let field = field_meta.clone();
+            match field.datatype {
+                Some(Datatype::Float) => {
+                    let values = parse_field_float(field_meta.id.clone(), blobdir).unwrap();
+                    indices = filter_float_values(values, filter, indices);
                 }
+                Some(Datatype::Integer) => {
+                    let values = parse_field_int(field_meta.id.clone(), blobdir).unwrap();
+                    indices = filter_int_values(values, filter, indices);
+                }
+                Some(Datatype::String) => {
+                    let (keys, values) =
+                        parse_field_string(field_meta.id.clone(), blobdir).unwrap();
+                    indices = filter_string_values(values, keys, filter, indices);
+                }
+                Some(_) => (),
+                None => (),
             }
-            None => (),
         };
     }
     if indices.is_empty() {
@@ -881,7 +844,7 @@ pub fn set_filters(filters: HashMap<String, Filter>, meta: &Meta, blobdir: &Path
 pub fn apply_filter_float(values: &Vec<f64>, indices: &Vec<usize>) -> Vec<f64> {
     let mut output = vec![];
     for i in indices {
-        output.push(values[i.clone()])
+        output.push(values[*i])
     }
     output
 }
@@ -889,7 +852,7 @@ pub fn apply_filter_float(values: &Vec<f64>, indices: &Vec<usize>) -> Vec<f64> {
 pub fn apply_filter_int(values: &Vec<usize>, indices: &Vec<usize>) -> Vec<usize> {
     let mut output = vec![];
     for i in indices {
-        output.push(values[i.clone()])
+        output.push(values[*i])
     }
     output
 }
@@ -897,10 +860,7 @@ pub fn apply_filter_int(values: &Vec<usize>, indices: &Vec<usize>) -> Vec<usize>
 pub fn apply_filter_option_int(values: &Vec<Option<usize>>, indices: &Vec<usize>) -> Vec<usize> {
     let mut output = vec![];
     for i in indices {
-        output.push(match values[i.clone()] {
-            Some(v) => v,
-            _ => 0,
-        })
+        output.push(values[*i].unwrap_or_default())
     }
     output
 }
@@ -911,7 +871,7 @@ pub fn apply_filter_busco(
 ) -> Vec<Vec<BuscoGene>> {
     let mut output = vec![];
     for i in indices {
-        output.push(values[i.clone()].clone())
+        output.push(values[*i].clone())
     }
     output
 }
@@ -919,7 +879,7 @@ pub fn apply_filter_busco(
 pub fn apply_filter_cat(values: &Vec<(String, usize)>, indices: &Vec<usize>) -> Vec<String> {
     let mut output = vec![];
     for i in indices {
-        output.push(values[i.clone()].clone().0)
+        output.push(values[*i].clone().0)
     }
     output
 }
@@ -930,7 +890,7 @@ pub fn apply_filter_cat_tuple(
 ) -> Vec<(String, usize)> {
     let mut output = vec![];
     for i in indices {
-        output.push(values[i.clone()].clone())
+        output.push(values[*i].clone())
     }
     output
 }
@@ -938,7 +898,7 @@ pub fn apply_filter_cat_tuple(
 pub fn apply_filter_string(values: &Vec<String>, indices: &Vec<usize>) -> Vec<String> {
     let mut output = vec![];
     for i in indices {
-        output.push(values[i.clone()].clone())
+        output.push(values[*i].clone())
     }
     output
 }
@@ -950,9 +910,9 @@ pub fn apply_filter_option_string_with_fallback(
 ) -> Vec<String> {
     let mut output = vec![];
     for i in indices {
-        output.push(match &values[i.clone()] {
+        output.push(match &values[*i] {
             Some(v) => v.clone(),
-            _ => fallback[i.clone()].clone(),
+            _ => fallback[*i].clone(),
         })
     }
     output
@@ -979,7 +939,7 @@ pub fn get_plot_values(
                     Some(Datatype::Integer) => {
                         let values: Vec<f64> = parse_field_int(field_meta.id.clone(), blobdir)?
                             .iter()
-                            .map(|x| x.clone() as f64)
+                            .map(|x| *x as f64)
                             .collect();
                         plot_values.insert(axis.clone(), values);
                     }
@@ -995,8 +955,6 @@ pub fn get_plot_values(
             None => {
                 if axis == "cat" && id == "_" {
                     cat_values = vec![("blank".to_string(), 0); meta.records]
-                } else {
-                    ()
                 }
             }
         };
@@ -1077,8 +1035,6 @@ pub fn get_window_values(
             None => {
                 if axis == "cat" && id == "_" {
                     cat_values = vec![vec![Some(("blank".to_string(), 0)); meta.records]]
-                } else {
-                    ()
                 }
             }
         };

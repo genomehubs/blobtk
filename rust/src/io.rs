@@ -144,17 +144,17 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
 
     let response = reqwest::blocking::get(url.to_string()).expect("Failed to fetch file");
     if response.status().is_success() {
-        return Ok(Box::new(BufReader::new(response)));
+        Ok(Box::new(BufReader::new(response)))
     } else {
         let response = reqwest::blocking::get(url.to_string().replace(".gz", ""))
-            .expect(format!("Failed to fetch file: {}", url).as_str());
+            .unwrap_or_else(|_| panic!("Failed to fetch file: {}", url));
         if response.status().is_success() {
-            return Ok(Box::new(BufReader::new(response)));
+            Ok(Box::new(BufReader::new(response)))
         } else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Failed to fetch file: {}", response.status()),
-            ));
+            Err(io::Error::other(format!(
+                "Failed to fetch file: {}",
+                response.status()
+            )))
         }
     }
 }
@@ -194,7 +194,7 @@ pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
 
     let stdout = process
         .stdout
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to capture stdout"))?;
+        .ok_or_else(|| io::Error::other("Failed to capture stdout"))?;
     let mut buffer = [0u8; 2];
     let mut stdout_reader = BufReader::new(stdout);
     match io::Read::read_exact(&mut stdout_reader, &mut buffer) {
@@ -277,6 +277,7 @@ pub fn get_csv_reader(
     skip_lines: usize,
     flexible: bool,
 ) -> csv::Reader<Box<dyn BufRead>> {
+    dbg!(&file_path);
     let file_reader =
         file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
     // Skip the first `skip_lines` lines

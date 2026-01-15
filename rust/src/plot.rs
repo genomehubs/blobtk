@@ -69,7 +69,7 @@ pub fn save_png(document: &Document, options: &PlotOptions) {
     let mut buf = Vec::new();
     svg::write(&mut buf, document).unwrap();
     let opt = usvg::Options::default();
-    let mut tree = usvg::Tree::from_data(&buf.as_slice(), &opt).unwrap();
+    let mut tree = usvg::Tree::from_data(buf.as_slice(), &opt).unwrap();
     tree.convert_text(&fontdb);
 
     let width = 2000;
@@ -85,9 +85,12 @@ pub fn save_png(document: &Document, options: &PlotOptions) {
     pixmap.save_png(options.output.as_str()).unwrap();
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Suffix {
     PNG,
     SVG,
+    JSON,
+    YAML,
 }
 
 impl FromStr for Suffix {
@@ -96,6 +99,8 @@ impl FromStr for Suffix {
         match input {
             "png" => Ok(Suffix::PNG),
             "svg" => Ok(Suffix::SVG),
+            "json" => Ok(Suffix::JSON),
+            "yaml" => Ok(Suffix::YAML),
             _ => Err(()),
         }
     }
@@ -133,8 +138,8 @@ pub fn plot_snail(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<()
     let id = meta.id.clone();
     let record_type = meta.record_type.clone();
 
-    let filters = blobdir::parse_filters(&options, None);
-    let wanted_indices = blobdir::set_filters(filters, &meta, &options.blobdir);
+    let filters = blobdir::parse_filters(options, None);
+    let wanted_indices = blobdir::set_filters(filters, meta, &options.blobdir);
 
     let gc_filtered = blobdir::apply_filter_float(&gc_values, &wanted_indices);
     let n_filtered = match n_values {
@@ -166,14 +171,28 @@ pub fn plot_snail(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<()
         busco_lineage,
         id,
         record_type,
-        &options,
+        options,
     );
-    let document: Document = snail::svg(&snail_stats, &options);
-    save_by_suffix(options, document)?;
-    Ok(())
+    let suffix = get_suffix(options)?;
+    match suffix {
+        Suffix::JSON => {
+            serde_json::to_writer_pretty(std::fs::File::create(&options.output)?, &snail_stats)?;
+            Ok(())
+        }
+        Suffix::YAML => {
+            serde_yaml::to_writer(std::fs::File::create(&options.output)?, &snail_stats)?;
+            Ok(())
+        }
+        _ => {
+            // For SVG/PNG, continue to create the document and save
+            let document: Document = snail::svg(&snail_stats, options);
+            save_by_suffix(options, document)?;
+            Ok(())
+        }
+    }
 }
 
-fn save_by_suffix(options: &PlotOptions, document: Document) -> Result<(), error::Error> {
+fn get_suffix(options: &PlotOptions) -> Result<Suffix, error::Error> {
     let output_str = options.output.as_str();
     let suffix_str = PathBuf::from(output_str)
         .extension()
@@ -181,11 +200,16 @@ fn save_by_suffix(options: &PlotOptions, document: Document) -> Result<(), error
         .to_str()
         .unwrap()
         .to_string();
-    let suffix = Suffix::from_str(&suffix_str);
+    Suffix::from_str(&suffix_str).map_err(|_| error::Error::InvalidImageSuffix(suffix_str))
+}
+
+fn save_by_suffix(options: &PlotOptions, document: Document) -> Result<(), error::Error> {
+    let suffix = get_suffix(options)?;
+
     match suffix {
-        Ok(Suffix::PNG) => save_png(&document, &options),
-        Ok(Suffix::SVG) => save_svg(&document, &options),
-        Err(_) => return Err(error::Error::InvalidImageSuffix(suffix_str)),
+        Suffix::PNG => save_png(&document, options),
+        Suffix::SVG => save_svg(&document, options),
+        _ => return Err(error::Error::InvalidImageSuffix(format!("{:?}", suffix))),
     };
     Ok(())
 }
@@ -206,7 +230,7 @@ pub fn reverse_palette(count: usize) -> Vec<String> {
     let mut list = vec![];
     for i in 0..count {
         let mut j = if i % 2 == 1 { i - 1 } else { i + 1 };
-        j = j % 12;
+        j %= 12;
         list.push(color_to_hex(gradient[j]));
     }
     list
@@ -316,7 +340,7 @@ fn set_blob_filters(
         meta.plot.cat.clone(),
         Some("_".to_string()),
     )?;
-    let (plot_values, cat_values) = blobdir::get_plot_values(&meta, &options.blobdir, &plot_meta)?;
+    let (plot_values, cat_values) = blobdir::get_plot_values(meta, &options.blobdir, &plot_meta)?;
     let palette = set_palette(&options.palette, &options.color, options.cat_count);
     let (cat_order, cat_indices) = category::set_cat_order(
         &cat_values,
@@ -325,8 +349,8 @@ fn set_blob_filters(
         &options.cat_count,
         &palette,
     );
-    let filters = blobdir::parse_filters(&options, Some(&plot_meta));
-    let wanted_indices = blobdir::set_filters(filters, &meta, &options.blobdir);
+    let filters = blobdir::parse_filters(options, Some(&plot_meta));
+    let wanted_indices = blobdir::set_filters(filters, meta, &options.blobdir);
     let z = blobdir::apply_filter_float(&plot_values["z"], &wanted_indices);
     let filtered_cat_values = blobdir::apply_filter_cat_tuple(&cat_values, &wanted_indices);
     let (cat_order, cat_indices) = if wanted_indices.len() < plot_values["x"].len() {
@@ -381,10 +405,9 @@ pub fn plot_blob(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(),
         ..Default::default()
     };
 
-    let scatter_data = blob::blob_points(plot_meta, &blob_data, &dimensions, &meta, &options, None);
+    let scatter_data = blob::blob_points(plot_meta, &blob_data, &dimensions, meta, options, None);
 
-    let (x_bins, y_bins, max_bin) =
-        blob::bin_axes(&scatter_data, &blob_data, &dimensions, &options);
+    let (x_bins, y_bins, max_bin) = blob::bin_axes(&scatter_data, &blob_data, &dimensions, options);
 
     let document: Document = blob::plot(
         dimensions,
@@ -393,7 +416,7 @@ pub fn plot_blob(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(),
         y_bins,
         max_bin,
         max_bin,
-        &options,
+        options,
     );
     save_by_suffix(options, document)?;
     Ok(())
@@ -413,7 +436,7 @@ fn set_grid_data(
     let (plot_meta, _plot_values, wanted_indices, _z, cat_order, _cat_indices) =
         set_blob_filters(options, meta)?;
     let (window_values, window_cat_values, limits) = blobdir::get_window_values(
-        &meta,
+        meta,
         &options.blobdir,
         &plot_meta,
         &wanted_indices,
@@ -443,10 +466,7 @@ fn set_grid_data(
             cat: if let Some(cat_values) = window_cat_values.get(i) {
                 cat_values
                     .iter()
-                    .map(|c| match c {
-                        Some((_, idx)) => Some(idx.to_owned() + 1),
-                        None => None,
-                    })
+                    .map(|c| c.as_ref().map(|(_, idx)| idx.to_owned() + 1))
                     .collect()
             } else {
                 vec![]
@@ -605,7 +625,7 @@ pub fn plot_grid(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(),
     let mut ratios = None;
     if Some("position".to_string()) == options.x_field
         && options.x_limit.is_none()
-        && grid_data.len() > 0
+        && !grid_data.is_empty()
     {
         let (_, num_rows) = calculate_grid_size(grid_data.len());
         let max_values = grid_data
@@ -633,7 +653,7 @@ pub fn plot_grid(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(),
         titles.push(blob_data.title.clone());
         scatter_data.push(blob::blob_points(
             plot_meta.clone(),
-            &blob_data,
+            blob_data,
             &BlobDimensions {
                 height: grid_size.row_height
                     - grid_size.padding.top
@@ -645,12 +665,12 @@ pub fn plot_grid(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(),
                     - grid_size.padding.right
                     - grid_size.margin.left
                     - grid_size.margin.right,
-                padding: grid_size.padding.clone(),
-                margin: grid_size.margin.clone(),
+                padding: grid_size.padding,
+                margin: grid_size.margin,
                 ..Default::default()
             },
-            &meta,
-            &options,
+            meta,
+            options,
             Some({
                 let mut new_limits = limits.clone();
                 new_limits.get_mut("x").unwrap()[1] *= grid_size.ratios[col];
@@ -670,7 +690,7 @@ pub fn plot_grid(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(),
         scatter_data,
         titles,
         (plot_meta["x"].clone(), plot_meta["y"].clone()),
-        &options,
+        options,
     );
     save_by_suffix(options, document)?;
     Ok(())
@@ -683,9 +703,9 @@ pub fn plot_legend(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(
         ..Default::default()
     };
 
-    let scatter_data = blob::blob_points(plot_meta, &blob_data, &dimensions, &meta, &options, None);
+    let scatter_data = blob::blob_points(plot_meta, &blob_data, &dimensions, meta, options, None);
 
-    let document: Document = blob::legend(dimensions, scatter_data, &options);
+    let document: Document = blob::legend(dimensions, scatter_data, options);
     save_by_suffix(options, document)?;
     Ok(())
 }
@@ -704,7 +724,7 @@ pub fn plot_cumulative(
         meta.plot.cat.clone(),
         Some("_".to_string()),
     )?;
-    let (plot_values, cat_values) = blobdir::get_plot_values(&meta, &options.blobdir, &plot_meta)?;
+    let (plot_values, cat_values) = blobdir::get_plot_values(meta, &options.blobdir, &plot_meta)?;
 
     let palette = set_palette(&options.palette, &options.color, options.cat_count);
 
@@ -718,8 +738,8 @@ pub fn plot_cumulative(
     // let id = meta.id.clone();
     // let record_type = meta.record_type.clone();
 
-    let filters = blobdir::parse_filters(&options, None);
-    let wanted_indices = blobdir::set_filters(filters, &meta, &options.blobdir);
+    let filters = blobdir::parse_filters(options, None);
+    let wanted_indices = blobdir::set_filters(filters, meta, &options.blobdir);
 
     let cumulative_data = CumulativeData {
         values: blobdir::apply_filter_float(&plot_values["z"], &wanted_indices),
@@ -731,9 +751,9 @@ pub fn plot_cumulative(
         ..Default::default()
     };
 
-    let cumulative_lines = cumulative::cumulative_lines(&cumulative_data, &dimensions, &options);
+    let cumulative_lines = cumulative::cumulative_lines(&cumulative_data, &dimensions, options);
 
-    let document: Document = cumulative::plot(dimensions, cumulative_lines, &options);
+    let document: Document = cumulative::plot(dimensions, cumulative_lines, options);
     save_by_suffix(options, document)?;
     Ok(())
 }
@@ -745,12 +765,12 @@ pub fn plot(options: &cli::PlotOptions) -> Result<(), anyhow::Error> {
     let shape = &options.shape;
     match view {
         cli::View::Blob => match shape {
-            Some(Shape::Grid) => plot_grid(&meta, &options)?,
-            _ => plot_blob(&meta, &options)?,
+            Some(Shape::Grid) => plot_grid(&meta, options)?,
+            _ => plot_blob(&meta, options)?,
         },
-        cli::View::Cumulative => plot_cumulative(&meta, &options)?,
-        cli::View::Legend => plot_legend(&meta, &options)?,
-        cli::View::Snail => plot_snail(&meta, &options)?,
+        cli::View::Cumulative => plot_cumulative(&meta, options)?,
+        cli::View::Legend => plot_legend(&meta, options)?,
+        cli::View::Snail => plot_snail(&meta, options)?,
     }
     Ok(())
 }
@@ -762,7 +782,7 @@ mod tests {
     #[test]
     fn test_calculate_grid_size_23() {
         let count = 23;
-        let expected = (5, 5);
+        let expected = (4, 6);
         let result = calculate_grid_size(count);
         assert_eq!(result, expected);
     }

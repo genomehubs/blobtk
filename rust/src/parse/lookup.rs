@@ -36,9 +36,9 @@ pub fn build_lookup(
         progress_bar.inc(1);
         // if rank_set.contains(node.rank.as_str()) {
         let lineage = nodes.lineage(&"1".to_string(), tax_id);
-        let names = node.names_by_class(Some(&name_classes), true).clone();
+        let names = node.names_by_class(Some(name_classes), true).clone();
         for n in lineage.iter().rev() {
-            let n_names = n.names_by_class(Some(&name_classes), true);
+            let n_names = n.names_by_class(Some(name_classes), true);
             for name in names.iter() {
                 for n_name in n_names.iter() {
                     // if higher_rank_set.contains(n.rank.as_str()) {
@@ -98,14 +98,14 @@ pub fn lookup_nodes(
     xref_label: Option<String>,
     _create_taxa: bool,
 ) {
-    let id_map = build_fast_lookup(&nodes, &name_classes);
+    let id_map = build_fast_lookup(nodes, name_classes);
     let node_count = new_nodes.nodes.len();
     let progress_bar = styled_progress_bar(node_count, "Looking up names");
     for node in new_nodes.nodes.values() {
         progress_bar.inc(1);
-        let mut taxonomy_section = node.to_taxonomy_section(&new_nodes);
+        let taxonomy_section = node.to_taxonomy_section(new_nodes);
         let (assigned_taxon, _taxon_match) =
-            match_taxonomy_section(&mut taxonomy_section, &id_map, None);
+            match_taxonomy_section(&taxonomy_section, &id_map, None);
         if let Some(taxon) = assigned_taxon {
             let tax_id = taxon.tax_id.clone().unwrap();
             let new_tax_id = node.tax_id();
@@ -145,8 +145,6 @@ pub fn lookup_nodes(
         }
     }
     progress_bar.finish();
-
-    return;
 }
 
 #[derive(Clone, Debug, Default)]
@@ -187,7 +185,7 @@ pub fn build_fast_lookup(
     for (tax_id, node) in nodes.nodes.iter() {
         progress_bar.inc(1);
         let lineage = nodes.lineage(&"1".to_string(), tax_id);
-        let names = node.names_by_class(Some(&name_classes), true);
+        let names = node.names_by_class(Some(name_classes), true);
         let anc_ids: HashSet<String> = lineage
             .iter()
             .filter(|n| higher_rank_set.contains(n.rank.as_str()))
@@ -412,11 +410,7 @@ impl MatchCounts {
 
 fn check_higher_taxon(taxon: &Candidate, higher_taxon: &Candidate) -> bool {
     let higher_tax_id = higher_taxon.clone().tax_id.unwrap();
-    if taxon.anc_ids.clone().unwrap().contains(&higher_tax_id) {
-        true
-    } else {
-        false
-    }
+    taxon.anc_ids.clone().unwrap().contains(&higher_tax_id)
 }
 
 fn check_higher_rank(taxon: &Candidate, taxon_match: &TaxonMatch) -> bool {
@@ -428,7 +422,7 @@ fn check_higher_rank(taxon: &Candidate, taxon_match: &TaxonMatch) -> bool {
             // check that only one possible higher taxon matches the lineage
             higher_taxa
                 .iter()
-                .map(|higher_taxon| check_higher_taxon(taxon, &higher_taxon))
+                .map(|higher_taxon| check_higher_taxon(taxon, higher_taxon))
                 .filter(|x| x.to_owned())
                 .count()
                 == 1
@@ -439,7 +433,7 @@ fn check_higher_rank(taxon: &Candidate, taxon_match: &TaxonMatch) -> bool {
                 // check that only one possible higher taxon matches the lineage
                 higher_options
                     .iter()
-                    .map(|higher_taxon| check_higher_taxon(taxon, &higher_taxon))
+                    .map(|higher_taxon| check_higher_taxon(taxon, higher_taxon))
                     .filter(|x| x.to_owned())
                     .count()
                     == 1
@@ -535,7 +529,7 @@ pub fn match_taxonomy_section(
         let name = taxonomy_section.get(rank).unwrap().clone();
         let taxon = Candidate {
             name: name.clone(),
-            tax_id: taxon_id.clone().map(|s| s.clone()),
+            tax_id: taxon_id.cloned(),
             rank: rank.clone(),
             ..Default::default()
         };
@@ -695,7 +689,7 @@ pub fn match_taxonomy_section(
                 let fuzzy: Vec<_> = id_map
                     .fuzzy(&CString::new(name.clone()).unwrap(), 2)
                     .collect();
-                if fuzzy.len() > 0 {
+                if !fuzzy.is_empty() {
                     // Check if fuzzy matches are at same rank
                     let mut candidates = vec![];
                     for fuzzies in fuzzy.iter() {
@@ -711,7 +705,7 @@ pub fn match_taxonomy_section(
                             }
                         }
                     }
-                    if candidates.len() > 0 {
+                    if !candidates.is_empty() {
                         if i == 0 {
                             taxon_match.rank_options = Some(candidates);
                         } else {
@@ -749,7 +743,7 @@ pub fn match_taxonomy_section(
             // println!("Taxon {} has multiple matches", taxon_match.taxon.name);
             let mut candidates = vec![];
             for taxon in taxa.iter() {
-                if check_higher_rank(&taxon, &taxon_match) {
+                if check_higher_rank(taxon, &taxon_match) {
                     candidates.push(taxon.clone());
                 }
             }

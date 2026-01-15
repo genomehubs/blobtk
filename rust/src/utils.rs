@@ -47,9 +47,9 @@ pub fn format_si(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrap
     fn set_suffix(thousands: i8) -> String {
         const POSITIVE: [&str; 9] = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
         const NEGATIVE: [&str; 8] = ["", "μ", "p", "n", "f", "a", "z", "y"];
-        let suffix = if thousands < 0 && thousands >= -8 {
-            NEGATIVE[(thousands * -1) as usize]
-        } else if thousands >= 0 && thousands <= 9 {
+        let suffix = if (-8..0).contains(&thousands) {
+            NEGATIVE[-thousands as usize]
+        } else if (0..=9).contains(&thousands) {
             POSITIVE[thousands as usize]
         } else {
             ""
@@ -60,14 +60,13 @@ pub fn format_si(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrap
     let magnitude = if *value == 0.0 {
         0
     } else {
-        (value.clone()).log10() as i8
+        (*value).log10() as i8
     };
-    let prefix;
     let thousands = magnitude / 3;
-    if thousands < 0 {
-        prefix = value.clone() * 10u32.pow(3 * (thousands.abs() as u32 + 1)) as f64;
+    let prefix = if thousands < 0 {
+        *value * 10u32.pow(3 * (thousands.unsigned_abs() as u32 + 1)) as f64
     } else {
-        prefix = value.clone() / 10u32.pow(3 * thousands as u32) as f64
+        *value / 10u32.pow(3 * thousands as u32) as f64
     };
     let d = Decimal::from_f64_retain(prefix).unwrap();
     let rounding_strategy = match rounding {
@@ -216,8 +215,7 @@ pub fn scale_float(
 ) -> f64 {
     let scale_log = &String::from("scaleLog");
     let scale_sqrt = &String::from("scaleSqrt");
-    if clamp.is_some() {
-        let clamp_value = clamp.unwrap();
+    if let Some(clamp_value) = clamp {
         if value < clamp_value {
             return clamp_value;
         }
@@ -238,8 +236,7 @@ pub fn scale_floats(
     scale_type: &Scale,
     clamp: Option<f64>,
 ) -> f64 {
-    if clamp.is_some() {
-        let clamp_value = clamp.unwrap();
+    if let Some(clamp_value) = clamp {
         if value < clamp_value {
             return match scale_type {
                 Scale::LINEAR => linear_scale_float(clamp_value, domain, range),

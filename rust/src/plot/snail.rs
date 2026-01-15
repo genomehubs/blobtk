@@ -4,7 +4,7 @@ use std::f64::consts::PI;
 
 use serde;
 use serde::{Deserialize, Serialize};
-use svg::node::element::{Group, Line, Path, Rectangle, Text};
+use svg::node::element::{Circle, Group, Line, Path, Rectangle, Text};
 use svg::Document;
 use titlecase::titlecase;
 
@@ -51,6 +51,14 @@ pub struct SnailStats {
     id: String,
     #[serde(rename = "assembly")]
     span: usize,
+    #[serde(rename = "auN")]
+    aun: usize,
+    #[serde(rename = "auNn")]
+    aun_n: usize,
+    #[serde(rename = "rauN")]
+    raun: f64,
+    #[serde(rename = "rauNn")]
+    raun_n: f64,
     #[serde(rename = "ATGC")]
     atgc: usize,
     #[serde(rename = "GC", with = "compact_float")]
@@ -79,6 +87,18 @@ pub struct SnailStats {
 impl SnailStats {
     pub fn span(&self) -> usize {
         self.span
+    }
+    pub fn aun(&self) -> usize {
+        self.aun
+    }
+    pub fn aun_n(&self) -> usize {
+        self.aun_n
+    }
+    pub fn raun(&self) -> f64 {
+        self.raun
+    }
+    pub fn raun_n(&self) -> f64 {
+        self.raun_n
     }
     pub fn atgc(&self) -> usize {
         self.atgc
@@ -132,7 +152,7 @@ fn count_buscos(
 ) {
     for busco in busco_values.clone().into_iter() {
         let busco_id = busco.id;
-        if busco.status == "Fragmented".to_string() {
+        if busco.status == "Fragmented" {
             busco_frag.insert(busco_id.clone());
         } else {
             if busco_list.contains(&busco_id) {
@@ -156,12 +176,20 @@ pub fn snail_stats(
     options: &cli::PlotOptions,
 ) -> SnailStats {
     let span = length_values.iter().sum();
+    let sum_of_squares: usize = length_values.iter().map(|&x| x * x).sum();
+    let sum_of_squares_atgc: usize = length_values
+        .iter()
+        .zip(ncount_values.iter())
+        .map(|(&len, &n)| {
+            let atgc = len.saturating_sub(n);
+            atgc * atgc
+        })
+        .sum::<usize>();
+    let aun = sum_of_squares / span;
+    let aun_n = sum_of_squares_atgc / span;
     let n = ncount_values.iter().sum();
     let mut new_vals = vec![];
-    let busco_total = match busco_total {
-        Some(total) => total,
-        None => 0,
-    };
+    let busco_total = busco_total.unwrap_or_default();
     let busco_lineage = match busco_lineage {
         Some(lineage) => lineage,
         None => "".to_string(),
@@ -170,14 +198,16 @@ pub fn snail_stats(
         Some(vals) => vals,
         None => {
             for (i, length) in length_values.iter().enumerate() {
-                new_vals.push(ncount_values[i] as f64 / length.clone() as f64);
+                new_vals.push(ncount_values[i] as f64 / *length as f64);
             }
             &new_vals
         }
     };
     let atgc = span - n;
     let segment = span / options.segments;
-    let order = utils::indexed_sort(&length_values);
+    let order = utils::indexed_sort(length_values);
+    let raun = aun as f64 / length_values[order[0]] as f64;
+    let raun_n = aun_n as f64 / length_values[order[0]] as f64;
     // TODO: check span > segments
     let mut position: usize = 0;
     let mut binned_gcs: Vec<SummaryStats> = vec![];
@@ -246,6 +276,10 @@ pub fn snail_stats(
     }
     SnailStats {
         span,
+        aun,
+        aun_n,
+        raun,
+        raun_n,
         atgc,
         gc_proportion: gc_span / span as f64,
         at_proportion: at_span / span as f64,
@@ -258,7 +292,7 @@ pub fn snail_stats(
         busco_complete: busco_list.len(),
         busco_duplicated: busco_dup.len(),
         busco_fragmented: busco_frag.len(),
-        busco_total: busco_total,
+        busco_total,
         busco_lineage,
         binned_scaffold_lengths,
         binned_scaffold_counts,
@@ -277,6 +311,7 @@ pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOption
         rounding.clone(),
     );
     let scaffold_length = format_si(&(snail_stats.span() as f64), precision, rounding.clone());
+    let aun = format_si(&(snail_stats.aun() as f64), precision, rounding.clone());
     let longest_scaffold = format_si(
         &(snail_stats.scaffolds()[0] as f64),
         precision,
@@ -301,7 +336,12 @@ pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOption
         ..Default::default()
     });
     entries.push(LegendEntry {
-        title: format!("{} length (total {})", titlecase(record), scaffold_length),
+        title: format!(
+            "{} length (total {} | auN {})",
+            titlecase(record),
+            scaffold_length,
+            aun
+        ),
         color: "#999999".to_string(),
         ..Default::default()
     });
@@ -333,39 +373,39 @@ pub fn composition_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOpt
     let show_numbers = options.show_numbers;
     let gc_prop = if show_numbers {
         format_si(
-            &(snail_stats.gc_proportion as f64 * snail_stats.span as f64),
+            &(snail_stats.gc_proportion * snail_stats.span as f64),
             digits,
             rounding.clone(),
         )
     } else {
         format_pct(
-            &(snail_stats.gc_proportion as f64 * 100.0),
+            &(snail_stats.gc_proportion * 100.0),
             precision,
             rounding.clone(),
         )
     };
     let at_prop = if show_numbers {
         format_si(
-            &(snail_stats.at_proportion as f64 * snail_stats.span as f64),
+            &(snail_stats.at_proportion * snail_stats.span as f64),
             digits,
             rounding.clone(),
         )
     } else {
         format_pct(
-            &(snail_stats.at_proportion as f64 * 100.0),
+            &(snail_stats.at_proportion * 100.0),
             precision,
             rounding.clone(),
         )
     };
     let n_prop = if show_numbers {
         format_si(
-            &(snail_stats.n_proportion as f64 * snail_stats.span as f64),
+            &(snail_stats.n_proportion * snail_stats.span as f64),
             digits,
             rounding.clone(),
         )
     } else {
         format_pct(
-            &(snail_stats.n_proportion as f64 * 100.0),
+            &(snail_stats.n_proportion * 100.0),
             precision,
             rounding.clone(),
         )
@@ -405,13 +445,13 @@ pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
     let circ_prop = format_si(&(max_span as f64), digits, rounding.clone());
     let rad_prop = format_si(&(max_scaffold as f64), digits, rounding.clone());
     entries.push(LegendEntry {
-        title: format!("{}", circ_prop),
+        title: circ_prop.to_string(),
         color: "#ffffff".to_string(),
         shape: LegendShape::Circumference,
         ..Default::default()
     });
     entries.push(LegendEntry {
-        title: format!("{}", rad_prop),
+        title: rad_prop.to_string(),
         color: "#ffffff".to_string(),
         shape: LegendShape::Radius,
         ..Default::default()
@@ -512,11 +552,12 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
         Some(scaffold_length) => scaffold_length,
         None => snail_stats.scaffolds()[0],
     };
+    let as_badge = options.badge;
     let radius: f64 = 375.0;
     let outer_radius: f64 = 450.0;
     let bin_count = snail_stats.binned_scaffold_lengths().len();
     let min_scaffold = snail_stats.binned_scaffold_lengths()[bin_count - 1];
-    let mut magnitude = (min_scaffold.clone() as f64).log10() as u32;
+    let mut magnitude = (min_scaffold as f64).log10() as u32;
     if magnitude > 1 {
         magnitude -= 1;
     }
@@ -773,8 +814,12 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
     for tick in major_ticks {
         major_tick_group = major_tick_group
             .add(tick.path)
-            .add(tick.label)
-            .add(tick.outer_label)
+            .add(if !as_badge { tick.label } else { Text::new() })
+            .add(if !as_badge {
+                tick.outer_label
+            } else {
+                Text::new()
+            })
     }
     let mut minor_tick_group = Group::new();
     for tick in minor_ticks {
@@ -793,13 +838,16 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
         } else {
             tick.label
         };
-        major_length_tick_group = major_length_tick_group.add(tick.path).add(label);
+        major_length_tick_group =
+            major_length_tick_group
+                .add(tick.path)
+                .add(if !as_badge { label } else { Text::new() });
         // skip last gridline if scale is linear
         if matches!(options.scale_function, Scale::LINEAR) && i == major_length_ticks.len() - 1 {
             continue;
         }
         let arc_data = arc_path(
-            -1.0 * tick.position,
+            -tick.position,
             None,
             -PI / 2.0,
             max_radians - PI / 2.0,
@@ -829,23 +877,42 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
         minor_length_tick_group = minor_length_tick_group.add(tick.path)
     }
 
-    let scaf_stats_legend = scaffold_stats_legend(&snail_stats, &options)
+    let scaf_stats_legend = scaffold_stats_legend(snail_stats, options)
         .set("transform", format!("translate({},{})", 5, 25));
 
-    let comp_stats_legend = composition_stats_legend(&snail_stats, &options)
+    let score_legend = if options.show_score {
+        legend_group(
+            format!("Score: {}", format_si(&snail_stats.raun_n(), 3, None)),
+            vec![],
+            None,
+            1,
+        )
+        .set("transform", format!("translate({},{})", 433.7, 35))
+    } else {
+        Group::new()
+    };
+
+    let comp_stats_legend = composition_stats_legend(snail_stats, options)
         .set("transform", format!("translate({},{})", 835, 900));
 
-    let scale_legend = scale_stats_legend(&snail_stats, &options)
+    let scale_legend = scale_stats_legend(snail_stats, options)
         .set("transform", format!("translate({},{})", 5, 900));
 
-    let dataset_legend = dataset_name_legend(&snail_stats, &options)
+    let dataset_legend = dataset_name_legend(snail_stats, options)
         .set("transform", format!("translate({},{})", 5, 990));
 
     let (busc_stats_legend, busco_group) = if snail_stats.busco_total() >= 1 {
         (
-            busco_stats_legend(&snail_stats, &options)
+            busco_stats_legend(snail_stats, options)
                 .set("transform", format!("translate({},{})", 630, 25)),
-            busco_plot(snail_stats).set("transform", "translate(910, 170)"),
+            busco_plot(snail_stats, as_badge).set(
+                "transform",
+                if as_badge {
+                    "translate(868, 147)"
+                } else {
+                    "translate(910, 170)"
+                },
+            ),
         )
     } else {
         (Group::new(), Group::new())
@@ -879,34 +946,87 @@ pub fn svg(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Document {
         .add(inner)
         .add(outer);
 
-    let document = Document::new()
-        .set("viewBox", (0, 0, 1000, 1000))
-        .add(
-            Rectangle::new()
-                .set("fill", "#ffffff")
-                .set("stroke", "none")
-                .set("width", 1000)
-                .set("height", 1000),
-        )
-        .add(scaf_stats_legend)
-        .add(comp_stats_legend)
-        .add(busc_stats_legend)
-        .add(scale_legend)
-        .add(dataset_legend)
-        .add(group)
-        .add(busco_group);
-
     // svg::save(options.output.as_str(), &document).unwrap();
     // let mut target = Vec::new();
     // let svg_data = svg::write(target, &document).unwrap();
-    document
+    Document::new()
+        .set(
+            "viewBox",
+            if as_badge {
+                (
+                    (500.0 - outer_radius) as i64 - 2,
+                    (525.0 - outer_radius) as i64 - 2,
+                    (outer_radius * 2.0) as i64 + 4,
+                    (outer_radius * 2.0) as i64 + 4,
+                )
+            } else {
+                (0, 0, 1000, 1000)
+            },
+        )
+        .add(if as_badge {
+            Group::new()
+                .add(
+                    Circle::new()
+                        .set("fill", "#ffffff")
+                        .set("cx", 500)
+                        .set("cy", 525)
+                        .set("r", outer_radius),
+                )
+                .add(
+                    Circle::new()
+                        .set("fill", "#ffffff")
+                        .set("cx", 500 + outer_radius as i64 - 82)
+                        .set("cy", 525 - outer_radius as i64 + 72)
+                        .set("r", 69),
+                )
+        } else {
+            Group::new().add(
+                Rectangle::new()
+                    .set("fill", "#ffffff")
+                    .set("stroke", "none")
+                    .set("width", 1000)
+                    .set("height", 1000),
+            )
+        })
+        .add(if !as_badge {
+            scaf_stats_legend
+        } else {
+            Group::new()
+        })
+        .add(if !as_badge {
+            score_legend
+        } else {
+            Group::new()
+        })
+        .add(if !as_badge {
+            comp_stats_legend
+        } else {
+            Group::new()
+        })
+        .add(if !as_badge {
+            busc_stats_legend
+        } else {
+            Group::new()
+        })
+        .add(if !as_badge {
+            scale_legend
+        } else {
+            Group::new()
+        })
+        .add(if !as_badge {
+            dataset_legend
+        } else {
+            Group::new()
+        })
+        .add(busco_group)
+        .add(group)
 }
 
-fn busco_plot(snail_stats: &SnailStats) -> Group {
+fn busco_plot(snail_stats: &SnailStats, as_badge: bool) -> Group {
     let domain = [0.0, snail_stats.busco_total() as f64];
     let range = [-PI / 2.0, PI * 1.5];
-    let inner_radius = 20.0;
-    let outer_radius = 60.0;
+    let inner_radius = if as_badge { 23.0 } else { 20.0 };
+    let outer_radius = if as_badge { 69.0 } else { 60.0 };
     let comp_arc_data = arc_path(
         outer_radius,
         Some(inner_radius),
@@ -950,7 +1070,10 @@ fn busco_plot(snail_stats: &SnailStats) -> Group {
     );
     let mut major_tick_group = Group::new();
     for tick in major_ticks {
-        major_tick_group = major_tick_group.add(tick.path).add(tick.label)
+        major_tick_group =
+            major_tick_group
+                .add(tick.path)
+                .add(if !as_badge { tick.label } else { Text::new() })
     }
     let minor_ticks = set_axis_ticks_circular(
         1000,
@@ -970,7 +1093,7 @@ fn busco_plot(snail_stats: &SnailStats) -> Group {
     }
 
     let cirular_axis_data = arc_path(outer_radius, None, -PI / 2.0, PI * 1.5, 1000);
-    let circular_axis_path = path_axis_minor(cirular_axis_data, None, None);
+    let circular_axis_path = path_axis_minor(cirular_axis_data, None, Some(2.0));
 
     let radial_axis = Line::new()
         .set("fill", "none")
@@ -981,14 +1104,12 @@ fn busco_plot(snail_stats: &SnailStats) -> Group {
         .set("x2", 0.0)
         .set("y2", -outer_radius);
 
-    let busco_group = Group::new()
+    Group::new()
         .add(comp_arc_path)
         .add(frag_arc_path)
         .add(dup_arc_path)
         .add(minor_tick_group)
         .add(major_tick_group)
         .add(radial_axis)
-        .add(circular_axis_path);
-
-    busco_group
+        .add(circular_axis_path)
 }

@@ -94,9 +94,8 @@ pub fn reads_from_bam<F: Fn()>(
             wanted_reads.insert(read.qname().to_vec());
         }
 
-        match callback {
-            Some(cb) => cb(),
-            None => (),
+        if let Some(cb) = callback {
+            cb()
         }
         progress_bar.inc(1);
     }
@@ -222,9 +221,8 @@ pub fn bed_from_bam<F: Fn()>(
             let bin = pileup.pos() as usize / step;
             raw_cov[bin] += pileup.depth() as usize;
         }
-        match callback {
-            Some(cb) => cb(),
-            None => (),
+        if let Some(cb) = callback {
+            cb()
         }
         match depth_to_bed(raw_cov, &length, step, &seq_name, &mut writer) {
             Err(err) if err.kind() == ErrorKind::BrokenPipe => return,
@@ -282,9 +280,8 @@ pub fn depth_from_bam<F: Fn()>(
             let bin = pileup.pos() as usize / step;
             raw_cov[bin] += pileup.depth() as usize;
         }
-        match callback {
-            Some(cb) => cb(),
-            None => (),
+        if let Some(cb) = callback {
+            cb()
         }
         binned_covs.push(depth_to_cov(raw_cov, &length, step, &seq_name));
         // match depth_to_bed(raw_cov, &length, step, &seq_name, &mut writer) {

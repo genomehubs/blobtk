@@ -74,9 +74,8 @@ fn subsample_paired<F: Fn()>(
                 break;
             }
         }
-        match callback {
-            Some(cb) => cb(),
-            None => (),
+        if let Some(cb) = callback {
+            cb()
         }
     }
     progress_bar.finish();
@@ -111,9 +110,8 @@ fn subsample_single<F: Fn()>(
                 break;
             }
         }
-        match callback {
-            Some(cb) => cb(),
-            None => (),
+        if let Some(cb) = callback {
+            cb()
         }
     }
     progress_bar.finish();
