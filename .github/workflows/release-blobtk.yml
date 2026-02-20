@@ -75,6 +75,9 @@ jobs:
       - name: Rename binary
         run: |
           mv ./rust/target/x86_64-apple-darwin/release/blobtk ./rust/target/x86_64-apple-darwin/release/blobtk-macos-x64
+      - name: Verify macOS deployment target
+        run: |
+          ./.github/scripts/check-macos-min-version.sh ./rust/target/x86_64-apple-darwin/release/blobtk-macos-x64 10.13
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -113,6 +116,9 @@ jobs:
       - name: Rename binary
         run: |
           mv ./rust/target/aarch64-apple-darwin/release/blobtk ./rust/target/aarch64-apple-darwin/release/blobtk-macos-arm64
+      - name: Verify macOS deployment target
+        run: |
+          ./.github/scripts/check-macos-min-version.sh ./rust/target/aarch64-apple-darwin/release/blobtk-macos-arm64 10.13
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -305,6 +311,7 @@ jobs:
           rust-toolchain: 1.91.0
         env:
           RUSTUP_TOOLCHAIN: 1.91.0
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
       - name: Build universal wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -315,8 +322,22 @@ jobs:
           RUSTUP_TOOLCHAIN: 1.91.0
           # Build for both Archs
           ARCHFLAGS: "-arch x86_64 -arch arm64"
-          # Set an appropriate macOS deployment target (adjust if you need a different min version)
-          MACOSX_DEPLOYMENT_TARGET: "10.9"
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
+      - name: Verify macOS deployment target in wheels
+        shell: bash
+        run: |
+          for wheel in dist/*.whl; do
+            so_path=$(unzip -Z1 "$wheel" | grep -E '\.so$' | head -n1 || true)
+            if [[ -z "$so_path" ]]; then
+              echo "No extension module found in $wheel"
+              continue
+            fi
+            tmpdir=$(mktemp -d)
+            unzip -p "$wheel" "$so_path" > "$tmpdir/module.so"
+            echo "== $wheel :: $so_path =="
+            ./.github/scripts/check-macos-min-version.sh "$tmpdir/module.so" 10.13
+            rm -rf "$tmpdir"
+          done
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
