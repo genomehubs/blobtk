@@ -1247,7 +1247,8 @@ impl Nodes {
         let nodes = HashMap::new();
         let children = HashMap::new();
         if let Some(existing_nodes) = existing {
-            let table = crate::parse::lookup::build_lookup(existing_nodes, &name_classes, false);
+            let mut table =
+                crate::parse::lookup::build_lookup(existing_nodes, &name_classes, false);
             let reader = file_reader(jsonl_path).map_err(crate::error::Error::from)?;
             for (row_index, line) in reader.lines().enumerate() {
                 let line = line.map_err(crate::error::Error::from)?;
@@ -1314,13 +1315,37 @@ impl Nodes {
                                 raw_row: Some(line.clone()),
                                 ..Default::default()
                             };
-                            existing_nodes.nodes.insert(tax_id.clone(), node);
+                            existing_nodes.nodes.insert(tax_id.clone(), node.clone());
                             match existing_nodes.children.entry(parent_tax_ids[0].clone()) {
                                 Entry::Vacant(e) => {
                                     e.insert(vec![tax_id.clone()]);
                                 }
                                 Entry::Occupied(mut e) => {
                                     e.get_mut().push(tax_id.clone());
+                                }
+                            }
+                            // Update lookup table with the newly added node so subsequent entries can find it
+                            // The lookup key format is "child_name:parent_name" (both scientific names)
+                            if let Some(parent_node) = existing_nodes.nodes.get(&node.parent_tax_id)
+                            {
+                                if let Some(parent_sci_name) = &parent_node.scientific_name {
+                                    if let Some(names) = &node.names {
+                                        for name in names {
+                                            if let Some(ref class) = name.class {
+                                                if name_classes.contains(class) {
+                                                    let parent_key = format!(
+                                                        "{}:{}",
+                                                        name.name.to_case(Case::Lower),
+                                                        parent_sci_name.to_case(Case::Lower)
+                                                    );
+                                                    table
+                                                        .entry(parent_key)
+                                                        .or_insert_with(Vec::new)
+                                                        .push(tax_id.clone());
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             break;
