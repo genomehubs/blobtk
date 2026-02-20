@@ -111,6 +111,8 @@ jobs:
           targets: aarch64-apple-darwin
       - name: Build
         working-directory: ./rust
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
           cargo build --target=aarch64-apple-darwin --release
       - name: Rename binary
@@ -118,7 +120,7 @@ jobs:
           mv ./rust/target/aarch64-apple-darwin/release/blobtk ./rust/target/aarch64-apple-darwin/release/blobtk-macos-arm64
       - name: Verify macOS deployment target
         run: |
-          bash ./.github/scripts/check-macos-min-version.sh ./rust/target/aarch64-apple-darwin/release/blobtk-macos-arm64 10.13
+          bash ./.github/scripts/check-macos-min-version.sh ./rust/target/aarch64-apple-darwin/release/blobtk-macos-arm64 11.0
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -320,9 +322,9 @@ jobs:
           rust-toolchain: 1.91.0
         env:
           RUSTUP_TOOLCHAIN: 1.91.0
-          # Build for both Archs
+          # Build for both Archs (arm64 requires macOS 11.0+)
           ARCHFLAGS: "-arch x86_64 -arch arm64"
-          MACOSX_DEPLOYMENT_TARGET: "10.13"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
       - name: Verify macOS deployment target in wheels
         shell: bash
         run: |
@@ -335,7 +337,12 @@ jobs:
             tmpdir=$(mktemp -d)
             unzip -p "$wheel" "$so_path" > "$tmpdir/module.so"
             echo "== $wheel :: $so_path =="
-            bash ./.github/scripts/check-macos-min-version.sh "$tmpdir/module.so" 10.13
+            # Universal wheels contain arm64, so check for 11.0; x86_64-only wheels checked separately
+            if file "$tmpdir/module.so" | grep -q "arm64"; then
+              bash ./.github/scripts/check-macos-min-version.sh "$tmpdir/module.so" 11.0
+            else
+              bash ./.github/scripts/check-macos-min-version.sh "$tmpdir/module.so" 10.13
+            fi
             rm -rf "$tmpdir"
           done
       - name: Upload wheels
