@@ -31,6 +31,9 @@ pub mod index;
 /// Functions for file/terminal IO.
 pub mod io;
 
+/// Create minimal BlobDir from inputs
+pub mod create;
+
 /// Functions for parsing files
 pub mod parse;
 

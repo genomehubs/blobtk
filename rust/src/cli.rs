@@ -82,6 +82,9 @@ pub enum SubCommand {
     /// [experimental] Validate BlobToolKit and GenomeHubs files.
     /// Called as `blobtk validate`
     Validate(ValidateOptions),
+    /// Create a minimal BlobDir from input files (FASTA and optional BUSCO)
+    /// Called as `blobtk create`
+    Create(CreateOptions),
 }
 
 /// Options to pass to `blobtk depth`
@@ -209,6 +212,21 @@ pub struct IndexOptions {
     pub schema: bool,
     /// Output schema file name
     #[arg(long, short = 'O')]
+    pub out: Option<PathBuf>,
+}
+
+/// Options to pass to `blobtk create`
+#[derive(Parser, Debug, Default)]
+#[cfg_attr(feature = "python-extension", pyclass)]
+pub struct CreateOptions {
+    /// Path to input FASTA file
+    #[arg(long = "fasta", value_name = "FASTA")]
+    pub fasta: Option<PathBuf>,
+    /// Path to BUSCO full_table.tsv or similar
+    #[arg(long = "busco", value_name = "BUSCO")]
+    pub busco: Option<PathBuf>,
+    /// Output BlobDir directory
+    #[arg(long = "out", value_name = "BLOB_DIR")]
     pub out: Option<PathBuf>,
 }
 

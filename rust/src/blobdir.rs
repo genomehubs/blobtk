@@ -30,20 +30,28 @@ fn default_level() -> String {
     "scaffold".to_string()
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Default, Deserialize, Debug)]
 pub struct AssemblyMeta {
     #[serde(default = "default_accession")]
     pub accession: String,
     #[serde(default = "default_level")]
     pub level: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bioproject: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub biosample: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<PathBuf>,
     #[serde(rename = "scaffold-count")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scaffold_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub span: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Url>,
 }
 
@@ -57,46 +65,79 @@ pub enum Datatype {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Default, Deserialize, Debug, Clone)]
+// #[serde(skip_serializing_none)]
 pub struct FieldMeta {
     pub id: String,
     #[serde(rename = "type")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub field_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub scale: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub datatype: Option<Datatype>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<FieldMeta>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Vec<FieldMeta>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub range: Option<[f64; 2]>,
     #[serde_as(deserialize_as = "DefaultOnError")]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clamp: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub preload: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub active: Option<bool>,
     #[serde(rename = "set")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub odb_set: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(rename = "category_slot")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category_slot: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct PlotMeta {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub x: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub y: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub z: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cat: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Default, Deserialize, Debug)]
 pub struct TaxonMeta {
     #[serde(default = "default_taxname")]
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub genus: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kingdom: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub phylum: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub superkingdom: Option<String>,
     #[serde(
         default = "default_taxid",
@@ -113,7 +154,7 @@ fn default_taxid() -> String {
     "0".to_string()
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Default, Deserialize, Debug)]
 pub struct Meta {
     pub id: String,
     pub name: String,
@@ -129,7 +170,9 @@ pub struct Meta {
     #[serde(default = "default_plotmeta")]
     pub plot: PlotMeta,
     pub taxon: TaxonMeta,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub field_list: Option<HashMap<String, FieldMeta>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub busco_list: Option<Vec<(String, usize, String)>>,
 }
 
@@ -152,7 +195,9 @@ pub struct Field<T> {
     // pub meta: FieldMeta,
     pub values: Vec<T>,
     pub keys: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub category_slot: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<Vec<String>>,
 }
 

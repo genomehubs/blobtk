@@ -8,6 +8,36 @@ use flate2::read::GzDecoder;
 use flate2::write;
 use flate2::Compression;
 use std::ffi::OsStr;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::io::Read;
+use std::time::Duration;
+
+struct ProgressRead<R: Read> {
+    inner: R,
+    pb: Option<ProgressBar>,
+}
+
+impl<R: Read> ProgressRead<R> {
+    fn new(inner: R, pb: Option<ProgressBar>) -> Self {
+        ProgressRead { inner, pb }
+    }
+}
+
+impl<R: Read> Read for ProgressRead<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        if n > 0 {
+            if let Some(pb) = &self.pb {
+                pb.inc(n as u64);
+            }
+        } else {
+            if let Some(pb) = &self.pb {
+                pb.finish();
+            }
+        }
+        Ok(n)
+    }
+}
 
 fn read_stdin() -> Vec<Vec<u8>> {
     let stdin = io::stdin();
@@ -138,18 +168,65 @@ pub fn local_file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
 /// Return a BufRead object for a given URL path.
 /// The file will be fetched.
 pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
-    // let response = reqwest::blocking::get(path)?;
-    // let reader = response.bytes()?;
-    // Ok(Box::new(BufReader::new(reader.as_ref()))
-
     let response = reqwest::blocking::get(url.to_string()).expect("Failed to fetch file");
     if response.status().is_success() {
-        Ok(Box::new(BufReader::new(response)))
+        let content_len = response.content_length();
+        let pb = content_len.map(|len| {
+            let pb = ProgressBar::new(len);
+            let _ = pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} {bytes}/{total_bytes} ({eta})")
+                    .unwrap()
+                    .progress_chars("#>-"),
+            );
+            pb
+        });
+
+        let is_gz_ext = url.ends_with(".gz");
+        let is_gz_encoding = response
+            .headers()
+            .get(reqwest::header::CONTENT_ENCODING)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
+            .unwrap_or(false);
+        if is_gz_ext || is_gz_encoding {
+            let decoder = GzDecoder::new(response);
+            let reader = ProgressRead::new(decoder, pb);
+            Ok(Box::new(BufReader::new(reader)))
+        } else {
+            let reader = ProgressRead::new(response, pb);
+            Ok(Box::new(BufReader::new(reader)))
+        }
     } else {
         let response = reqwest::blocking::get(url.to_string().replace(".gz", ""))
             .unwrap_or_else(|_| panic!("Failed to fetch file: {}", url));
         if response.status().is_success() {
-            Ok(Box::new(BufReader::new(response)))
+            let content_len = response.content_length();
+            let pb = content_len.map(|len| {
+                let pb = ProgressBar::new(len);
+                let _ = pb.set_style(
+                    ProgressStyle::default_bar()
+                        .template("{spinner:.green} {bytes}/{total_bytes} ({eta})")
+                        .unwrap()
+                        .progress_chars("#>-"),
+                );
+                pb
+            });
+
+            let is_gz_encoding = response
+                .headers()
+                .get(reqwest::header::CONTENT_ENCODING)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
+                .unwrap_or(false);
+            if is_gz_encoding {
+                let decoder = GzDecoder::new(response);
+                let reader = ProgressRead::new(decoder, pb);
+                Ok(Box::new(BufReader::new(reader)))
+            } else {
+                let reader = ProgressRead::new(response, pb);
+                Ok(Box::new(BufReader::new(reader)))
+            }
         } else {
             Err(io::Error::other(format!(
                 "Failed to fetch file: {}",
