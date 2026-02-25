@@ -3,11 +3,12 @@ use std::process;
 use anyhow;
 
 use blobtk::cli;
+use blobtk::create;
 use blobtk::depth;
 use blobtk::filter;
 use blobtk::index;
-use blobtk::create;
 use blobtk::plot;
+use blobtk::snail;
 use blobtk::taxonomy;
 use blobtk::validate;
 
@@ -18,6 +19,7 @@ fn cmd(args: cli::Arguments) -> Result<(), anyhow::Error> {
         cli::SubCommand::Index(options) => index::index(&options)?,
         cli::SubCommand::Create(options) => create::create(&options)?,
         cli::SubCommand::Plot(options) => plot::plot(&options)?,
+        cli::SubCommand::Snail(options) => snail::snail(&options)?,
         cli::SubCommand::Taxonomy(options) => taxonomy::taxonomy(&options)?,
         cli::SubCommand::Validate(options) => validate::validate(&options)?,
     }

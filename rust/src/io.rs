@@ -7,19 +7,27 @@ use std::path::{Path, PathBuf};
 use flate2::read::GzDecoder;
 use flate2::write;
 use flate2::Compression;
-use std::ffi::OsStr;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::ffi::OsStr;
 use std::io::Read;
-use std::time::Duration;
 
 struct ProgressRead<R: Read> {
     inner: R,
     pb: Option<ProgressBar>,
+    total: Option<u64>,
+    finished: bool,
+    label: Option<String>,
 }
 
 impl<R: Read> ProgressRead<R> {
-    fn new(inner: R, pb: Option<ProgressBar>) -> Self {
-        ProgressRead { inner, pb }
+    fn new(inner: R, pb: Option<ProgressBar>, total: Option<u64>, label: Option<String>) -> Self {
+        ProgressRead {
+            inner,
+            pb,
+            total,
+            finished: false,
+            label,
+        }
     }
 }
 
@@ -28,11 +36,40 @@ impl<R: Read> Read for ProgressRead<R> {
         let n = self.inner.read(buf)?;
         if n > 0 {
             if let Some(pb) = &self.pb {
-                pb.inc(n as u64);
+                if !self.finished {
+                    pb.inc(n as u64);
+                    // If we know the total content length, finish when we've
+                    // reached it so the final message is shown even if the
+                    // wrapped decoder doesn't issue a zero-length read.
+                    if let Some(total) = self.total {
+                        if pb.position() >= total {
+                            let pos = pb.position();
+                            pb.finish();
+                            if let Some(lbl) = &self.label {
+                                let _ = eprintln!("Downloaded {} bytes from {}", pos, lbl);
+                            } else {
+                                let _ = eprintln!("Downloaded {} bytes", pos);
+                            }
+                            self.finished = true;
+                        }
+                    }
+                }
             }
         } else {
             if let Some(pb) = &self.pb {
-                pb.finish();
+                if !self.finished {
+                    // Replace the progress bar with a final message so the
+                    // completed report is preserved and not overwritten by
+                    // subsequent progress bars.
+                    let pos = pb.position();
+                    pb.finish();
+                    if let Some(lbl) = &self.label {
+                        let _ = eprintln!("Downloaded {} bytes from {}", pos, lbl);
+                    } else {
+                        let _ = eprintln!("Downloaded {} bytes", pos);
+                    }
+                    self.finished = true;
+                }
             }
         }
         Ok(n)
@@ -190,11 +227,15 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
             .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
             .unwrap_or(false);
         if is_gz_ext || is_gz_encoding {
-            let decoder = GzDecoder::new(response);
-            let reader = ProgressRead::new(decoder, pb);
-            Ok(Box::new(BufReader::new(reader)))
+            // Wrap the original response with ProgressRead so the progress bar
+            // measures compressed bytes (Content-Length) rather than the
+            // decompressed stream which would exceed the reported length.
+            let progress_response =
+                ProgressRead::new(response, pb, content_len, Some(url.to_string()));
+            let decoder = GzDecoder::new(progress_response);
+            Ok(Box::new(BufReader::new(decoder)))
         } else {
-            let reader = ProgressRead::new(response, pb);
+            let reader = ProgressRead::new(response, pb, content_len, Some(url.to_string()));
             Ok(Box::new(BufReader::new(reader)))
         }
     } else {
@@ -220,11 +261,14 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
                 .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
                 .unwrap_or(false);
             if is_gz_encoding {
-                let decoder = GzDecoder::new(response);
-                let reader = ProgressRead::new(decoder, pb);
-                Ok(Box::new(BufReader::new(reader)))
+                // See note above: count compressed bytes by wrapping the
+                // response in ProgressRead before GzDecoder.
+                let progress_response =
+                    ProgressRead::new(response, pb, content_len, Some(url.to_string()));
+                let decoder = GzDecoder::new(progress_response);
+                Ok(Box::new(BufReader::new(decoder)))
             } else {
-                let reader = ProgressRead::new(response, pb);
+                let reader = ProgressRead::new(response, pb, content_len, Some(url.to_string()));
                 Ok(Box::new(BufReader::new(reader)))
             }
         } else {

@@ -76,6 +76,9 @@ pub enum SubCommand {
     /// Process a BlobDir and produce static plots.
     /// Called as `blobtk plot`
     Plot(PlotOptions),
+    /// Produce a snail plot from a BlobDir or FASTA file.
+    /// Called as `blobtk snail`
+    Snail(SnailOptions),
     /// [experimental] Process a taxonomy and lookup lineages, or start the API server with --api
     /// Called as `blobtk taxonomy [--api] ...`
     Taxonomy(TaxonomyOptions),
@@ -219,14 +222,14 @@ pub struct IndexOptions {
 #[derive(Parser, Debug, Default)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct CreateOptions {
-    /// Path to input FASTA file
-    #[arg(long = "fasta", value_name = "FASTA")]
+    /// Path to input assembly FASTA file
+    #[arg(short = 'a', long = "fasta", value_name = "FASTA")]
     pub fasta: Option<PathBuf>,
     /// Path to BUSCO full_table.tsv or similar
-    #[arg(long = "busco", value_name = "BUSCO")]
+    #[arg(short = 'b', long = "busco", value_name = "BUSCO")]
     pub busco: Option<PathBuf>,
     /// Output BlobDir directory
-    #[arg(long = "out", value_name = "BLOB_DIR")]
+    #[arg(short = 'd', long = "out", value_name = "BLOB_DIR")]
     pub out: Option<PathBuf>,
 }
 
@@ -480,6 +483,60 @@ impl RoundingStrategyWrapper {
     pub fn default() -> RoundingStrategy {
         RoundingStrategy::MidpointAwayFromZero
     }
+}
+
+/// Options to pass to `blobtk plot`
+#[derive(Parser, Debug, Default)]
+#[command(arg_required_else_help = true)]
+#[cfg_attr(feature = "python-extension", pyclass)]
+pub struct SnailOptions {
+    /// Path to input assembly FASTA file
+    #[arg(long = "fasta", value_name = "FASTA")]
+    pub fasta: Option<PathBuf>,
+    /// Path to BUSCO full_table.tsv or similar
+    #[arg(long = "busco", value_name = "BUSCO")]
+    pub busco: Option<PathBuf>,
+    /// Path to BlobDir directory
+    #[arg(long, short = 'd')]
+    pub blobdir: Option<PathBuf>,
+    /// Output filename
+    #[arg(long, short = 'o', default_value_t = String::from("output.svg"))]
+    pub output: String,
+    #[arg(long, short = 'f')]
+    pub filter: Vec<String>,
+    /// Segment count for snail plot
+    #[arg(long, short = 's', default_value_t = 1000)]
+    pub segments: usize,
+    /// Max span for snail plot
+    #[arg(long = "max-span")]
+    pub max_span: Option<usize>,
+    /// max scaffold length for snail plot
+    #[arg(long = "max-scaffold")]
+    pub max_scaffold: Option<usize>,
+    /// Scale function for snail plot
+    #[arg(long, value_enum, default_value_t = Scale::SQRT)]
+    pub scale_function: Scale,
+    /// [experimental] Significant digits to use when rounding numbers for display
+    #[arg(long = "significant-digits", default_value_t = 3)]
+    pub significant_digits: u32,
+    /// [experimental] Decimal precision (number of decimal places) to use when percentages for display
+    #[arg(long = "decimal-precision", default_value_t = 2)]
+    pub decimal_precision: u32,
+    // [experimental] Flag to choose the rounding method
+    #[arg(long = "rounding", value_enum)]
+    pub rounding: Option<RoundingStrategyWrapper>,
+    /// [experimental] Flag to show numbers instead of percentages in snail plot legend
+    #[arg(long = "show-numbers", default_value_t = false)]
+    pub show_numbers: bool,
+    /// [experimental] Flag to show busco numbers instead of percentages in snail plot legend
+    #[arg(long = "busco-numbers", default_value_t = false)]
+    pub busco_numbers: bool,
+    /// [experimental] Flag to show minimal snail plot as assembly badge
+    #[arg(long = "badge", default_value_t = false)]
+    pub badge: bool,
+    /// [experimental] Flag to show snail score in snail plot legend
+    #[arg(long = "show-score", default_value_t = false)]
+    pub show_score: bool,
 }
 
 /// Valid taxonomy formats

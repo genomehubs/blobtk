@@ -40,6 +40,9 @@ pub mod parse;
 /// Generate a plot.
 pub mod plot;
 
+/// Generate a snail plot.
+pub mod snail;
+
 /// Python bindings.
 #[cfg(feature = "python-extension")]
 pub mod python;
