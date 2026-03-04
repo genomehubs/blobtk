@@ -342,14 +342,17 @@ pub fn create(options: &crate::cli::CreateOptions) -> Result<(), anyhow::Error> 
         serde_json::to_writer_pretty(busco_file, &busco_field)?;
     }
     let span = seqs.iter().map(|(_, l, _, _)| *l).sum::<usize>();
+    // extract the file basename as id and name prefix for meta.json
+    dbg!(&fasta_path);
+    let id = fasta_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("assembly");
 
     // Build meta
     let mut meta = Meta {
-        id: String::from("minimal"),
-        name: fasta_path
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "assembly".to_string()),
+        id: id.to_string(),
+        name: id.to_string(),
         record_type: String::from("scaffold"),
         records: seq_count,
         revision: 0,
@@ -357,7 +360,7 @@ pub fn create(options: &crate::cli::CreateOptions) -> Result<(), anyhow::Error> 
         assembly: AssemblyMeta {
             accession: "draft".to_string(),
             level: "scaffold".to_string(),
-            prefix: Some(prefix.to_string()),
+            prefix: Some(id.to_string()),
             file: Some(fasta_path),
             scaffold_count: Some(seq_count),
             span: Some(span),

@@ -965,6 +965,10 @@ impl GHubsConfig {
     }
 
     pub fn write_yaml(&self, output_file: &PathBuf) -> Result<(), error::Error> {
+        // Ensure parent directory exists
+        if let Some(parent) = output_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let yaml = self.to_yaml()?;
         let mut file = OpenOptions::new()
             .write(true)
@@ -1004,7 +1008,7 @@ impl GHubsConfig {
             file_config.comment_char,
             0,
             false,
-        );
+        )?;
 
         if let Some(keys) = keys {
             if file_config.header {
@@ -1085,14 +1089,17 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(
+        let mut rdr = match io::get_csv_reader(
             &Some(file_path),
             delimiter,
             true,
             file_config.comment_char,
             0,
             false,
-        );
+        ) {
+            Ok(reader) => reader,
+            Err(_) => return fixed_names,
+        };
         let expected_headers = ["taxon_id", "input", "rank"];
         let headers = rdr.headers().unwrap().clone();
         for (i, header) in headers.iter().enumerate() {

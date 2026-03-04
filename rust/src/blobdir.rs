@@ -207,7 +207,7 @@ impl<T> Field<T> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Filter {
     pub min: Option<f64>,
     pub max: Option<f64>,
@@ -224,10 +224,7 @@ pub struct BuscoGene {
 pub fn get_path(dir: &PathBuf, prefix: &str) -> Option<String> {
     let mut path = dir.clone();
     path.push(prefix);
-    if let Some(e) = glob(&format!("{}*", path.to_string_lossy()))
-        .expect("Failed to read glob pattern")
-        .next()
-    {
+    if let Some(e) = glob(&format!("{}*", path.to_string_lossy())).ok()?.next() {
         return Some(format!("{}", e.unwrap().to_string_lossy()));
     }
     None
@@ -244,7 +241,10 @@ pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
                 prefix.replace(".json", "")
             );
         }
-        let response = reqwest::blocking::get(&url).expect("Failed to fetch file");
+        let response = match reqwest::blocking::get(&url) {
+            Ok(resp) => resp,
+            Err(_) => return None,
+        };
         if response.status().is_success() {
             Some(Box::new(BufReader::new(response)))
         } else {
@@ -252,7 +252,7 @@ pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
         }
     } else {
         let path = get_path(dir, prefix)?;
-        let file = File::open(&path).expect("no such file");
+        let file = File::open(&path).ok()?;
 
         if path.ends_with(".gz") {
             Some(Box::new(BufReader::new(GzDecoder::new(file))))
@@ -264,7 +264,7 @@ pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
 
 pub fn local_file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
     let path = get_path(dir, prefix)?;
-    let file = File::open(&path).expect("no such file");
+    let file = File::open(&path).ok()?;
 
     if path.ends_with(".gz") {
         Some(Box::new(BufReader::new(GzDecoder::new(file))))
@@ -405,8 +405,7 @@ pub fn parse_blobdir(blobdir: &PathBuf) -> Result<Meta, error::Error> {
 
 pub fn parse_field_busco(id: String, blobdir: &PathBuf) -> Option<Vec<Vec<BuscoGene>>> {
     let reader = file_reader(blobdir, &format!("{}.json", &id))?;
-    let field: Field<Vec<(String, usize)>> =
-        serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<Vec<(String, usize)>> = serde_json::from_reader(reader).ok()?;
     let mut values: Vec<Vec<BuscoGene>> = vec![];
     let keys = field.keys.clone();
     // let cat_slot = field.category_slot.unwrap() as usize;
@@ -437,7 +436,8 @@ pub fn parse_field_cat(
             )))
         }
     };
-    let field: Field<usize> = serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<usize> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let mut values: Vec<(String, usize)> = vec![];
     let keys = field.keys.clone();
     for value in field.values() {
@@ -461,8 +461,8 @@ pub fn parse_field_cat_windows(
             )))
         }
     };
-    let field: Field<Vec<Vec<Option<usize>>>> =
-        serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<Vec<Vec<Option<usize>>>> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let mut values: Vec<Vec<Option<(String, usize)>>> = vec![];
     let keys = field.keys.clone();
     let cat_slot;
@@ -509,7 +509,8 @@ pub fn parse_field_synonym(
             )))
         }
     };
-    let field: Field<Vec<String>> = serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<Vec<String>> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let mut values: Vec<Option<String>> = vec![];
     let mut name_slot = 0;
     if let Some(headers) = field.headers.clone() {
@@ -540,7 +541,8 @@ pub fn parse_field_float(id: String, blobdir: &PathBuf) -> Result<Vec<f64>, erro
             )))
         }
     };
-    let field: Field<f64> = serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<f64> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let values = field.values().clone();
     Ok(values)
 }
@@ -560,8 +562,8 @@ pub fn parse_field_float_windows(
             )))
         }
     };
-    let field: Field<Vec<Vec<f64>>> =
-        serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<Vec<Vec<f64>>> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let mut values = vec![];
     let indices: HashSet<usize> = match wanted_indices {
         Some(i) => HashSet::from_iter(i.iter().cloned()),
@@ -595,7 +597,8 @@ pub fn parse_field_int(id: String, blobdir: &PathBuf) -> Result<Vec<usize>, erro
             )))
         }
     };
-    let field: Field<usize> = serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<usize> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let values = field.values().clone();
     Ok(values)
 }
@@ -615,8 +618,8 @@ pub fn parse_field_int_windows(
             )))
         }
     };
-    let field: Field<Vec<Vec<usize>>> =
-        serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<Vec<Vec<usize>>> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let mut values = vec![];
     let indices: HashSet<usize> = match wanted_indices {
         Some(i) => HashSet::from_iter(i.iter().cloned()),
@@ -653,7 +656,8 @@ pub fn parse_field_string(
             )))
         }
     };
-    let field: Field<usize> = serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<usize> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     let mut keys = HashMap::new();
     for (index, key) in field.keys.iter().enumerate() {
         keys.insert(key.clone(), index);
@@ -677,7 +681,8 @@ pub fn parse_field_identifiers(id: String, blobdir: &PathBuf) -> Result<Vec<Stri
             )))
         }
     };
-    let field: Field<String> = serde_json::from_reader(reader).expect("unable to parse json");
+    let field: Field<String> = serde_json::from_reader(reader)
+        .map_err(|e| error::Error::SerdeError(format!("Failed to parse field {}: {}", &id, e)))?;
     Ok(field.values().to_owned())
 }
 

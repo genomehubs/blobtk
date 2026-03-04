@@ -97,7 +97,7 @@ pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
 {
-    let file = File::open(filename).expect("no such file");
+    let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
 }
 
@@ -205,7 +205,8 @@ pub fn local_file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
 /// Return a BufRead object for a given URL path.
 /// The file will be fetched.
 pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
-    let response = reqwest::blocking::get(url.to_string()).expect("Failed to fetch file");
+    let response = reqwest::blocking::get(url.to_string())
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     if response.status().is_success() {
         let content_len = response.content_length();
         let pb = content_len.map(|len| {
@@ -240,7 +241,7 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
         }
     } else {
         let response = reqwest::blocking::get(url.to_string().replace(".gz", ""))
-            .unwrap_or_else(|_| panic!("Failed to fetch file: {}", url));
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         if response.status().is_success() {
             let content_len = response.content_length();
             let pb = content_len.map(|len| {
@@ -311,7 +312,12 @@ pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
         .arg(command)
         .stdout(std::process::Stdio::piped())
         .spawn()
-        .expect("Failed to start SSH command");
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to start SSH command: {}", e),
+            )
+        })?;
 
     let stdout = process
         .stdout
@@ -397,10 +403,9 @@ pub fn get_csv_reader(
     comment_char: Option<u8>,
     skip_lines: usize,
     flexible: bool,
-) -> csv::Reader<Box<dyn BufRead>> {
+) -> io::Result<csv::Reader<Box<dyn BufRead>>> {
     dbg!(&file_path);
-    let file_reader =
-        file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
+    let file_reader = file_reader(file_path.as_ref().unwrap().clone())?;
     // Skip the first `skip_lines` lines
     let mut file_reader = Box::new(file_reader);
     for _ in 0..skip_lines {
@@ -408,12 +413,12 @@ pub fn get_csv_reader(
         file_reader.read_line(&mut line).unwrap();
     }
 
-    csv::ReaderBuilder::new()
+    Ok(csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .has_headers(has_headers)
         .comment(comment_char)
         .flexible(flexible) // Allow incomplete rows
-        .from_reader(file_reader)
+        .from_reader(file_reader))
 }
 
 pub fn write_list(entries: &HashSet<Vec<u8>>, file_path: &Option<PathBuf>) -> Result<()> {

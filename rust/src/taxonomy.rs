@@ -258,7 +258,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                     .clone()
                     .unwrap_or_else(|| std::path::PathBuf::from("."));
                 // ensure the output directory exists
-                std::fs::create_dir_all(&out_dir).expect("Unable to create output directory");
+                std::fs::create_dir_all(&out_dir)?;
                 let format_str = taxonomy_format
                     .as_ref()
                     .map(|f| format!("{}", f).to_lowercase())
@@ -267,12 +267,11 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                 let mut file = OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(&exceptions_path)
-                    .expect("Unable to open exceptions file");
+                    .open(&exceptions_path)?;
                 for exception in &merge_exceptions {
                     let json =
-                        serde_json::to_string(exception).expect("Failed to serialize exception");
-                    writeln!(file, "{}", json).expect("Failed to write exception");
+                        serde_json::to_string(exception)?;
+                    writeln!(file, "{}", json)?;
                 }
             }
         }

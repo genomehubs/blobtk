@@ -9,6 +9,7 @@ use svg::Document;
 
 use crate::blobdir::FieldMeta;
 use crate::cli::Shape;
+use crate::plot::component::LegendAlignment;
 use crate::utils::{max_float, min_float, scale_floats};
 use crate::{blobdir, cli, plot};
 
@@ -409,7 +410,6 @@ pub fn category_legend_full(categories: Vec<Category>, show_legend: ShowLegend) 
     if let ShowLegend::Full = show_legend {
         entries.push(LegendEntry {
             subtitle: Some("[count; span; n50]".to_string()),
-            shape: LegendShape::None,
             ..Default::default()
         })
     };
@@ -423,16 +423,18 @@ pub fn category_legend_full(categories: Vec<Category>, show_legend: ShowLegend) 
         let subtitle = match show_legend {
             ShowLegend::Compact => None,
             ShowLegend::Default | ShowLegend::Full => Some(cat.clone().subtitle()),
-            ShowLegend::None => return legend_group(title, entries, None, 1),
+            ShowLegend::None => {
+                return legend_group(title, entries, None, 1, LegendAlignment::Start)
+            }
         };
         entries.push(LegendEntry {
             title: cat.title.to_string(),
-            color: cat.color.clone(),
+            color: Some(cat.color.clone()),
             subtitle,
             ..Default::default()
         });
     }
-    legend_group(title, entries, None, 1)
+    legend_group(title, entries, None, 1, LegendAlignment::Start)
 }
 
 pub fn plot(
