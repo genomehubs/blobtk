@@ -169,6 +169,51 @@ pub struct SnailStats {
 }
 
 impl SnailStats {
+    pub fn id(&self) -> &String {
+        &self.id
+    }
+
+    pub fn short_id(&self) -> String {
+        let max_length = 30; // Adjust as needed
+
+        let parts: Vec<&str> = self.id.split('_').collect();
+        let truncated = if parts.len() >= 2 {
+            // Keep first two parts (everything before second underscore)
+            format!("{}_{}", parts[0], parts[1])
+        } else {
+            // Less than 2 underscores, keep the whole ID
+            self.id.clone()
+        };
+
+        if truncated.len() > max_length {
+            // Check what would be removed
+            let suffix = &truncated[max_length..];
+
+            // Don't truncate if we're removing only a dot and 1-2 numbers (e.g., ".1" or ".12")
+            if suffix.starts_with('.')
+                && suffix[1..].len() <= 2
+                && suffix[1..].chars().all(|c| c.is_numeric())
+            {
+                return truncated;
+            }
+
+            // If truncation would leave a trailing dot, back up one character
+            let mut truncate_at = max_length;
+            if truncated[..max_length].ends_with('.') {
+                if max_length > 1 {
+                    truncate_at = max_length - 1;
+                } else {
+                    // Can't truncate if we'd end up with just the dot
+                    return truncated;
+                }
+            }
+
+            format!("{}…", &truncated[..truncate_at])
+        } else {
+            truncated
+        }
+    }
+
     pub fn span(&self) -> usize {
         self.span
     }
@@ -467,7 +512,11 @@ pub fn snail_stats(
     })
 }
 
-pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) -> Group {
+pub fn scaffold_stats_legend(
+    snail_stats: &SnailStats,
+    ref_snail_stats: &Option<SnailStats>,
+    options: &cli::PlotOptions,
+) -> Group {
     let mut entries = vec![];
     let precision = options.significant_digits;
     let rounding = options.rounding.clone();
@@ -496,11 +545,26 @@ pub fn scaffold_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOption
         rounding.clone(),
     );
     let record = snail_stats.record_type();
-    entries.push(LegendEntry {
-        title: format!("Log10 {} count (total {})", record, scaffold_count),
-        color: Some(COLOR_SCAFFOLD_COUNT.to_string()),
-        ..Default::default()
-    });
+
+    if let Some(ref_stats) = ref_snail_stats {
+        let title = format!(
+            "Ref: {} ({} | auN {})",
+            ref_stats.short_id(),
+            format_si(&(ref_stats.span() as f64), precision, rounding.clone()),
+            format_si(&(ref_stats.aun() as f64), precision, rounding.clone())
+        );
+        entries.push(LegendEntry {
+            title,
+            color: Some(COLOR_REF_OUTLINE.to_string()),
+            ..Default::default()
+        });
+    } else {
+        entries.push(LegendEntry {
+            title: format!("Log10 {} count (total {})", record, scaffold_count),
+            color: Some(COLOR_SCAFFOLD_COUNT.to_string()),
+            ..Default::default()
+        });
+    }
     entries.push(LegendEntry {
         title: format!(
             "{} length (total {} | auN {})",
@@ -600,14 +664,20 @@ pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
     let mut entries = vec![];
     let digits = options.significant_digits;
     let rounding = options.rounding.clone();
-    let max_span = match options.max_span {
-        Some(span) => span,
-        None => snail_stats.span(),
-    };
-    let max_scaffold = match options.max_scaffold {
-        Some(scaffold_length) => scaffold_length,
-        None => snail_stats.scaffolds()[0],
-    };
+    let mut max_span = snail_stats.span();
+    let mut max_scaffold = snail_stats.scaffolds()[0];
+    if let Some(params) = &snail_stats.parameters {
+        if let Some(span) = params.max_span {
+            if span > snail_stats.span() {
+                max_span = span;
+            }
+        }
+        if let Some(scaffold) = params.max_scaffold {
+            if scaffold > snail_stats.scaffolds()[0] {
+                max_scaffold = scaffold;
+            }
+        }
+    }
     let circ_prop = format_si(&(max_span as f64), digits, rounding.clone());
     let rad_prop = format_si(&(max_scaffold as f64), digits, rounding.clone());
     entries.push(LegendEntry {
@@ -628,7 +698,7 @@ pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
 pub fn dataset_name_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) -> Group {
     let entries = vec![];
 
-    let title = format!("Dataset: {}", snail_stats.id);
+    let title = format!("Dataset: {}", snail_stats.short_id());
     legend_group(title, entries, None, 1, LegendAlignment::Start)
 }
 
@@ -969,7 +1039,8 @@ impl PolarCoordinates {
             ]);
 
             // longest scaffold
-            if snail_stats.binned_scaffold_lengths()[i] == config.max_scaffold {
+            if snail_stats.binned_scaffold_lengths()[i] == snail_stats.binned_scaffold_lengths()[0]
+            {
                 coords.longest.push(vec![0.0, angle]);
                 coords.show_longest = true;
             }
@@ -1342,6 +1413,26 @@ impl PlotPaths {
     }
 }
 
+fn get_score_and_type(snail_stats: &SnailStats, options: &cli::PlotOptions) -> (f64, String) {
+    let score = match options.score_type {
+        Some(ScoreType::Base) => snail_stats.raun_n(),
+        Some(ScoreType::G) => snail_stats.raun_ng().unwrap(),
+        Some(ScoreType::Gs) => snail_stats.raun_ngs().unwrap(),
+        Some(ScoreType::GAbsolute) => snail_stats.raun_ng_absolute().unwrap(),
+        Some(ScoreType::GsAbsolute) => snail_stats.raun_ngs_absolute().unwrap(),
+        None => snail_stats.raun_n(),
+    };
+    let score_type = match options.score_type {
+        Some(ScoreType::Base) => "Score".to_string(),
+        Some(ScoreType::G) => "G-score".to_string(),
+        Some(ScoreType::Gs) => "GS-score".to_string(),
+        Some(ScoreType::GAbsolute) => "aG-score".to_string(),
+        Some(ScoreType::GsAbsolute) => "aGS-score".to_string(),
+        None => "Score".to_string(),
+    };
+    (score, score_type)
+}
+
 struct PlotLegends {
     scaf_stats: Group,
     score: Group,
@@ -1353,26 +1444,6 @@ struct PlotLegends {
 }
 
 impl PlotLegends {
-    fn get_score_and_type(snail_stats: &SnailStats, options: &cli::PlotOptions) -> (f64, String) {
-        let score = match options.score_type {
-            Some(ScoreType::Base) => snail_stats.raun_n(),
-            Some(ScoreType::G) => snail_stats.raun_ng().unwrap(),
-            Some(ScoreType::Gs) => snail_stats.raun_ngs().unwrap(),
-            Some(ScoreType::GAbsolute) => snail_stats.raun_ng_absolute().unwrap(),
-            Some(ScoreType::GsAbsolute) => snail_stats.raun_ngs_absolute().unwrap(),
-            None => snail_stats.raun_n(),
-        };
-        let score_type = match options.score_type {
-            Some(ScoreType::Base) => "Score".to_string(),
-            Some(ScoreType::G) => "G-score".to_string(),
-            Some(ScoreType::Gs) => "GS-score".to_string(),
-            Some(ScoreType::GAbsolute) => "aG-score".to_string(),
-            Some(ScoreType::GsAbsolute) => "aGS-score".to_string(),
-            None => "Score".to_string(),
-        };
-        (score, score_type)
-    }
-
     fn new(
         snail_stats: &SnailStats,
         ref_snail_stats: &Option<SnailStats>,
@@ -1380,51 +1451,20 @@ impl PlotLegends {
         config: &SnailPlotConfig,
         busco_colors: (&str, &str, &str, &str, &str, &str),
     ) -> Self {
-        let scaf_stats = scaffold_stats_legend(snail_stats, options)
+        let scaf_stats = scaffold_stats_legend(snail_stats, ref_snail_stats, options)
             .set("transform", format!("translate({},{})", 5, 25));
 
         let score = if options.show_score {
-            let (snail_score, score_type) = PlotLegends::get_score_and_type(snail_stats, options);
+            let (snail_score, score_type) = get_score_and_type(snail_stats, options);
             dbg!(&score_type, snail_score);
             legend_group(
                 format!("{}: {}", score_type, format_si(&snail_score, 3, None)),
-                if let Some(ref_stats) = ref_snail_stats {
-                    let (ref_score, _) = PlotLegends::get_score_and_type(ref_stats, options);
-                    let delta = snail_score - ref_score;
-                    vec![
-                        LegendEntry {
-                            color: Some(COLOR_REF_BUSCO_COMPLETE.to_string()),
-                            title: format!(
-                                "{} | Δ {}{}",
-                                format_si(&ref_score, 3, None),
-                                if delta >= 0.0 { "+" } else { "" },
-                                format_si(&delta, 3, None)
-                            ),
-                            shape: None,
-                            ..Default::default()
-                        },
-                        // format!(
-                        //     "\nRef: {} | Δ: {}{}",
-                        //     format_si(&ref_score, 3, None),
-                        //     if delta >= 0.0 { "+" } else { "" },
-                        //     format_si(&delta, 3, None)
-                        // ),
-                    ]
-                } else {
-                    vec![]
-                },
+                vec![],
                 None,
                 1,
-                LegendAlignment::Start,
+                LegendAlignment::Center,
             )
-            .set(
-                "transform",
-                format!(
-                    "translate({},{})",
-                    433.7,
-                    if ref_snail_stats.is_some() { 25 } else { 35 }
-                ),
-            )
+            .set("transform", format!("translate({},{})", 500, 35))
         } else {
             Group::new()
         };
@@ -1636,8 +1676,8 @@ pub fn svg(
         .add(paths.longest_arc)
         .add(paths.n50_arc)
         .add(paths.n90_arc)
-        .add(paths.n50_arc_outline)
         .add(paths.n90_arc_outline)
+        .add(paths.n50_arc_outline)
         .add(paths.longest_arc_outline)
         .add(if ref_snail_stats.is_some() {
             Group::new().add(paths.ref_length_outline)
@@ -1731,7 +1771,19 @@ fn busco_plot(
     ) = busco_colors;
     let domain = [0.0, snail_stats.busco_total() as f64];
     let range = [-PI / 2.0, PI * 1.5];
-    let inner_radius = if as_badge { 39.0 } else { 35.0 };
+    let inner_radius = if ref_snail_stats.is_some() {
+        if as_badge {
+            31.0
+        } else {
+            27.0
+        }
+    } else {
+        if as_badge {
+            23.0
+        } else {
+            20.0
+        }
+    };
     let outer_radius = if as_badge { 69.0 } else { 60.0 };
     let comp_arc_data = arc_path(
         outer_radius,
@@ -1770,8 +1822,8 @@ fn busco_plot(
 
     if let Some(ref_stats) = ref_snail_stats {
         if ref_stats.busco_total() >= 1 {
-            let ref_inner_radius = if as_badge { 14.0 } else { 10.0 };
-            let ref_outer_radius = if as_badge { 34.0 } else { 30.0 };
+            let ref_inner_radius = if as_badge { 0.0 } else { 0.0 };
+            let ref_outer_radius = if as_badge { 28.0 } else { 24.0 };
             let ref_domain = [0.0, ref_stats.busco_total() as f64];
 
             let ref_comp_arc_data = arc_path(
