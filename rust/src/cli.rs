@@ -326,10 +326,15 @@ impl FromStr for Palette {
 #[derive(ValueEnum, Clone, Debug)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub enum ScoreType {
-    Base,       // unadjusted snail score
-    G,          // genome-size-adjusted
-    Gs,         // genome + scaffold-adjusted
-    GAbsolute,  // absolute (penalizes both directions)
+    #[value(name = "base")]
+    Base, // unadjusted snail score
+    #[value(name = "g")]
+    G, // genome-size-adjusted
+    #[value(name = "gs")]
+    Gs, // genome + scaffold-adjusted
+    #[value(name = "ag")]
+    GAbsolute, // absolute (penalizes both directions)
+    #[value(name = "ags")]
     GsAbsolute, // absolute with both corrections
 }
 
@@ -340,8 +345,8 @@ impl FromStr for ScoreType {
             "base" => Ok(ScoreType::Base),
             "g" => Ok(ScoreType::G),
             "gs" => Ok(ScoreType::Gs),
-            "g-absolute" => Ok(ScoreType::GAbsolute),
-            "gs-absolute" => Ok(ScoreType::GsAbsolute),
+            "ag" => Ok(ScoreType::GAbsolute),
+            "ags" => Ok(ScoreType::GsAbsolute),
             _ => Err(()),
         }
     }
@@ -352,7 +357,7 @@ fn less_than_5(s: &str) -> Result<f64, String> {
 }
 
 /// Options to pass to `blobtk plot`
-#[derive(Parser, Debug, Default)]
+#[derive(Clone, Parser, Debug, Default)]
 #[command(arg_required_else_help = true)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct PlotOptions {
@@ -370,9 +375,10 @@ pub struct PlotOptions {
     /// Window size for grid shape plot
     #[arg(long = "window-size", short = 'w')]
     pub window_size: Option<String>,
-    /// Output filename
-    #[arg(long, short = 'o', default_value_t = String::from("output.svg"))]
-    pub output: String,
+    /// Output filename(s) - can be specified multiple times
+    /// Supports .svg, .png, .json, .yaml extensions
+    #[arg(long, short = 'o', value_name = "FILE", action = clap::ArgAction::Append)]
+    pub output: Vec<String>,
     /// Optional reference BlobDir for snail plot
     #[arg(long = "reference", value_name = "REFERENCE")]
     pub reference: Option<PathBuf>,
@@ -468,8 +474,8 @@ pub struct PlotOptions {
     /// - base: unadjusted snail score
     /// - g: genome-size-adjusted (requires --max-span or --reference)
     /// - gs: genome and scaffold-adjusted (requires --max-span/--reference and --max-scaffold)
-    /// - g-absolute: absolute adjustment (penalizes both over/underassembly)
-    /// - gs-absolute: absolute with both corrections
+    /// - ag: absolute adjustment (penalizes both over/underassembly)
+    /// - ags: absolute with both corrections
     #[arg(long, value_name = "TYPE")]
     pub score_type: Option<ScoreType>,
     /// Internal field to track original FASTA input (for snail command)
@@ -481,6 +487,12 @@ pub struct PlotOptions {
     /// Internal field to track original BlobDir input (for snail command)
     #[clap(skip)]
     pub original_blobdir: Option<String>,
+    /// Internal field to track score-only mode (for snail command)
+    #[clap(skip)]
+    pub score_only: bool,
+    /// Internal field to track score JSON output mode (for snail command)
+    #[clap(skip)]
+    pub score_json: bool,
 }
 
 impl PlotOptions {
@@ -493,7 +505,7 @@ impl PlotOptions {
                     Ok(())
                 } else {
                     Err(anyhow::anyhow!(
-                        "--score-type g or g-absolute requires either --max-span or --reference"
+                        "--score-type g or ag requires either --max-span or --reference"
                     ))
                 }
             }
@@ -506,7 +518,7 @@ impl PlotOptions {
                     Ok(())
                 } else {
                     Err(anyhow::anyhow!(
-                        "--score-type gs or gs-absolute requires both --max-span and --max-scaffold, or a --reference"
+                        "--score-type gs or ags requires both --max-span and --max-scaffold, or a --reference"
                     ))
                 }
             }
@@ -579,9 +591,16 @@ pub struct SnailOptions {
     /// Reference assembly for snail plot (BlobDir or FASTA)
     #[arg(long = "reference", value_name = "REFERENCE")]
     pub reference: Option<PathBuf>,
-    /// Output filename
-    #[arg(long, short = 'o', default_value_t = String::from("output.svg"))]
-    pub output: String,
+    /// Output filename(s) - can be specified multiple times
+    /// Supports .svg, .png, .json, .yaml extensions
+    #[arg(long, short = 'o', value_name = "FILE", action = clap::ArgAction::Append)]
+    pub output: Vec<String>,
+    /// Report snail score to stdout (base type by default)
+    #[arg(long)]
+    pub score_only: bool,
+    /// Report snail score as JSON to stdout
+    #[arg(long)]
+    pub score_json: bool,
     #[arg(long, short = 'f')]
     pub filter: Vec<String>,
     /// Segment count for snail plot
@@ -623,8 +642,8 @@ pub struct SnailOptions {
     /// - base: unadjusted snail score
     /// - g: genome-size-adjusted (requires --max-span or --reference)
     /// - gs: genome and scaffold-adjusted (requires --max-span/--reference and --max-scaffold)
-    /// - g-absolute: absolute adjustment (penalizes both over/underassembly)
-    /// - gs-absolute: absolute with both corrections
+    /// - ag: absolute adjustment (penalizes both over/underassembly)
+    /// - ags: absolute with both corrections
     #[arg(long, value_name = "TYPE")]
     pub score_type: Option<ScoreType>,
 }
@@ -639,7 +658,7 @@ impl SnailOptions {
                     Ok(())
                 } else {
                     Err(anyhow::anyhow!(
-                        "--score-type g or g-absolute requires either --max-span or --reference"
+                        "--score-type g or ag requires either --max-span or --reference"
                     ))
                 }
             }
@@ -652,7 +671,7 @@ impl SnailOptions {
                     Ok(())
                 } else {
                     Err(anyhow::anyhow!(
-                        "--score-type gs or gs-absolute requires both --max-span and --max-scaffold, or a --reference"
+                        "--score-type gs or ags requires both --max-span and --max-scaffold, or a --reference"
                     ))
                 }
             }

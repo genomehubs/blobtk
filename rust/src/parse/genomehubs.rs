@@ -61,6 +61,31 @@ impl fmt::Display for StringOrVec {
     }
 }
 
+impl StringOrVec {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StringOrVec::Single(s) => s.as_str(),
+            StringOrVec::Multiple(v) => v.get(0).map(|s| s.as_str()).unwrap_or(""),
+        }
+    }
+
+    pub fn into_vec(self) -> Vec<String> {
+        match self {
+            StringOrVec::Single(s) => vec![s],
+            StringOrVec::Multiple(v) => v,
+        }
+    }
+}
+
+impl std::str::FromStr for StringOrVec {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Single occurrence becomes Single variant
+        Ok(StringOrVec::Single(s.to_string()))
+    }
+}
+
 // Value may be u32 or Vec of u32
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]

@@ -138,10 +138,10 @@ pub struct SnailStats {
     #[serde(rename = "rauNn-gs", skip_serializing_if = "Option::is_none")]
     raun_ngs: Option<f64>,
     /// Snail score adjusted for genome size, penalising assemblies larger or smaller than max_span
-    #[serde(rename = "rauNn-g-absolute", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "rauNn-ag", skip_serializing_if = "Option::is_none")]
     raun_ng_absolute: Option<f64>,
     /// Snail score adjusted for genome size and scaffold length, penalising assemblies larger or smaller than max_span and max_scaffold
-    #[serde(rename = "rauNn-gs-absolute", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "rauNn-ags", skip_serializing_if = "Option::is_none")]
     raun_ngs_absolute: Option<f64>,
     #[serde(rename = "ATGC")]
     atgc: usize,
@@ -1413,7 +1413,7 @@ impl PlotPaths {
     }
 }
 
-fn get_score_and_type(snail_stats: &SnailStats, options: &cli::PlotOptions) -> (f64, String) {
+pub fn get_score_and_type(snail_stats: &SnailStats, options: &cli::PlotOptions) -> (f64, String) {
     let score = match options.score_type {
         Some(ScoreType::Base) => snail_stats.raun_n(),
         Some(ScoreType::G) => snail_stats.raun_ng().unwrap(),
@@ -1423,12 +1423,12 @@ fn get_score_and_type(snail_stats: &SnailStats, options: &cli::PlotOptions) -> (
         None => snail_stats.raun_n(),
     };
     let score_type = match options.score_type {
-        Some(ScoreType::Base) => "Score".to_string(),
-        Some(ScoreType::G) => "G-score".to_string(),
-        Some(ScoreType::Gs) => "GS-score".to_string(),
-        Some(ScoreType::GAbsolute) => "aG-score".to_string(),
-        Some(ScoreType::GsAbsolute) => "aGS-score".to_string(),
-        None => "Score".to_string(),
+        Some(ScoreType::Base) => "Snail".to_string(),
+        Some(ScoreType::G) => "Snail-G".to_string(),
+        Some(ScoreType::Gs) => "Snail-GS".to_string(),
+        Some(ScoreType::GAbsolute) => "Snail-aG".to_string(),
+        Some(ScoreType::GsAbsolute) => "Snail-aGS".to_string(),
+        None => "Snail".to_string(),
     };
     (score, score_type)
 }
@@ -1456,7 +1456,6 @@ impl PlotLegends {
 
         let score = if options.show_score {
             let (snail_score, score_type) = get_score_and_type(snail_stats, options);
-            dbg!(&score_type, snail_score);
             legend_group(
                 format!("{}: {}", score_type, format_si(&snail_score, 3, None)),
                 vec![],
@@ -1653,59 +1652,102 @@ pub fn svg(
         ),
     );
 
-    let mut group = Group::new().set("transform", "translate(500, 525)");
+    let mut group = Group::new()
+        .set("id", "plot_area_group")
+        .set("transform", "translate(500, 525)");
 
     group = group
         .add(if ref_snail_stats.is_some() {
-            Group::new().add(paths.ref_length)
+            Group::new()
+                .set("id", "ref_length_fill_group")
+                .add(paths.ref_length)
         } else {
             Group::new()
+                .set("id", "scaffold_count_group")
                 .add(paths.scaf_count)
                 .add(paths.major_count_gridline)
         })
-        .add(paths.scaf_length)
-        .add(paths.scaf_length_outline)
-        .add(paths.gc_prop)
-        .add(paths.at_prop)
-        .add(paths.n_prop_inner)
-        .add(paths.n_prop_outer)
-        .add(paths.n_prop_inner_max)
-        .add(paths.n_prop_outer_max)
-        .add(paths.gc_prop_max)
-        .add(paths.gc_prop_min)
-        .add(paths.longest_arc)
-        .add(paths.n50_arc)
-        .add(paths.n90_arc)
-        .add(paths.n90_arc_outline)
-        .add(paths.n50_arc_outline)
-        .add(paths.longest_arc_outline)
+        .add(
+            Group::new()
+                .set("id", "scaffold_length_group")
+                .add(paths.scaf_length)
+                .add(paths.scaf_length_outline),
+        )
+        .add(
+            Group::new()
+                .set("id", "gc_composition_group")
+                .add(paths.gc_prop)
+                .add(paths.at_prop)
+                .add(
+                    Group::new()
+                        .set("id", "gc_range_group")
+                        .add(paths.n_prop_inner_max)
+                        .add(paths.n_prop_outer_max)
+                        .add(paths.gc_prop_max)
+                        .add(paths.gc_prop_min),
+                )
+                .add(paths.n_prop_inner)
+                .add(paths.n_prop_outer),
+        )
+        .add(
+            Group::new()
+                .set("id", "scaffold_overlay_group")
+                .add(paths.longest_arc)
+                .add(
+                    Group::new()
+                        .set("id", "n50_group")
+                        .add(paths.n50_arc)
+                        .add(
+                            Group::new()
+                                .set("id", "n90_group")
+                                .add(paths.n90_arc)
+                                .add(paths.n90_arc_outline),
+                        )
+                        .add(paths.n50_arc_outline),
+                )
+                .add(paths.longest_arc_outline),
+        )
         .add(if ref_snail_stats.is_some() {
-            Group::new().add(paths.ref_length_outline)
+            Group::new()
+                .set("id", "ref_length_outline_group")
+                .add(paths.ref_length_outline)
         } else {
             Group::new()
         })
-        .add(paths.major_length_gridline)
-        .add(paths.minor_tick)
-        .add(paths.major_tick)
-        .add(paths.minor_length_tick)
-        .add(paths.major_length_tick)
-        .add(paths.inner_axis)
-        // .add(paths.outer_axis)
-        .add(paths.inner)
-        .add(paths.outer)
-        .add(if config.ratio > 1.0 {
-            Group::new().add(
-                Circle::new()
-                    .set("fill", "none")
-                    .set("cx", 0)
-                    .set("cy", 0)
-                    .set("r", config.radius)
-                    .set("stroke", "#000000")
-                    .set("stroke-width", 3),
-            )
-        } else {
+        .add(
             Group::new()
-        });
+                .set("id", "axis_group")
+                .add(
+                    Group::new()
+                        .set("id", "length_axis_group")
+                        .add(paths.major_length_gridline)
+                        .add(paths.minor_length_tick)
+                        .add(paths.major_length_tick),
+                )
+                .add(
+                    Group::new()
+                        .set("id", "angle_axis_group")
+                        .add(paths.minor_tick)
+                        .add(paths.major_tick)
+                        .add(paths.inner_axis)
+                        // .add(paths.outer_axis)
+                        .add(paths.inner)
+                        .add(paths.outer)
+                        .add(if config.ratio > 1.0 {
+                            Group::new().add(
+                                Circle::new()
+                                    .set("fill", "none")
+                                    .set("cx", 0)
+                                    .set("cy", 0)
+                                    .set("r", config.radius)
+                                    .set("stroke", "#000000")
+                                    .set("stroke-width", 3),
+                            )
+                        } else {
+                            Group::new()
+                        }),
+                ),
+        );
 
     // svg::save(options.output.as_str(), &document).unwrap();
     // let mut target = Vec::new();

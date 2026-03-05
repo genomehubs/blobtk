@@ -70,6 +70,8 @@ fn snail_opts_to_plot_opts(
         original_fasta,
         original_busco,
         original_blobdir,
+        score_only: options.score_only,
+        score_json: options.score_json,
         ..Default::default()
     })
 }
@@ -82,7 +84,6 @@ pub fn snail(options: &cli::SnailOptions) -> Result<(), anyhow::Error> {
     if let Some(reference) = options.reference.as_ref() {
         if let Ok(blobdir_meta) = blobdir::parse_blobdir(reference) {
             // If it's a valid BlobDir, use it directly
-            dbg!("Reference is a valid BlobDir, using it directly");
             reference_meta = Some(blobdir_meta);
             reference_blobdir = Some(reference.clone());
         } else {
@@ -103,7 +104,6 @@ pub fn snail(options: &cli::SnailOptions) -> Result<(), anyhow::Error> {
             ));
         }
     }
-    dbg!("Reference metadata loaded successfully");
 
     // Parse the BlobDir metadata and data
     // if the blobdir does not exist, create a blobdir instead of erroring

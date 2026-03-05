@@ -10,7 +10,8 @@ use svg::node::element::{Circle, Group, Line, Path, Rectangle, Text};
 use svg::node::Text as nodeText;
 
 use crate::utils::{
-    format_si, linear_scale, linear_scale_float, min_float, scale_float, scale_floats,
+    format_element_id, format_si, linear_scale, linear_scale_float, min_float, scale_float,
+    scale_floats,
 };
 
 use super::axis::{AxisOptions, Position, Scale, TickOptions, TickStatus};
@@ -118,7 +119,9 @@ pub fn legend_group(
             .set("fill", "black")
             .add(nodeText::new(title.clone()))
     };
-    let mut group = Group::new().add(title_text);
+    let mut group = Group::new()
+        .set("id", format_element_id(&format!("{} legend", title)))
+        .add(title_text);
     let cell: i32 = 18;
     let gap = 8;
     let mut offset_y = 0;

@@ -11,6 +11,7 @@ use num_integer::sqrt;
 
 #[cfg(feature = "python-extension")]
 use pyo3::pyclass;
+use serde_json::json;
 
 use crate::blobdir;
 use crate::blobdir::parse_field_identifiers;
@@ -20,7 +21,9 @@ use crate::cli::Shape;
 use crate::error;
 use crate::plot::blob::BlobData;
 use crate::plot::cumulative::CumulativeData;
+use crate::plot::snail::get_score_and_type;
 use crate::plot::snail::{DataSource, SnailStats};
+use crate::utils::format_si;
 // use crate::io;
 
 use clap::ValueEnum;
@@ -62,10 +65,15 @@ pub mod style;
 
 pub fn save_svg(document: &Document, options: &PlotOptions) -> Result<(), anyhow::Error> {
     // create parent directories if they don't exist
-    if let Some(parent) = PathBuf::from(&options.output).parent() {
+    let output_str = options
+        .output
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("output.svg");
+    if let Some(parent) = PathBuf::from(&output_str).parent() {
         std::fs::create_dir_all(parent)?;
     }
-    svg::save(options.output.as_str(), document)?;
+    svg::save(output_str, document)?;
     Ok(())
 }
 
@@ -89,11 +97,16 @@ pub fn save_png(document: &Document, options: &PlotOptions) -> Result<(), anyhow
     )
     .unwrap();
     // Save the pixmap as a PNG file
+    let output_str = options
+        .output
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("output.png");
     // create parent directories if they don't exist
-    if let Some(parent) = PathBuf::from(&options.output).parent() {
+    if let Some(parent) = PathBuf::from(&output_str).parent() {
         std::fs::create_dir_all(parent)?;
     }
-    pixmap.save_png(options.output.as_str())?;
+    pixmap.save_png(output_str)?;
     Ok(())
 }
 
@@ -196,7 +209,6 @@ fn generate_snail_stats(
 }
 
 fn determine_max_values(
-    snail_stats: &SnailStats,
     ref_snail_stats: &Option<SnailStats>,
     options: &cli::PlotOptions,
 ) -> (Option<usize>, Option<usize>) {
@@ -260,8 +272,6 @@ pub fn plot_snail(
 
     // Generate stats for the reference assembly if provided
     let mut ref_snail_stats = if let Some(ref_meta) = reference_meta {
-        dbg!(meta.id.clone());
-        dbg!(ref_meta.id.clone());
         if ref_meta.id == meta.id {
             return Err(anyhow::anyhow!(
                 "Reference BlobDir cannot be the same as the input BlobDir"
@@ -289,45 +299,78 @@ pub fn plot_snail(
     } else {
         None
     };
-    let (max_span, max_scaffold) = determine_max_values(&snail_stats, &ref_snail_stats, options);
+    let (max_span, max_scaffold) = determine_max_values(&ref_snail_stats, options);
     snail_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
 
     if let Some(ref_stats) = &mut ref_snail_stats {
         ref_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
     }
 
-    let suffix = get_suffix(options)?;
-    // create output directory if it doesn't exist
-    if let Some(parent) = PathBuf::from(&options.output).parent() {
-        std::fs::create_dir_all(parent)?;
+    let mut outputs = options.output.clone();
+
+    // 1. Report to stdout if requested
+    if options.score_only {
+        let (value, _) = get_score_and_type(&snail_stats, options);
+        println!(
+            "{}",
+            format_si(&value, options.significant_digits, options.rounding.clone())
+        );
+    } else if options.score_json {
+        let (value, score_type) = get_score_and_type(&snail_stats, options);
+        let score_obj = json!({
+            "id": snail_stats.id(),
+            "score_type": score_type,
+            "value": format_si(&value, options.significant_digits, options.rounding.clone()),
+        });
+        println!("{}", serde_json::to_string_pretty(&score_obj)?);
+    } else if options.output.is_empty() {
+        outputs = vec!["output.svg".to_string()];
+    };
+
+    for output in outputs {
+        let mut plot_options = (*options).clone();
+        plot_options.output = vec![output.clone()];
+        let (max_span, max_scaffold) = determine_max_values(&ref_snail_stats, &plot_options);
+        snail_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+        if let Some(ref_stats) = &mut ref_snail_stats {
+            ref_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+        }
+        if let Some(parent) = PathBuf::from(&output).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let suffix = get_suffix(&plot_options)?;
+
+        match suffix {
+            Suffix::JSON => {
+                serde_json::to_writer_pretty(std::fs::File::create(&output)?, &snail_stats)?;
+            }
+            Suffix::YAML => {
+                serde_yaml::to_writer(std::fs::File::create(&output)?, &snail_stats)?;
+            }
+            _ => {
+                // For SVG/PNG, continue to create the document and save
+                // Pass both snail_stats and ref_snail_stats to the svg function
+                let document: Document = snail::svg(
+                    &snail_stats,
+                    &ref_snail_stats,
+                    &plot_options,
+                    max_span,
+                    max_scaffold,
+                );
+                save_by_suffix(&plot_options, document)?;
+            }
+        };
     }
-    match suffix {
-        Suffix::JSON => {
-            serde_json::to_writer_pretty(std::fs::File::create(&options.output)?, &snail_stats)?;
-            Ok(())
-        }
-        Suffix::YAML => {
-            serde_yaml::to_writer(std::fs::File::create(&options.output)?, &snail_stats)?;
-            Ok(())
-        }
-        _ => {
-            // For SVG/PNG, continue to create the document and save
-            // Pass both snail_stats and ref_snail_stats to the svg function
-            let document: Document = snail::svg(
-                &snail_stats,
-                &ref_snail_stats,
-                options,
-                max_span,
-                max_scaffold,
-            );
-            save_by_suffix(options, document)?;
-            Ok(())
-        }
-    }
+    Ok(())
 }
 
 fn get_suffix(options: &PlotOptions) -> Result<Suffix, error::Error> {
-    let output_str = options.output.as_str();
+    let output_str = options
+        .output
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("output.svg");
     let suffix_str = PathBuf::from(output_str)
         .extension()
         .unwrap()

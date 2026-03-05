@@ -267,3 +267,12 @@ pub fn min_float<T: PartialOrd>(a: T, b: T) -> T {
         b
     }
 }
+
+pub fn format_element_id(title: &str) -> String {
+    title
+        .to_lowercase()
+        .replace(' ', "_")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect::<String>()
+}
