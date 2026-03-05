@@ -18,6 +18,7 @@ use url::Url;
 
 use crate::cli;
 use crate::error;
+use crate::io;
 use crate::utils::{max_float, min_float};
 
 pub use cli::PlotOptions;
@@ -249,6 +250,29 @@ pub fn file_reader(dir: &PathBuf, prefix: &str) -> Option<Box<dyn BufRead>> {
             Some(Box::new(BufReader::new(response)))
         } else {
             None
+        }
+    } else if blobdir.starts_with("ssh") {
+        // Handle SSH paths - try with and without .gz extension
+        let mut ssh_path = blobdir.to_string();
+        if !prefix.starts_with("meta.") {
+            // For field data, just append the prefix to the path
+            ssh_path = format!("{}/{}", ssh_path, prefix);
+        } else {
+            // For meta.json, append it directly
+            ssh_path = format!("{}/{}", ssh_path, prefix);
+        }
+
+        // Try the path as-is first
+        match io::ssh_file_reader(&ssh_path) {
+            Ok(reader) => Some(reader),
+            Err(_) => {
+                // If that fails and the file doesn't end with .gz, try with .gz appended
+                if !ssh_path.ends_with(".gz") {
+                    io::ssh_file_reader(&format!("{}.gz", ssh_path)).ok()
+                } else {
+                    None
+                }
+            }
         }
     } else {
         let path = get_path(dir, prefix)?;
