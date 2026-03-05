@@ -297,14 +297,14 @@ pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
     // Use SSH to read the file
     let command = if path.ends_with(".gz") {
         format!(
-            "ssh {} 'if [ -f {} ]; then cat {}; else cat {}; fi'",
+            "ssh {} 'if [ -f {} ]; then cat {}; else cat {}; fi 2>/dev/null'",
             host,
             path,
             path,
             path.trim_end_matches(".gz")
         )
     } else {
-        format!("ssh {} cat {}", host, path)
+        format!("ssh {} cat {} 2>/dev/null", host, path)
     };
 
     let process = std::process::Command::new("sh")

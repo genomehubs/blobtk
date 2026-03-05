@@ -547,12 +547,13 @@ pub fn scaffold_stats_legend(
     let record = snail_stats.record_type();
 
     if let Some(ref_stats) = ref_snail_stats {
-        let title = format!(
-            "Ref: {} ({} | auN {})",
-            ref_stats.short_id(),
-            format_si(&(ref_stats.span() as f64), precision, rounding.clone()),
-            format_si(&(ref_stats.aun() as f64), precision, rounding.clone())
-        );
+        // let title = format!(
+        //     "Ref: {} ({} | auN {})",
+        //     ref_stats.short_id(),
+        //     format_si(&(ref_stats.span() as f64), precision, rounding.clone()),
+        //     format_si(&(ref_stats.aun() as f64), precision, rounding.clone())
+        // );
+        let title = ref_stats.id().to_string();
         entries.push(LegendEntry {
             title,
             color: Some(COLOR_REF_OUTLINE.to_string()),
@@ -698,7 +699,7 @@ pub fn scale_stats_legend(snail_stats: &SnailStats, options: &cli::PlotOptions) 
 pub fn dataset_name_legend(snail_stats: &SnailStats, _: &cli::PlotOptions) -> Group {
     let entries = vec![];
 
-    let title = format!("Dataset: {}", snail_stats.short_id());
+    let title = format!("Dataset: {}", snail_stats.id());
     legend_group(title, entries, None, 1, LegendAlignment::Start)
 }
 
