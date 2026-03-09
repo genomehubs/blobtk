@@ -6,11 +6,8 @@ on:
       # - main
       - develop
       - feature/x*
-    tags:
-      - "*"
-
-env:
-  VERSION: 0.5.8
+    # tags:
+    #   - "*"
 
 jobs:
   macos-binary:

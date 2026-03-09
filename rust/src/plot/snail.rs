@@ -1653,11 +1653,8 @@ pub fn svg(
         ),
     );
 
-    let mut group = Group::new()
-        .set("id", "plot_area_group")
-        .set("transform", "translate(500, 525)");
-
-    group = group
+    let plot_features = Group::new()
+        .set("id", "plot_features_group")
         .add(if ref_snail_stats.is_some() {
             Group::new()
                 .set("id", "ref_length_fill_group")
@@ -1749,6 +1746,11 @@ pub fn svg(
                         }),
                 ),
         );
+
+    let group = Group::new()
+        .set("id", "plot_translate_group")
+        .set("transform", "translate(500, 525)")
+        .add(plot_features);
 
     // svg::save(options.output.as_str(), &document).unwrap();
     // let mut target = Vec::new();
@@ -1859,6 +1861,7 @@ fn busco_plot(
 
     // Add inner circle for reference BUSCO if available
     let mut group = Group::new()
+        .set("id", "busco_plot_group")
         .add(comp_arc_path)
         .add(frag_arc_path)
         .add(dup_arc_path);
