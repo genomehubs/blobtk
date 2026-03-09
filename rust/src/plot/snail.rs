@@ -887,7 +887,8 @@ impl PolarCoordinates {
         config: &SnailPlotConfig,
         options: &cli::PlotOptions,
     ) -> Self {
-        let length_scale_function = match options.scale_function {
+        let scale_function = options.resolved_scale_function();
+        let length_scale_function = match scale_function {
             Scale::LINEAR => linear_scale,
             Scale::SQRT => sqrt_scale,
             Scale::LOG => log_scale,
@@ -1304,7 +1305,7 @@ impl PlotPaths {
 
         for (i, tick) in major_length_ticks.iter().enumerate() {
             let tick = tick.clone();
-            let label = if !matches!(options.scale_function, Scale::LINEAR)
+            let label = if !matches!(options.resolved_scale_function(), Scale::LINEAR)
                 && i < cmp::max(major_length_ticks.len(), 3) - 3
             {
                 Text::new()
@@ -1317,7 +1318,8 @@ impl PlotPaths {
                 Text::new()
             });
 
-            if matches!(options.scale_function, Scale::LINEAR) && i == major_length_ticks.len() - 1
+            if matches!(options.resolved_scale_function(), Scale::LINEAR)
+                && i == major_length_ticks.len() - 1
             {
                 continue;
             }
@@ -1587,7 +1589,7 @@ pub fn svg(
             ..Default::default()
         },
     );
-    let length_scale = match options.scale_function {
+    let length_scale = match options.resolved_scale_function() {
         Scale::LINEAR => "scaleLinear".to_string(),
         Scale::SQRT => "scaleSqrt".to_string(),
         Scale::LOG => "scaleLog".to_string(),

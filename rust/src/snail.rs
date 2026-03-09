@@ -58,7 +58,7 @@ fn snail_opts_to_plot_opts(
         segments: options.segments,
         max_span: options.max_span,
         max_scaffold: options.max_scaffold,
-        scale_function: options.scale_function.clone(),
+        scale_function: Some(options.scale_function.clone()),
         significant_digits: options.significant_digits,
         decimal_precision: options.decimal_precision,
         rounding: options.rounding.clone(),

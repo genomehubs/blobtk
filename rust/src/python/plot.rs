@@ -77,7 +77,7 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         resolution: resolution.unwrap_or(30),
         hist_height,
         reducer_function: reducer_function.unwrap_or_default(),
-        scale_function: scale_function.unwrap_or_default(),
+        scale_function,
         scale_factor: scale_factor.unwrap_or(1.0),
         x_limit,
         y_limit,

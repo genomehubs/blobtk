@@ -17,7 +17,7 @@ use plot::category::Category;
 
 use super::axis::{AxisName, AxisOptions, ChartAxes, Position, Scale, TickOptions};
 use super::chart::{Chart, Dimensions, TopRightBottomLeft};
-use super::component::{font_family, legend_group, LegendEntry, LegendShape};
+use super::component::{font_family, legend_group, LegendEntry};
 use super::data::{Bin, HistogramData, Reducer, ScatterData, ScatterPoint};
 use super::{GridSize, ShowLegend};
 
@@ -331,7 +331,7 @@ pub fn blob_points(
     }
     let z_axis = AxisOptions {
         label: axes["z"].clone(),
-        scale: options.scale_function.clone(),
+        scale: options.resolved_scale_function(),
         domain: z_domain,
         range: [2.0, 2.0 + dimensions.height / 15.0 * options.scale_factor],
         ..Default::default()

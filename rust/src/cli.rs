@@ -356,6 +356,16 @@ fn less_than_5(s: &str) -> Result<f64, String> {
     Ok(number_range(&format!("{}", s.parse::<f64>().unwrap() * 10.0), 2, 50)? as f64 / 10.0)
 }
 
+const BADGE_LINEAR_SCALE_ERROR: &str =
+    "--badge requires --scale-function linear (badge mode only supports linear scaling)";
+
+fn validate_badge_scale(badge: bool, scale_function: &Scale) -> Result<(), anyhow::Error> {
+    if badge && scale_function != &Scale::LINEAR {
+        return Err(anyhow::anyhow!(BADGE_LINEAR_SCALE_ERROR));
+    }
+    Ok(())
+}
+
 /// Options to pass to `blobtk plot`
 #[derive(Clone, Parser, Debug, Default)]
 #[command(arg_required_else_help = true)]
@@ -419,8 +429,10 @@ pub struct PlotOptions {
     #[arg(long, value_enum, default_value_t = Reducer::Sum)]
     pub reducer_function: Reducer,
     /// Scale function for blob/snail plot
-    #[arg(long, value_enum, default_value_t = Scale::SQRT)]
-    pub scale_function: Scale,
+    ///
+    /// Defaults to `sqrt` for blob view and `linear` for snail view.
+    #[arg(long, value_enum)]
+    pub scale_function: Option<Scale>,
     /// Scale factor for blob plot (0.2 - 5.0)
     #[arg(long, default_value_t = 1.0, value_parser=less_than_5)]
     pub scale_factor: f64,
@@ -496,8 +508,20 @@ pub struct PlotOptions {
 }
 
 impl PlotOptions {
+    /// Resolve scale function, applying view-specific defaults when unset.
+    pub fn resolved_scale_function(&self) -> Scale {
+        self.scale_function
+            .clone()
+            .unwrap_or_else(|| match self.view {
+                View::Snail => Scale::LINEAR,
+                _ => Scale::SQRT,
+            })
+    }
+
     /// Validate that score_type requirements are met
     pub fn validate_score_type(&self) -> Result<(), anyhow::Error> {
+        validate_badge_scale(self.badge, &self.resolved_scale_function())?;
+
         match &self.score_type {
             Some(ScoreType::Base) | None => Ok(()),
             Some(ScoreType::G) | Some(ScoreType::GAbsolute) => {
@@ -613,7 +637,7 @@ pub struct SnailOptions {
     #[arg(long = "max-scaffold")]
     pub max_scaffold: Option<usize>,
     /// Scale function for snail plot
-    #[arg(long, value_enum, default_value_t = Scale::SQRT)]
+    #[arg(long, value_enum, default_value_t = Scale::LINEAR)]
     pub scale_function: Scale,
     /// [experimental] Significant digits to use when rounding numbers for display
     #[arg(long = "significant-digits", default_value_t = 3)]
@@ -651,6 +675,8 @@ pub struct SnailOptions {
 impl SnailOptions {
     /// Validate that score_type requirements are met
     pub fn validate_score_type(&self) -> Result<(), anyhow::Error> {
+        validate_badge_scale(self.badge, &self.scale_function)?;
+
         match &self.score_type {
             Some(ScoreType::Base) | None => Ok(()),
             Some(ScoreType::G) | Some(ScoreType::GAbsolute) => {
@@ -811,4 +837,45 @@ pub struct ValidateOptions {
 /// Command line argument parser
 pub fn parse() -> Arguments {
     Arguments::parse()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plot_badge_rejects_non_linear_scale() {
+        let options = PlotOptions {
+            badge: true,
+            scale_function: Some(Scale::SQRT),
+            ..Default::default()
+        };
+
+        let err = options.validate_score_type().unwrap_err();
+        assert_eq!(err.to_string(), BADGE_LINEAR_SCALE_ERROR);
+    }
+
+    #[test]
+    fn plot_badge_accepts_snail_default_linear_scale() {
+        let options = PlotOptions {
+            badge: true,
+            view: View::Snail,
+            scale_function: None,
+            ..Default::default()
+        };
+
+        assert!(options.validate_score_type().is_ok());
+    }
+
+    #[test]
+    fn snail_badge_rejects_non_linear_scale() {
+        let options = SnailOptions {
+            badge: true,
+            scale_function: Scale::SQRT,
+            ..Default::default()
+        };
+
+        let err = options.validate_score_type().unwrap_err();
+        assert_eq!(err.to_string(), BADGE_LINEAR_SCALE_ERROR);
+    }
 }
