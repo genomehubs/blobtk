@@ -269,8 +269,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                     .append(true)
                     .open(&exceptions_path)?;
                 for exception in &merge_exceptions {
-                    let json =
-                        serde_json::to_string(exception)?;
+                    let json = serde_json::to_string(exception)?;
                     writeln!(file, "{}", json)?;
                 }
             }

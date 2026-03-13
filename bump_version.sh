@@ -8,8 +8,25 @@ if [ -z "$LEVEL" ]; then
 fi
 
 CURRENT_VERSION=$(grep current_version .bumpversion.cfg | head -n 1 | cut -d' ' -f 3)
+CARGO_VERSION=$(grep '^version = "' rust/Cargo.toml | head -n 1 | cut -d '"' -f 2)
+
+if [ "$CURRENT_VERSION" != "$CARGO_VERSION" ]; then
+  echo "Version mismatch before bump:"
+  echo "  .bumpversion.cfg: $CURRENT_VERSION"
+  echo "  rust/Cargo.toml: $CARGO_VERSION"
+  echo "Sync versions before running bump_version.sh"
+  exit 1
+fi
 
 cd rust &&
+
+cargo fmt --all -- --check
+
+if [ $? != "0" ]; then
+  cd -
+  echo "failed cargo fmt check"
+  exit 1
+fi
 
 ./test/integration.sh
 
