@@ -19,7 +19,7 @@ pub fn plot_with_options(options: &PlotOptions) -> PyResult<()> {
         cli::View::Blob => plot_blob(&meta, &options).unwrap(),
         cli::View::Cumulative => plot_cumulative(&meta, &options).unwrap(),
         cli::View::Legend => plot_legend(&meta, &options).unwrap(),
-        cli::View::Snail => plot_snail(&meta, &options).unwrap(),
+        cli::View::Snail => plot_snail(&meta, &None, &options).unwrap(),
     }
     Ok(())
 }
@@ -64,7 +64,9 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         view,
         shape,
         window_size,
-        output: output.unwrap_or(String::from("output.svg")),
+        output: output
+            .map(|s| vec![s])
+            .unwrap_or_else(|| vec!["output.svg".to_string()]),
         filter: filter.unwrap_or_default(),
         segments: segments.unwrap_or(1000),
         max_span,
@@ -94,7 +96,14 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         rounding,
         badge,
         show_score,
+        reference: None,
+        score_type: None,
+        original_fasta: None,
+        original_busco: None,
+        original_blobdir: None,
         original_reference: None,
+        score_only: false,
+        score_json: false,
     }
 }
 
