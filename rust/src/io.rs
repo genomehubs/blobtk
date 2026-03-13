@@ -4,10 +4,78 @@ use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Result, Write};
 use std::path::{Path, PathBuf};
 
+use crate::utils::styled_bytes_progress_bar;
 use flate2::read::GzDecoder;
 use flate2::write;
 use flate2::Compression;
+use indicatif::ProgressBar;
 use std::ffi::OsStr;
+use std::io::Read;
+
+struct ProgressRead<R: Read> {
+    inner: R,
+    pb: Option<ProgressBar>,
+    total: Option<u64>,
+    finished: bool,
+    label: Option<String>,
+}
+
+impl<R: Read> ProgressRead<R> {
+    fn new(inner: R, pb: Option<ProgressBar>, total: Option<u64>, label: Option<String>) -> Self {
+        ProgressRead {
+            inner,
+            pb,
+            total,
+            finished: false,
+            label,
+        }
+    }
+}
+
+impl<R: Read> Read for ProgressRead<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        if n > 0 {
+            if let Some(pb) = &self.pb {
+                if !self.finished {
+                    pb.inc(n as u64);
+                    // If we know the total content length, finish when we've
+                    // reached it so the final message is shown even if the
+                    // wrapped decoder doesn't issue a zero-length read.
+                    if let Some(total) = self.total {
+                        if pb.position() >= total {
+                            let pos = pb.position();
+                            pb.finish();
+                            if let Some(lbl) = &self.label {
+                                let _ = eprintln!("Downloaded {} bytes from {}", pos, lbl);
+                            } else {
+                                let _ = eprintln!("Downloaded {} bytes", pos);
+                            }
+                            self.finished = true;
+                        }
+                    }
+                }
+            }
+        } else {
+            if let Some(pb) = &self.pb {
+                if !self.finished {
+                    // Replace the progress bar with a final message so the
+                    // completed report is preserved and not overwritten by
+                    // subsequent progress bars.
+                    let pos = pb.position();
+                    pb.finish();
+                    if let Some(lbl) = &self.label {
+                        let _ = eprintln!("Downloaded {} bytes from {}", pos, lbl);
+                    } else {
+                        let _ = eprintln!("Downloaded {} bytes", pos);
+                    }
+                    self.finished = true;
+                }
+            }
+        }
+        Ok(n)
+    }
+}
 
 fn read_stdin() -> Vec<Vec<u8>> {
     let stdin = io::stdin();
@@ -30,7 +98,7 @@ pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
 {
-    let file = File::open(filename).expect("no such file");
+    let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
 }
 
@@ -138,23 +206,60 @@ pub fn local_file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
 /// Return a BufRead object for a given URL path.
 /// The file will be fetched.
 pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
-    // let response = reqwest::blocking::get(path)?;
-    // let reader = response.bytes()?;
-    // Ok(Box::new(BufReader::new(reader.as_ref()))
-
-    let response = reqwest::blocking::get(url.to_string()).expect("Failed to fetch file");
+    let response = reqwest::blocking::get(url.to_string())
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     if response.status().is_success() {
-        return Ok(Box::new(BufReader::new(response)));
+        let content_len = response.content_length();
+        let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
+
+        let is_gz_ext = url.ends_with(".gz");
+        let is_gz_encoding = response
+            .headers()
+            .get(reqwest::header::CONTENT_ENCODING)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
+            .unwrap_or(false);
+        if is_gz_ext || is_gz_encoding {
+            // Wrap the original response with ProgressRead so the progress bar
+            // measures compressed bytes (Content-Length) rather than the
+            // decompressed stream which would exceed the reported length.
+            let progress_response =
+                ProgressRead::new(response, pb, content_len, Some(url.to_string()));
+            let decoder = GzDecoder::new(progress_response);
+            Ok(Box::new(BufReader::new(decoder)))
+        } else {
+            let reader = ProgressRead::new(response, pb, content_len, Some(url.to_string()));
+            Ok(Box::new(BufReader::new(reader)))
+        }
     } else {
         let response = reqwest::blocking::get(url.to_string().replace(".gz", ""))
-            .expect(format!("Failed to fetch file: {}", url).as_str());
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         if response.status().is_success() {
-            return Ok(Box::new(BufReader::new(response)));
+            let content_len = response.content_length();
+            let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
+
+            let is_gz_encoding = response
+                .headers()
+                .get(reqwest::header::CONTENT_ENCODING)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
+                .unwrap_or(false);
+            if is_gz_encoding {
+                // See note above: count compressed bytes by wrapping the
+                // response in ProgressRead before GzDecoder.
+                let progress_response =
+                    ProgressRead::new(response, pb, content_len, Some(url.to_string()));
+                let decoder = GzDecoder::new(progress_response);
+                Ok(Box::new(BufReader::new(decoder)))
+            } else {
+                let reader = ProgressRead::new(response, pb, content_len, Some(url.to_string()));
+                Ok(Box::new(BufReader::new(reader)))
+            }
         } else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Failed to fetch file: {}", response.status()),
-            ));
+            Err(io::Error::other(format!(
+                "Failed to fetch file: {}",
+                response.status()
+            )))
         }
     }
 }
@@ -175,14 +280,14 @@ pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
     // Use SSH to read the file
     let command = if path.ends_with(".gz") {
         format!(
-            "ssh {} 'if [ -f {} ]; then cat {}; else cat {}; fi'",
+            "ssh {} 'if [ -f {} ]; then cat {}; else cat {}; fi 2>/dev/null'",
             host,
             path,
             path,
             path.trim_end_matches(".gz")
         )
     } else {
-        format!("ssh {} cat {}", host, path)
+        format!("ssh {} cat {} 2>/dev/null", host, path)
     };
 
     let process = std::process::Command::new("sh")
@@ -190,11 +295,16 @@ pub fn ssh_file_reader(path: &str) -> io::Result<Box<dyn BufRead>> {
         .arg(command)
         .stdout(std::process::Stdio::piped())
         .spawn()
-        .expect("Failed to start SSH command");
+        .map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to start SSH command: {}", e),
+            )
+        })?;
 
     let stdout = process
         .stdout
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Failed to capture stdout"))?;
+        .ok_or_else(|| io::Error::other("Failed to capture stdout"))?;
     let mut buffer = [0u8; 2];
     let mut stdout_reader = BufReader::new(stdout);
     match io::Read::read_exact(&mut stdout_reader, &mut buffer) {
@@ -276,9 +386,9 @@ pub fn get_csv_reader(
     comment_char: Option<u8>,
     skip_lines: usize,
     flexible: bool,
-) -> csv::Reader<Box<dyn BufRead>> {
-    let file_reader =
-        file_reader(file_path.as_ref().unwrap().clone()).expect("Failed to read file");
+) -> io::Result<csv::Reader<Box<dyn BufRead>>> {
+    dbg!(&file_path);
+    let file_reader = file_reader(file_path.as_ref().unwrap().clone())?;
     // Skip the first `skip_lines` lines
     let mut file_reader = Box::new(file_reader);
     for _ in 0..skip_lines {
@@ -286,12 +396,12 @@ pub fn get_csv_reader(
         file_reader.read_line(&mut line).unwrap();
     }
 
-    csv::ReaderBuilder::new()
+    Ok(csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .has_headers(has_headers)
         .comment(comment_char)
         .flexible(flexible) // Allow incomplete rows
-        .from_reader(file_reader)
+        .from_reader(file_reader))
 }
 
 pub fn write_list(entries: &HashSet<Vec<u8>>, file_path: &Option<PathBuf>) -> Result<()> {

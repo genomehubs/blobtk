@@ -92,10 +92,7 @@ impl Default for Chart {
 
 impl Chart {
     pub fn svg(self, x_offset: f64, y_offset: f64, opacity: Option<f64>) -> Group {
-        let opacity = match opacity {
-            Some(o) => o,
-            None => 1.0,
-        };
+        let opacity = opacity.unwrap_or(1.0);
         let mut group = Group::new();
         let mut axis_group = Group::new();
         let mut gridline_group = Group::new();
@@ -153,8 +150,7 @@ impl Chart {
             let mut hist_group = Group::new();
             let mut hist_paths = vec![];
             for hist in self.histogram_data.unwrap() {
-                let color;
-                color = hist.category.clone().unwrap().color;
+                let color = hist.category.clone().unwrap().color;
                 let path_data = hist
                     .clone()
                     .to_path_data(self.axes.x.clone().unwrap().position, true);

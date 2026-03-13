@@ -35,7 +35,7 @@ fn add_new_names(
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
     xref_label: &Option<String>,
 ) {
-    if !taxon.tax_id.is_some() {
+    if taxon.tax_id.is_none() {
         return;
     }
     let tax_id = taxon.tax_id.clone().unwrap();
@@ -45,7 +45,7 @@ fn add_new_names(
         }
         // does name already exist in id_map associated with the same class and taxid?
         // if so, skip for now
-        if let Some(tax_info) = id_map.get(&CString::new(clean_name(&name)).unwrap()) {
+        if let Some(tax_info) = id_map.get(&CString::new(clean_name(name)).unwrap()) {
             let mut found = false;
             for info in tax_info {
                 if info.tax_id == tax_id {
@@ -69,10 +69,7 @@ fn add_new_names(
             ..Default::default()
         };
 
-        names
-            .entry(tax_id.clone())
-            .or_insert(vec![])
-            .push(taxon_name);
+        names.entry(tax_id.clone()).or_default().push(taxon_name);
     }
 }
 
@@ -157,10 +154,10 @@ fn nodes_from_file(
         let (mut processed, mut combined_report) =
             ghubs_config.validate_record(&record, row_index, &keys);
         validation_counts.update(&combined_report.counts);
-        if combined_report.status == ValidationStatus::Partial {
-            if ghubs_config.file.as_ref().unwrap().skip_partial == Some(SkipPartial::Row) {
-                continue;
-            }
+        if combined_report.status == ValidationStatus::Partial
+            && ghubs_config.file.as_ref().unwrap().skip_partial == Some(SkipPartial::Row)
+        {
+            continue;
         }
 
         let taxonomy_section = processed.get(&"taxonomy".to_string());
@@ -188,7 +185,7 @@ fn nodes_from_file(
         if let Some(taxon) = &assigned_taxon {
             match_counts.assigned += 1;
             if let Some(taxon_names) = taxon_names_section {
-                add_new_names(&taxon, taxon_names, &mut names, &id_map, &xref_label);
+                add_new_names(taxon, taxon_names, &mut names, id_map, &xref_label);
             }
             ghubs_config.write_modified_row(
                 &processed,
@@ -279,7 +276,7 @@ fn nodes_from_file(
             if let Some(ref genus) = genus_name {
                 // Look up genus in id_map
                 let genus_tax_id = if let Some(genus_infos) =
-                    id_map.get(&CString::new(clean_name(&genus)).unwrap())
+                    id_map.get(&CString::new(clean_name(genus)).unwrap())
                 {
                     // Use first match if available
                     genus_infos.first().map(|info| info.tax_id.clone())
@@ -336,7 +333,7 @@ fn nodes_from_file(
             if let Some(node) = add_new_taxid(
                 &new_taxon_match,
                 tax_section,
-                &id_map,
+                id_map,
                 Some(row_index),
                 Some(raw_row.clone()),
             ) {
@@ -349,7 +346,7 @@ fn nodes_from_file(
                         },
                         taxon_names,
                         &mut names,
-                        &id_map,
+                        id_map,
                         &xref_label,
                     );
                 }
@@ -363,7 +360,7 @@ fn nodes_from_file(
             }
         }
     }
-    pb.finish_with_message(format!("done"));
+    pb.finish_with_message("done".to_string());
     println!("Validation Report: {}", validation_counts.to_jsonl());
     if write_validated {
         // write ghubs_config back to file in validated directory
@@ -406,15 +403,12 @@ pub fn parse_file(
 ) -> Result<(Nodes, HashMap<String, Vec<Name>>, Source), error::Error> {
     // let mut children = HashMap::new();
 
-    let mut ghubs_config = match GHubsConfig::new(&config_file) {
-        Ok(ghubs_config) => ghubs_config,
-        Err(err) => return Err(err),
-    };
+    let mut ghubs_config = GHubsConfig::new(&config_file)?;
     // let source = Source::new(&ghubs_config);
     let (names, tmp_nodes) = nodes_from_file(
         &config_file,
         &mut ghubs_config,
-        &id_map,
+        id_map,
         write_validated,
         create_taxa,
         xref_label.clone(),
@@ -530,7 +524,25 @@ mod tests {
                     tax_id: String::from("1"),
                     parent_tax_id: String::from("1"),
                     rank: String::from("no rank"),
-                    ..Default::default()
+                    columns: vec![
+                        "1".to_string(),
+                        "1".to_string(),
+                        "no rank".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string(),
+                        "".to_string()
+                    ],
+                    names: None,
+                    scientific_name: None,
+                    row_index: None,
+                    raw_row: None,
                 }
             )
         );
@@ -543,7 +555,25 @@ mod tests {
                     tax_id: String::from("2"),
                     parent_tax_id: String::from("131567"),
                     rank: String::from("superkingdom"),
-                    ..Default::default()
+                    columns: vec![
+                        "2".to_string(),
+                        "131567".to_string(),
+                        "superkingdom".to_string(),
+                        "".to_string(),
+                        "0".to_string(),
+                        "0".to_string(),
+                        "11".to_string(),
+                        "0".to_string(),
+                        "0".to_string(),
+                        "0".to_string(),
+                        "0".to_string(),
+                        "0".to_string(),
+                        "".to_string()
+                    ],
+                    names: None,
+                    scientific_name: None,
+                    row_index: None,
+                    raw_row: None,
                 }
             )
         );

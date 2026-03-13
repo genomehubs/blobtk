@@ -5,17 +5,34 @@ use rust_decimal::prelude::*;
 use crate::{cli::RoundingStrategyWrapper, plot::axis::Scale};
 
 pub mod compact_float {
-    //! rounds a float to 3 decimal places, when serialized into a str, such as for JSON
-    //! offers space savings when such such precision is not needed.
+    //! rounds a float to 3 significant figures, when serialized into a str, such as for JSON
+    //! offers space savings when such precision is not needed.
+    use rust_decimal::prelude::*;
+    use rust_decimal::RoundingStrategy;
     use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(float: &f64, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = format!("{:.3}", float);
-        let parsed = s.parse::<f64>().unwrap();
+        let parsed = Decimal::from_f64_retain(*float)
+            .and_then(|d| {
+                d.round_sf_with_strategy(3, RoundingStrategy::MidpointAwayFromZero)
+                    .map(|rounded| rounded.normalize())
+            })
+            .and_then(|d| d.to_f64())
+            .unwrap_or(*float);
         serializer.serialize_f64(parsed)
+    }
+
+    pub fn serialize_option<S>(float: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match float {
+            Some(value) => serialize(value, serializer),
+            None => serializer.serialize_none(),
+        }
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
@@ -47,9 +64,9 @@ pub fn format_si(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrap
     fn set_suffix(thousands: i8) -> String {
         const POSITIVE: [&str; 9] = ["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
         const NEGATIVE: [&str; 8] = ["", "μ", "p", "n", "f", "a", "z", "y"];
-        let suffix = if thousands < 0 && thousands >= -8 {
-            NEGATIVE[(thousands * -1) as usize]
-        } else if thousands >= 0 && thousands <= 9 {
+        let suffix = if (-8..0).contains(&thousands) {
+            NEGATIVE[-thousands as usize]
+        } else if (0..=9).contains(&thousands) {
             POSITIVE[thousands as usize]
         } else {
             ""
@@ -60,14 +77,13 @@ pub fn format_si(value: &f64, digits: u32, rounding: Option<RoundingStrategyWrap
     let magnitude = if *value == 0.0 {
         0
     } else {
-        (value.clone()).log10() as i8
+        (*value).log10() as i8
     };
-    let prefix;
     let thousands = magnitude / 3;
-    if thousands < 0 {
-        prefix = value.clone() * 10u32.pow(3 * (thousands.abs() as u32 + 1)) as f64;
+    let prefix = if thousands < 0 {
+        *value * 10u32.pow(3 * (thousands.unsigned_abs() as u32 + 1)) as f64
     } else {
-        prefix = value.clone() / 10u32.pow(3 * thousands as u32) as f64
+        *value / 10u32.pow(3 * thousands as u32) as f64
     };
     let d = Decimal::from_f64_retain(prefix).unwrap();
     let rounding_strategy = match rounding {
@@ -114,6 +130,21 @@ pub fn indexed_sort<T: Ord>(list: &[T]) -> Vec<usize> {
     indices.sort_by_key(|&i| &list[i]);
     indices.reverse();
     indices
+}
+
+pub fn styled_bytes_progress_bar(total: u64, message: &str) -> ProgressBar {
+    let progress_bar = ProgressBar::new(total);
+    let format_string = format!(
+        "[+]\t{}: {{bar:40.cyan/blue}} {{bytes:>10}}/{{total_bytes:12}} ({{eta}})",
+        message
+    );
+    let pb_style_result = ProgressStyle::with_template(format_string.as_str());
+    let pb_style = match pb_style_result {
+        Ok(style) => style,
+        Err(error) => panic!("Problem with the progress bar: {:?}", error),
+    };
+    progress_bar.set_style(pb_style);
+    progress_bar
 }
 
 pub fn styled_progress_bar(total: usize, message: &str) -> ProgressBar {
@@ -216,8 +247,7 @@ pub fn scale_float(
 ) -> f64 {
     let scale_log = &String::from("scaleLog");
     let scale_sqrt = &String::from("scaleSqrt");
-    if clamp.is_some() {
-        let clamp_value = clamp.unwrap();
+    if let Some(clamp_value) = clamp {
         if value < clamp_value {
             return clamp_value;
         }
@@ -238,8 +268,7 @@ pub fn scale_floats(
     scale_type: &Scale,
     clamp: Option<f64>,
 ) -> f64 {
-    if clamp.is_some() {
-        let clamp_value = clamp.unwrap();
+    if let Some(clamp_value) = clamp {
         if value < clamp_value {
             return match scale_type {
                 Scale::LINEAR => linear_scale_float(clamp_value, domain, range),
@@ -269,4 +298,13 @@ pub fn min_float<T: PartialOrd>(a: T, b: T) -> T {
     } else {
         b
     }
+}
+
+pub fn format_element_id(title: &str) -> String {
+    title
+        .to_lowercase()
+        .replace(' ', "_")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect::<String>()
 }

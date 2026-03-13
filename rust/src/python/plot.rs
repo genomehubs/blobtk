@@ -19,7 +19,7 @@ pub fn plot_with_options(options: &PlotOptions) -> PyResult<()> {
         cli::View::Blob => plot_blob(&meta, &options).unwrap(),
         cli::View::Cumulative => plot_cumulative(&meta, &options).unwrap(),
         cli::View::Legend => plot_legend(&meta, &options).unwrap(),
-        cli::View::Snail => plot_snail(&meta, &options).unwrap(),
+        cli::View::Snail => plot_snail(&meta, &None, &options).unwrap(),
     }
     Ok(())
 }
@@ -57,12 +57,16 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
     let palette = extract_to_option_palette(py, &map, "palette");
     let color = extract_to_option_vec_string(py, &map, "color");
     let rounding = extract_to_option_rounding_strategy(py, &map, "rounding");
+    let badge = extract_to_bool(py, &map, "badge");
+    let show_score = extract_to_bool(py, &map, "show_score");
     PlotOptions {
         blobdir,
         view,
         shape,
         window_size,
-        output: output.unwrap_or(String::from("output.svg")),
+        output: output
+            .map(|s| vec![s])
+            .unwrap_or_else(|| vec!["output.svg".to_string()]),
         filter: filter.unwrap_or_default(),
         segments: segments.unwrap_or(1000),
         max_span,
@@ -75,7 +79,7 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         resolution: resolution.unwrap_or(30),
         hist_height,
         reducer_function: reducer_function.unwrap_or_default(),
-        scale_function: scale_function.unwrap_or_default(),
+        scale_function,
         scale_factor: scale_factor.unwrap_or(1.0),
         x_limit,
         y_limit,
@@ -90,6 +94,16 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         palette,
         color,
         rounding,
+        badge,
+        show_score,
+        reference: None,
+        score_type: None,
+        original_fasta: None,
+        original_busco: None,
+        original_blobdir: None,
+        original_reference: None,
+        score_only: false,
+        score_json: false,
     }
 }
 

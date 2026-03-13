@@ -54,9 +54,8 @@ pub fn cumulative_lines(
     };
     let mut lines = vec![];
     let mut cat_order = cumulative_data.cat_order.clone();
-    match options.origin {
-        Some(Origin::Y) => cat_order.sort_by(|x, y| y.span.cmp(&x.span)),
-        _ => (),
+    if let Some(Origin::Y) = options.origin {
+        cat_order.sort_by(|x, y| y.span.cmp(&x.span))
     };
     // let mut ordered_points = vec![vec![]; cat_order.len()];
     let mut end_coords = [0.0, y_range[0]];
@@ -66,7 +65,7 @@ pub fn cumulative_lines(
             lengths.push(cumulative_data.values[*i]);
         }
         lengths.sort_by(|a, b| b.partial_cmp(a).unwrap());
-        let mut coords = vec![end_coords.clone()];
+        let mut coords = vec![end_coords];
         let mut cumulative_span = 0.0;
         for (i, length) in lengths.iter().enumerate() {
             // add coords to line
@@ -74,7 +73,7 @@ pub fn cumulative_lines(
             coords.push([
                 coords[0][0] + linear_scale_float((i + 1) as f64, &x_domain, &x_range),
                 coords[0][1] - dimensions.height
-                    + linear_scale_float(cumulative_span as f64, &y_domain, &y_range),
+                    + linear_scale_float(cumulative_span, &y_domain, &y_range),
             ]);
         }
         if index > 0 {

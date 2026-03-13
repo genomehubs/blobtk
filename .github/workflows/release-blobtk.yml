@@ -3,26 +3,70 @@ name: release-blobtk
 on:
   push:
     branches:
-      # - main
-      - feature/release-action
+      - develop
+      - feature/*
     tags:
       - "*"
 
 env:
-  VERSION: 0.7.7
+  VERSION: ${{ github.ref_name }}
 
 jobs:
-  macos-binary:
-    runs-on: macos-latest
+  test:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.91.0
+          targets: x86_64-unknown-linux-gnu
+          components: rustfmt, clippy
+      - name: Run tests
+        working-directory: ./rust
+        run: cargo test --all --lib --bins --target x86_64-unknown-linux-gnu
+      - name: Check formatting
+        working-directory: ./rust
+        run: cargo fmt --check
+      - name: Run clippy
+        working-directory: ./rust
+        run: cargo clippy --all --target x86_64-unknown-linux-gnu -- -W clippy::correctness -W clippy::perf -A unused
+
+  macos-binary:
+    runs-on: macos-latest
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-x86_64-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-x86_64-
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: 1.82.0
+          toolchain: 1.91.0
           targets: x86_64-apple-darwin
       - name: Build
         working-directory: ./rust
@@ -31,6 +75,9 @@ jobs:
       - name: Rename binary
         run: |
           mv ./rust/target/x86_64-apple-darwin/release/blobtk ./rust/target/x86_64-apple-darwin/release/blobtk-macos-x64
+      - name: Verify macOS deployment target
+        run: |
+          bash ./.github/scripts/check-macos-min-version.sh ./rust/target/x86_64-apple-darwin/release/blobtk-macos-x64 10.13
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -39,23 +86,41 @@ jobs:
 
   macos-binary-arm64:
     runs-on: macos-latest
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-arm64-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-arm64-
       - uses: actions/setup-python@v4
         with:
           python-version: "3.10"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: 1.82.0
+          toolchain: 1.91.0
           targets: aarch64-apple-darwin
       - name: Build
         working-directory: ./rust
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
           cargo build --target=aarch64-apple-darwin --release
       - name: Rename binary
         run: |
           mv ./rust/target/aarch64-apple-darwin/release/blobtk ./rust/target/aarch64-apple-darwin/release/blobtk-macos-arm64
+      - name: Verify macOS deployment target
+        run: |
+          bash ./.github/scripts/check-macos-min-version.sh ./rust/target/aarch64-apple-darwin/release/blobtk-macos-arm64 11.0
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
@@ -64,14 +129,27 @@ jobs:
 
   linux-binary:
     runs-on: ubuntu-latest
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - name: Install static libraries for C
         run: sudo apt-get install -y libc6-dev
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: 1.82.0
+          toolchain: 1.91.0
           targets: x86_64-unknown-linux-gnu
       - name: Build
         working-directory: ./rust
@@ -87,13 +165,29 @@ jobs:
 
   sdist-wheels:
     runs-on: ubuntu-latest
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist -m rust/Cargo.toml
+          rust-toolchain: 1.91.0
+        env:
+          RUSTUP_TOOLCHAIN: 1.91.0
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +196,8 @@ jobs:
 
   linux-wheels:
     runs-on: ubuntu-latest
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/')
     strategy:
       matrix:
         python:
@@ -110,10 +206,22 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
+          - "3.14"
         target:
           - x86_64 # , x86, aarch64, armv7, s390x, ppc64le]
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
@@ -121,11 +229,29 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          before-script-linux: yum install -y perl-IPC-Cmd
+          before-script-linux: |
+            # install Perl modules and build deps so openssl-src can build OpenSSL
+            yum install -y \
+              perl \
+              perl-ExtUtils-MakeMaker \
+              perl-IPC-Cmd \
+              perl-Time-Piece \
+              perl-Text-Template \
+              openssl-devel \
+              zlib-devel \
+              make \
+              gcc
+            # Set environment variables to use system OpenSSL
+            export OPENSSL_NO_VENDOR=1
+            export OPENSSL_LIB_DIR=/usr/lib64
+            export OPENSSL_INCLUDE_DIR=/usr/include
+            export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
           args: --release --out dist -i python${{ matrix.python }} --target x86_64-unknown-linux-gnu -m rust/Cargo.toml
           sccache: "true"
-          rust-toolchain: 1.82.0
+          rust-toolchain: 1.91.0
           manylinux: auto
+        env:
+          RUSTUP_TOOLCHAIN: 1.91.0
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -157,6 +283,8 @@ jobs:
 
   macos-wheels:
     runs-on: macos-latest
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/')
     strategy:
       matrix:
         python:
@@ -165,8 +293,20 @@ jobs:
           - "3.11"
           - "3.12"
           - "3.13"
+          - "3.14"
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - uses: actions/setup-python@v4
         with:
           python-version: ${{matrix.python}}
@@ -175,11 +315,41 @@ jobs:
         with:
           args: --release --out dist -i python${{matrix.python}} --target x86_64-apple-darwin -m rust/Cargo.toml
           sccache: "true"
+          rust-toolchain: 1.91.0
+        env:
+          RUSTUP_TOOLCHAIN: 1.91.0
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
       - name: Build universal wheels
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --out dist -i python${{matrix.python}} --universal2 -m rust/Cargo.toml
+          args: --release --out dist -i python${{matrix.python}} -m rust/Cargo.toml
           sccache: "true"
+          rust-toolchain: 1.91.0
+        env:
+          RUSTUP_TOOLCHAIN: 1.91.0
+          # Build for both Archs (arm64 requires macOS 11.0+)
+          ARCHFLAGS: "-arch x86_64 -arch arm64"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+      - name: Verify macOS deployment target in wheels
+        shell: bash
+        run: |
+          for wheel in dist/*.whl; do
+            so_path=$(unzip -Z1 "$wheel" | grep -E '\.so$' | head -n1 || true)
+            if [[ -z "$so_path" ]]; then
+              echo "No extension module found in $wheel"
+              continue
+            fi
+            tmpdir=$(mktemp -d)
+            unzip -p "$wheel" "$so_path" > "$tmpdir/module.so"
+            echo "== $wheel :: $so_path =="
+            # Universal wheels contain arm64, so check for 11.0; x86_64-only wheels checked separately
+            if file "$tmpdir/module.so" | grep -q "arm64"; then
+              bash ./.github/scripts/check-macos-min-version.sh "$tmpdir/module.so" 11.0
+            else
+              bash ./.github/scripts/check-macos-min-version.sh "$tmpdir/module.so" 10.13
+            fi
+            rm -rf "$tmpdir"
+          done
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -188,7 +358,7 @@ jobs:
 
   build-and-push-docker-develop:
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    if: github.ref == 'refs/heads/develop'
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -213,7 +383,7 @@ jobs:
   create-conda-release-macos:
     name: Create conda release Mac
     runs-on: macos-latest
-    # if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/')
     needs:
       - macos-binary
       - macos-wheels
@@ -247,7 +417,7 @@ jobs:
   create-conda-release-linux:
     name: Create conda release Linux
     runs-on: ubuntu-latest
-    # if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/')
     needs:
       - linux-binary
       - linux-wheels
@@ -297,29 +467,29 @@ jobs:
           files: |
             dist/binaries-*/blobtk-*
             dist/wheels-*/blobtk-*
-        if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-crate:
     name: Publish crate
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: create-github-release
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    needs:
+      - create-github-release
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: 1.82.0
+          toolchain: 1.91.0
       - name: Publish
         working-directory: ./rust
-        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }} --no-verify
 
   upload-to-pypi:
     name: Upload to PyPI
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs:
       - create-github-release
     steps:
@@ -335,14 +505,16 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           cp -r ./dist/wheels-*/* ./
+          rm -r dist
           ls -l
-          exit 0
           pip install --upgrade twine
           twine upload --skip-existing *
 
   build-and-push-docker-release:
     runs-on: ubuntu-latest
-    needs: create-github-release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - create-github-release
     steps:
       - name: Checkout
         uses: actions/checkout@v3

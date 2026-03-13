@@ -176,21 +176,10 @@ impl FromStr for TickStatus {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ChartAxes {
     pub x: Option<AxisOptions>,
     pub y: Option<AxisOptions>,
     pub x2: Option<AxisOptions>,
     pub y2: Option<AxisOptions>,
-}
-
-impl Default for ChartAxes {
-    fn default() -> ChartAxes {
-        ChartAxes {
-            x: None,
-            y: None,
-            x2: None,
-            y2: None,
-        }
-    }
 }

@@ -31,11 +31,17 @@ pub mod index;
 /// Functions for file/terminal IO.
 pub mod io;
 
+/// Create minimal BlobDir from inputs
+pub mod create;
+
 /// Functions for parsing files
 pub mod parse;
 
 /// Generate a plot.
 pub mod plot;
+
+/// Generate a snail plot.
+pub mod snail;
 
 /// Python bindings.
 #[cfg(feature = "python-extension")]

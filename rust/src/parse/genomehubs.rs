@@ -61,6 +61,31 @@ impl fmt::Display for StringOrVec {
     }
 }
 
+impl StringOrVec {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StringOrVec::Single(s) => s.as_str(),
+            StringOrVec::Multiple(v) => v.get(0).map(|s| s.as_str()).unwrap_or(""),
+        }
+    }
+
+    pub fn into_vec(self) -> Vec<String> {
+        match self {
+            StringOrVec::Single(s) => vec![s],
+            StringOrVec::Multiple(v) => v,
+        }
+    }
+}
+
+impl std::str::FromStr for StringOrVec {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Single occurrence becomes Single variant
+        Ok(StringOrVec::Single(s.to_string()))
+    }
+}
+
 // Value may be u32 or Vec of u32
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
@@ -798,7 +823,7 @@ fn merge_attributes(
                 }
             }
             for (field, config) in attributes {
-                if let Some(_) = new_attributes.get(&field) {
+                if new_attributes.get(&field).is_some() {
                     continue;
                 } else {
                     merged_attributes.insert(field.clone(), config.clone());
@@ -965,6 +990,10 @@ impl GHubsConfig {
     }
 
     pub fn write_yaml(&self, output_file: &PathBuf) -> Result<(), error::Error> {
+        // Ensure parent directory exists
+        if let Some(parent) = output_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let yaml = self.to_yaml()?;
         let mut file = OpenOptions::new()
             .write(true)
@@ -992,7 +1021,10 @@ impl GHubsConfig {
             GHubsFileFormat::TSV => b'\t',
         };
         if !file_path.exists() {
-            return Err(error::Error::FileNotFound(format!("{}", file_path.display())).into());
+            return Err(error::Error::FileNotFound(format!(
+                "{}",
+                file_path.display()
+            )));
         }
         let mut rdr = io::get_csv_reader(
             &Some(file_path.clone()),
@@ -1001,7 +1033,7 @@ impl GHubsConfig {
             file_config.comment_char,
             0,
             false,
-        );
+        )?;
 
         if let Some(keys) = keys {
             if file_config.header {
@@ -1016,7 +1048,7 @@ impl GHubsConfig {
         Ok(rdr)
     }
 
-    pub fn init_file_writers(&mut self, write_validated: bool, write_exceptions: bool) -> () {
+    pub fn init_file_writers(&mut self, write_validated: bool, write_exceptions: bool) {
         if self.file.is_none() {
             return;
         }
@@ -1082,15 +1114,18 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(
+        let mut rdr = match io::get_csv_reader(
             &Some(file_path),
             delimiter,
             true,
             file_config.comment_char,
             0,
             false,
-        );
-        let expected_headers = vec!["taxon_id", "input", "rank"];
+        ) {
+            Ok(reader) => reader,
+            Err(_) => return fixed_names,
+        };
+        let expected_headers = ["taxon_id", "input", "rank"];
         let headers = rdr.headers().unwrap().clone();
         for (i, header) in headers.iter().enumerate() {
             if header != expected_headers[i] {
@@ -1195,7 +1230,7 @@ impl GHubsConfig {
                         .iter()
                         .map(|idx| record.get(idx.to_owned()).unwrap_or(""))
                         .collect::<Vec<&str>>()
-                        .join(&field.join.as_ref().unwrap_or(&"".to_string())),
+                        .join(field.join.as_ref().unwrap_or(&"".to_string())),
                 };
                 let (values, invalid_values, status) = process_value(string_value, field).unwrap();
                 field_counts.total += 1;
@@ -1254,7 +1289,8 @@ impl GHubsConfig {
                 ValidationStatus::Invalid
             }
         };
-        let report = ValidationReport {
+
+        ValidationReport {
             row_index: 0,
             status,
             counts: field_counts,
@@ -1263,8 +1299,7 @@ impl GHubsConfig {
             blank,
             validated,
             ..Default::default()
-        };
-        report
+        }
     }
 
     pub fn validate_record(
@@ -1280,7 +1315,7 @@ impl GHubsConfig {
         };
         for key in keys.iter() {
             if self.get(key).is_some() {
-                let report = self.validate_values(key, &record);
+                let report = self.validate_values(key, record);
                 let validated = report.validated.clone();
                 combined_report.combine_reports(report);
                 processed.insert(key.to_string(), validated);
@@ -1392,10 +1427,9 @@ fn parse_genomehubs_config(config_file: &PathBuf) -> Result<GHubsConfig, error::
     let reader = match io::file_reader(config_file.clone()) {
         Ok(r) => r,
         Err(_) => {
-            return Err(error::Error::FileNotFound(format!(
-                "{}",
-                &config_file.to_str().unwrap()
-            )))
+            return Err(error::Error::FileNotFound(
+                (&config_file.to_str().unwrap()).to_string(),
+            ))
         }
     };
     let mut ghubs_config: GHubsConfig = match serde_yaml::from_reader(reader) {
@@ -1404,7 +1438,7 @@ fn parse_genomehubs_config(config_file: &PathBuf) -> Result<GHubsConfig, error::
             return Err(error::Error::SerdeError(format!(
                 "{} {}",
                 &config_file.to_str().unwrap(),
-                err.to_string()
+                err
             )))
         }
     };
@@ -1429,10 +1463,7 @@ fn parse_genomehubs_config(config_file: &PathBuf) -> Result<GHubsConfig, error::
                 }
             };
             for needs_file in needs_files.iter() {
-                let extra_config = match parse_genomehubs_config(&needs_file) {
-                    Ok(extra_config) => extra_config,
-                    Err(err) => return Err(err),
-                };
+                let extra_config = parse_genomehubs_config(needs_file)?;
                 // TODO: combine_configs(extra_config, ghubs_config);
                 ghubs_config = extra_config.merge(ghubs_config);
             }
@@ -1513,7 +1544,7 @@ fn apply_validation(value: String, field: &GHubsFieldConfig) -> Result<bool, err
             ..Default::default()
         },
     };
-    let ref field_type = field.field_type;
+    let field_type = &field.field_type;
     let valid = match field_type {
         FieldType::Byte => {
             let dot_pos = value.find(".").unwrap_or(value.len());
@@ -1739,7 +1770,7 @@ impl ValidationReport {
 }
 
 fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, ValidationStatus) {
-    if value == "" || value == "None" || value == "NA" {
+    if value.is_empty() || value == "None" || value == "NA" {
         return ("None".to_string(), ValidationStatus::Blank);
     }
     let mut val = value;
@@ -1748,7 +1779,7 @@ fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, Validatio
         let value = eval(equation.as_str(), false, Unit::NoUnit, false).unwrap();
         val = format!("{}", value);
     }
-    match apply_validation(val.clone(), &field) {
+    match apply_validation(val.clone(), field) {
         Ok(is_valid) => {
             if is_valid {
                 (val, ValidationStatus::Valid)
@@ -1797,7 +1828,7 @@ fn process_value(
         .as_ref()
         .map(|s| match s {
             StringOrVec::Single(sep) => sep.as_str(),
-            StringOrVec::Multiple(vec) => vec.get(0).map(|s| s.as_str()).unwrap_or(";"),
+            StringOrVec::Multiple(vec) => vec.first().map(|s| s.as_str()).unwrap_or(";"),
         })
         .unwrap_or(";");
     let mut input_values: Vec<String> = value

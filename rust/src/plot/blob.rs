@@ -9,6 +9,7 @@ use svg::Document;
 
 use crate::blobdir::FieldMeta;
 use crate::cli::Shape;
+use crate::plot::component::LegendAlignment;
 use crate::utils::{max_float, min_float, scale_floats};
 use crate::{blobdir, cli, plot};
 
@@ -16,7 +17,7 @@ use plot::category::Category;
 
 use super::axis::{AxisName, AxisOptions, ChartAxes, Position, Scale, TickOptions};
 use super::chart::{Chart, Dimensions, TopRightBottomLeft};
-use super::component::{font_family, legend_group, LegendEntry, LegendShape};
+use super::component::{font_family, legend_group, LegendEntry};
 use super::data::{Bin, HistogramData, Reducer, ScatterData, ScatterPoint};
 use super::{GridSize, ShowLegend};
 
@@ -64,7 +65,7 @@ fn scale_values(data: &Vec<f64>, meta: &AxisOptions) -> Vec<f64> {
             &meta.domain,
             &meta.range,
             &meta.scale,
-            meta.clamp.clone(),
+            meta.clamp,
         ));
     }
     scaled
@@ -77,9 +78,9 @@ pub fn bin_axis(
     options: &cli::PlotOptions,
 ) -> (Vec<Vec<f64>>, f64) {
     let range = match axis {
-        AxisName::X => scatter_data.x.range.clone(),
-        AxisName::Y => scatter_data.y.range.clone(),
-        AxisName::Z => scatter_data.z.range.clone(),
+        AxisName::X => scatter_data.x.range,
+        AxisName::Y => scatter_data.y.range,
+        AxisName::Z => scatter_data.z.range,
         _ => [0.0, 100.0],
     };
     let bin_size = (range[1] - range[0]) / options.resolution as f64;
@@ -226,10 +227,7 @@ fn set_domain(
     limit_arr: Option<[f64; 2]>,
     limit_clamp: Option<f64>,
 ) -> ([f64; 2], Option<f64>) {
-    let clamp = match limit_clamp {
-        Some(value) => value,
-        None => 0.1,
-    };
+    let clamp = limit_clamp.unwrap_or(0.1);
     let mut domain = field_meta.range.unwrap();
     if limit_string.is_some() {
         if let Some((min_value, max_value)) = limit_string.clone().unwrap().split_once(",") {
@@ -241,13 +239,12 @@ fn set_domain(
             }
         }
     } else if limit_arr.is_some() {
-        domain = limit_arr.clone().unwrap();
+        domain = limit_arr.unwrap();
     }
     let clamp_value = if field_meta.clamp.is_some() {
         domain[0] = field_meta.range.unwrap()[0];
         field_meta.clamp
-    } else if field_meta.range.unwrap()[0] == 0.0
-        && field_meta.scale.clone().unwrap() == "scaleLog".to_string()
+    } else if field_meta.range.unwrap()[0] == 0.0 && field_meta.scale.clone().unwrap() == "scaleLog"
     {
         domain[0] = clamp;
         Some(clamp)
@@ -323,7 +320,7 @@ pub fn blob_points(
     let y_scaled = scale_values(&blob_data.y, &y_axis);
 
     let z_meta = fields[axes["z"].as_str()].clone();
-    let mut z_domain = z_meta.range.unwrap().clone();
+    let mut z_domain = z_meta.range.unwrap();
     if z_domain[0] == z_domain[1] {
         if z_domain[0] == 0.0 {
             z_domain[1] += 0.1;
@@ -334,7 +331,7 @@ pub fn blob_points(
     }
     let z_axis = AxisOptions {
         label: axes["z"].clone(),
-        scale: options.scale_function.clone(),
+        scale: options.resolved_scale_function(),
         domain: z_domain,
         range: [2.0, 2.0 + dimensions.height / 15.0 * options.scale_factor],
         ..Default::default()
@@ -410,13 +407,11 @@ pub fn blob_points(
 pub fn category_legend_full(categories: Vec<Category>, show_legend: ShowLegend) -> Group {
     let mut entries = vec![];
     let title = "".to_string();
-    match show_legend {
-        ShowLegend::Full => entries.push(LegendEntry {
+    if let ShowLegend::Full = show_legend {
+        entries.push(LegendEntry {
             subtitle: Some("[count; span; n50]".to_string()),
-            shape: LegendShape::None,
             ..Default::default()
-        }),
-        _ => (),
+        })
     };
     for (i, cat) in categories.iter().enumerate() {
         if i == 0 {
@@ -428,16 +423,18 @@ pub fn category_legend_full(categories: Vec<Category>, show_legend: ShowLegend) 
         let subtitle = match show_legend {
             ShowLegend::Compact => None,
             ShowLegend::Default | ShowLegend::Full => Some(cat.clone().subtitle()),
-            ShowLegend::None => return legend_group(title, entries, None, 1),
+            ShowLegend::None => {
+                return legend_group(title, entries, None, 1, LegendAlignment::Start)
+            }
         };
         entries.push(LegendEntry {
-            title: format!("{}", cat.title),
-            color: cat.color.clone(),
+            title: cat.title.to_string(),
+            color: Some(cat.color.clone()),
             subtitle,
             ..Default::default()
         });
     }
-    legend_group(title, entries, None, 1)
+    legend_group(title, entries, None, 1, LegendAlignment::Start)
 }
 
 pub fn plot(
@@ -709,9 +706,9 @@ pub fn plot_grid(
                     padding: [grid_size.padding.left, grid_size.padding.right],
                     offset,
                     scale: x_opts.scale.clone(),
-                    domain: x_opts.domain.clone(),
+                    domain: x_opts.domain,
                     range,
-                    clamp: x_opts.clamp.clone(),
+                    clamp: x_opts.clamp,
                     font_size,
                     weight: 1.0,
                     tick_count: 3,
@@ -736,9 +733,9 @@ pub fn plot_grid(
                     offset: grid_size.margin.left,
                     padding: [grid_size.padding.top, grid_size.padding.bottom],
                     scale: y_opts.scale.clone(),
-                    domain: y_opts.domain.clone(),
+                    domain: y_opts.domain,
                     range: y_range,
-                    clamp: y_opts.clamp.clone(),
+                    clamp: y_opts.clamp,
                     font_size,
                     weight: 1.0,
                     tick_count: 3,
@@ -847,7 +844,7 @@ pub fn plot_grid(
             if title.len() > 3 && title.len() as f64 * 10.0 > grid_size.col_widths[col] {
                 title = format!(
                     "{}...",
-                    title[..(grid_size.col_widths[col] / 10.0) as usize - 3].to_string()
+                    &title[..(grid_size.col_widths[col] / 10.0) as usize - 3]
                 );
             }
             group = group
