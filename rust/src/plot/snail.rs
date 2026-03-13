@@ -115,6 +115,37 @@ pub struct Parameters {
     pub reference: DataSource,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct SnailScores {
+    #[serde(with = "compact_float")]
+    score: f64,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "compact_float::serialize_option"
+    )]
+    g: Option<f64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "compact_float::serialize_option"
+    )]
+    gs: Option<f64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "compact_float::serialize_option"
+    )]
+    ag: Option<f64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "compact_float::serialize_option"
+    )]
+    ags: Option<f64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "compact_float::serialize_option"
+    )]
+    reference: Option<f64>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SnailStats {
     id: String,
@@ -126,22 +157,24 @@ pub struct SnailStats {
     aun: usize,
     #[serde(rename = "auNn")]
     aun_n: usize,
-    #[serde(rename = "rauN")]
+    #[serde(rename = "rauN", with = "compact_float")]
     raun: f64,
     /// Snail score
-    #[serde(rename = "rauNn")]
+    #[serde(rename = "rauNn", with = "compact_float")]
     raun_n: f64,
+    #[serde(rename = "snail", default)]
+    snail_scores: SnailScores,
     /// Snail score adjusted for genome size (max_span)
-    #[serde(rename = "rauNn-g", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing)]
     raun_ng: Option<f64>,
     /// Snail score adjusted for both genome size and longest scaffold length
-    #[serde(rename = "rauNn-gs", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing)]
     raun_ngs: Option<f64>,
     /// Snail score adjusted for genome size, penalising assemblies larger or smaller than max_span
-    #[serde(rename = "rauNn-ag", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing)]
     raun_ng_absolute: Option<f64>,
     /// Snail score adjusted for genome size and scaffold length, penalising assemblies larger or smaller than max_span and max_scaffold
-    #[serde(rename = "rauNn-ags", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing)]
     raun_ngs_absolute: Option<f64>,
     #[serde(rename = "ATGC")]
     atgc: usize,
@@ -149,6 +182,7 @@ pub struct SnailStats {
     gc_proportion: f64,
     #[serde(rename = "AT", with = "compact_float")]
     at_proportion: f64,
+    #[serde(with = "compact_float")]
     n_proportion: f64,
     #[serde(rename = "N")]
     n: usize,
@@ -276,6 +310,19 @@ impl SnailStats {
                 }
             }
         }
+
+        self.snail_scores = SnailScores {
+            score: self.raun_n(),
+            g: self.raun_ng,
+            gs: self.raun_ngs,
+            ag: self.raun_ng_absolute,
+            ags: self.raun_ngs_absolute,
+            reference: self.snail_scores.reference,
+        };
+    }
+
+    pub fn set_reference_score(&mut self, reference_score: Option<f64>) {
+        self.snail_scores.reference = reference_score;
     }
 
     pub fn raun_ng(&self) -> Option<f64> {
@@ -487,6 +534,14 @@ pub fn snail_stats(
         aun_n,
         raun,
         raun_n,
+        snail_scores: SnailScores {
+            score: raun_n,
+            g: None,
+            gs: None,
+            ag: None,
+            ags: None,
+            reference: None,
+        },
         raun_ng: None,
         raun_ngs: None,
         raun_ng_absolute: None,
@@ -547,13 +602,13 @@ pub fn scaffold_stats_legend(
     let record = snail_stats.record_type();
 
     if let Some(ref_stats) = ref_snail_stats {
-        // let title = format!(
-        //     "Ref: {} ({} | auN {})",
-        //     ref_stats.short_id(),
-        //     format_si(&(ref_stats.span() as f64), precision, rounding.clone()),
-        //     format_si(&(ref_stats.aun() as f64), precision, rounding.clone())
-        // );
-        let title = ref_stats.id().to_string();
+        let title = format!(
+            "Ref: {} ({} | auN {})",
+            ref_stats.id(),
+            format_si(&(ref_stats.span() as f64), precision, rounding.clone()),
+            format_si(&(ref_stats.aun() as f64), precision, rounding.clone())
+        );
+        // let title = format!("Ref: {}", ref_stats.id());
         entries.push(LegendEntry {
             title,
             color: Some(COLOR_REF_OUTLINE.to_string()),
@@ -1043,7 +1098,14 @@ impl PolarCoordinates {
             // longest scaffold
             if snail_stats.binned_scaffold_lengths()[i] == snail_stats.binned_scaffold_lengths()[0]
             {
-                coords.longest.push(vec![0.0, angle]);
+                coords.longest.push(vec![
+                    length_scale_function(
+                        snail_stats.binned_scaffold_lengths()[i],
+                        &[config.min_value, config.max_scaffold],
+                        &[config.radius, 0.0],
+                    ),
+                    angle,
+                ]);
                 coords.show_longest = true;
             }
 
@@ -1341,7 +1403,7 @@ impl PlotPaths {
 
         let mut major_count_gridline = Group::new();
         if ref_snail_stats.is_some() {
-            if config.ratio < 0.98 {
+            if config.ratio <= 1.00 {
                 let ref_end_path_line = Line::new()
                     .set(
                         "x1",
@@ -1818,7 +1880,10 @@ fn busco_plot(
     ) = busco_colors;
     let domain = [0.0, snail_stats.busco_total() as f64];
     let range = [-PI / 2.0, PI * 1.5];
-    let inner_radius = if ref_snail_stats.is_some() {
+    let has_ref_busco = ref_snail_stats
+        .as_ref()
+        .map_or(false, |ref_stats| ref_stats.busco_total() >= 1);
+    let inner_radius = if has_ref_busco {
         if as_badge {
             31.0
         } else {

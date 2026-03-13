@@ -392,8 +392,27 @@ pub struct PlotOptions {
     /// Optional reference BlobDir for snail plot
     #[arg(long = "reference", value_name = "REFERENCE")]
     pub reference: Option<PathBuf>,
-    /// Filters to apply to BlobDir data
-    #[arg(long, short = 'f')]
+    /// Filters to apply to BlobDir data.
+    ///
+    /// Preferred syntax: <field>:<type>=<value>
+    /// Legacy BlobToolKit URL-compatible syntax is also supported: <field>--<Type>=<value>
+    ///
+    /// Types:
+    /// - min / max for numeric fields (inclusive bounds)
+    /// - keys for categorical/string fields (comma-separated)
+    /// - inv to invert a filter (either as <field>:inv or <field>:inv=<keys>)
+    ///
+    /// Examples:
+    /// - --filter length:min=1000
+    /// - --filter gc:max=0.6
+    /// - --filter buscogenes_phylum:keys=Arthropoda,Chordata
+    /// - --filter buscogenes_phylum:inv=Arthropoda,Chordata
+    #[arg(
+        long,
+        short = 'f',
+        value_name = "FILTER",
+        help = "Filter expression(s), e.g. length:min=1000 or gc:max=0.6"
+    )]
     pub filter: Vec<String>,
     /// Segment count for snail plot
     #[arg(long, short = 's', default_value_t = 1000)]
@@ -460,25 +479,25 @@ pub struct PlotOptions {
     /// Individual colours to modify palette (<index>=<hexcode>)
     #[arg(long)]
     pub color: Option<Vec<String>>,
-    /// [experimental] Significant digits to use when rounding numbers for display
+    /// Significant digits to use when rounding numbers for display
     #[arg(long = "significant-digits", default_value_t = 3)]
     pub significant_digits: u32,
-    /// [experimental] Decimal precision (number of decimal places) to use when percentages for display
+    /// Decimal precision (number of decimal places) to use when percentages for display
     #[arg(long = "decimal-precision", default_value_t = 2)]
     pub decimal_precision: u32,
     // [experimental] Flag to choose the rounding method
     #[arg(long = "rounding", value_enum)]
     pub rounding: Option<RoundingStrategyWrapper>,
-    /// [experimental] Flag to show numbers instead of percentages in snail plot legend
+    /// Flag to show numbers instead of percentages in snail plot legend
     #[arg(long = "show-numbers", default_value_t = false)]
     pub show_numbers: bool,
-    /// [experimental] Flag to show busco numbers instead of percentages in snail plot legend
+    /// Flag to show busco numbers instead of percentages in snail plot legend
     #[arg(long = "busco-numbers", default_value_t = false)]
     pub busco_numbers: bool,
-    /// [experimental] Flag to show minimal snail plot as assembly badge
+    /// Flag to show minimal snail plot as assembly badge
     #[arg(long = "badge", default_value_t = false)]
     pub badge: bool,
-    /// [experimental] Flag to show snail score in snail plot legend
+    /// Flag to show snail score in snail plot legend
     #[arg(long = "show-score", default_value_t = false)]
     pub show_score: bool,
     /// Score variant to display with --show-score
@@ -499,6 +518,9 @@ pub struct PlotOptions {
     /// Internal field to track original BlobDir input (for snail command)
     #[clap(skip)]
     pub original_blobdir: Option<String>,
+    /// Internal field to track original reference input (for snail command)
+    #[clap(skip)]
+    pub original_reference: Option<String>,
     /// Internal field to track score-only mode (for snail command)
     #[clap(skip)]
     pub score_only: bool,
@@ -619,13 +641,39 @@ pub struct SnailOptions {
     /// Supports .svg, .png, .json, .yaml extensions
     #[arg(long, short = 'o', value_name = "FILE", action = clap::ArgAction::Append)]
     pub output: Vec<String>,
+    /// Assembly name for display in snail plot legend (defaults to filename or BlobDir name)
+    #[arg(long = "assembly-name", short = 'n')]
+    pub assembly_name: Option<String>,
+    /// Reference assembly name for display in snail plot legend (defaults to filename or BlobDir name)
+    #[arg(long = "reference-name", short = 'r')]
+    pub reference_name: Option<String>,
     /// Report snail score to stdout (base type by default)
     #[arg(long)]
     pub score_only: bool,
     /// Report snail score as JSON to stdout
     #[arg(long)]
     pub score_json: bool,
-    #[arg(long, short = 'f')]
+    /// Filters to apply to scaffold data before snail stats are computed.
+    ///
+    /// Preferred syntax: <field>:<type>=<value>
+    /// Legacy BlobToolKit URL-compatible syntax is also supported: <field>--<Type>=<value>
+    ///
+    /// Types:
+    /// - min / max for numeric fields (inclusive bounds)
+    /// - keys for categorical/string fields (comma-separated)
+    /// - inv to invert a filter (either as <field>:inv or <field>:inv=<keys>)
+    ///
+    /// Examples:
+    /// - --filter length:min=1000
+    /// - --filter gc:max=0.6
+    /// - --filter buscogenes_phylum:keys=Arthropoda,Chordata
+    /// - --filter buscogenes_phylum:inv=Arthropoda,Chordata
+    #[arg(
+        long,
+        short = 'f',
+        value_name = "FILTER",
+        help = "Filter expression(s), e.g. length:min=1000 or gc:max=0.6"
+    )]
     pub filter: Vec<String>,
     /// Segment count for snail plot
     #[arg(long, short = 's', default_value_t = 1000)]
@@ -639,25 +687,25 @@ pub struct SnailOptions {
     /// Scale function for snail plot
     #[arg(long, value_enum, default_value_t = Scale::LINEAR)]
     pub scale_function: Scale,
-    /// [experimental] Significant digits to use when rounding numbers for display
+    /// Significant digits to use when rounding numbers for display
     #[arg(long = "significant-digits", default_value_t = 3)]
     pub significant_digits: u32,
-    /// [experimental] Decimal precision (number of decimal places) to use when percentages for display
+    /// Decimal precision (number of decimal places) to use when percentages for display
     #[arg(long = "decimal-precision", default_value_t = 2)]
     pub decimal_precision: u32,
     // [experimental] Flag to choose the rounding method
     #[arg(long = "rounding", value_enum)]
     pub rounding: Option<RoundingStrategyWrapper>,
-    /// [experimental] Flag to show numbers instead of percentages in snail plot legend
+    /// Flag to show numbers instead of percentages in snail plot legend
     #[arg(long = "show-numbers", default_value_t = false)]
     pub show_numbers: bool,
-    /// [experimental] Flag to show busco numbers instead of percentages in snail plot legend
+    /// Flag to show busco numbers instead of percentages in snail plot legend
     #[arg(long = "busco-numbers", default_value_t = false)]
     pub busco_numbers: bool,
-    /// [experimental] Flag to show minimal snail plot as assembly badge
+    /// Flag to show minimal snail plot as assembly badge
     #[arg(long = "badge", default_value_t = false)]
     pub badge: bool,
-    /// [experimental] Flag to show snail score in snail plot legend
+    /// Flag to show snail score in snail plot legend
     #[arg(long = "show-score", default_value_t = false)]
     pub show_score: bool,
 

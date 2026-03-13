@@ -70,6 +70,10 @@ fn snail_opts_to_plot_opts(
         original_fasta,
         original_busco,
         original_blobdir,
+        original_reference: options
+            .reference
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string()),
         score_only: options.score_only,
         score_json: options.score_json,
         ..Default::default()
@@ -103,13 +107,21 @@ pub fn snail(options: &cli::SnailOptions) -> Result<(), anyhow::Error> {
                 reference.display()
             ));
         }
+        // If reference_name is provided, update the BlobDir metadata id so it will be used in the snail plot legend
+        if let Some(reference_name) = &options.reference_name {
+            reference_meta.as_mut().unwrap().id = reference_name.clone();
+        }
     }
 
     // Parse the BlobDir metadata and data
     // if the blobdir does not exist, create a blobdir instead of erroring
     let mut plotted = false;
     if let Some(blobdir) = options.blobdir.as_ref() {
-        if let Ok(blobdir_meta) = blobdir::parse_blobdir(blobdir) {
+        if let Ok(mut blobdir_meta) = blobdir::parse_blobdir(blobdir) {
+            // If assembly_name is provided, update the BlobDir metadata id so it will be used in the snail plot legend
+            if let Some(assembly_name) = &options.assembly_name {
+                blobdir_meta.id = assembly_name.clone();
+            }
             plot_snail(
                 &blobdir_meta,
                 &reference_meta,
@@ -141,7 +153,11 @@ pub fn snail(options: &cli::SnailOptions) -> Result<(), anyhow::Error> {
                 busco: options.busco.clone(),
                 out: blobdir.clone(),
             })?;
-            let blobdir_meta = blobdir::parse_blobdir(&blobdir.clone().unwrap())?;
+            let mut blobdir_meta = blobdir::parse_blobdir(&blobdir.clone().unwrap())?;
+            // If assembly_name is provided, update the BlobDir metadata id so it will be used in the snail plot legend
+            if let Some(assembly_name) = &options.assembly_name {
+                blobdir_meta.id = assembly_name.clone();
+            }
             plot_snail(
                 &blobdir_meta,
                 &reference_meta,

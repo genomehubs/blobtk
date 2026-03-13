@@ -94,6 +94,7 @@ fn convert_hashmap_to_options(py: Python<'_>, map: HashMap<String, PyObject>) ->
         rounding,
         badge,
         show_score,
+        original_reference: None,
     }
 }
 

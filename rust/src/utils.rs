@@ -5,17 +5,34 @@ use rust_decimal::prelude::*;
 use crate::{cli::RoundingStrategyWrapper, plot::axis::Scale};
 
 pub mod compact_float {
-    //! rounds a float to 3 decimal places, when serialized into a str, such as for JSON
-    //! offers space savings when such such precision is not needed.
+    //! rounds a float to 3 significant figures, when serialized into a str, such as for JSON
+    //! offers space savings when such precision is not needed.
+    use rust_decimal::prelude::*;
+    use rust_decimal::RoundingStrategy;
     use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(float: &f64, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let s = format!("{:.3}", float);
-        let parsed = s.parse::<f64>().unwrap();
+        let parsed = Decimal::from_f64_retain(*float)
+            .and_then(|d| {
+                d.round_sf_with_strategy(3, RoundingStrategy::MidpointAwayFromZero)
+                    .map(|rounded| rounded.normalize())
+            })
+            .and_then(|d| d.to_f64())
+            .unwrap_or(*float);
         serializer.serialize_f64(parsed)
+    }
+
+    pub fn serialize_option<S>(float: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match float {
+            Some(value) => serialize(value, serializer),
+            None => serializer.serialize_none(),
+        }
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<f64, D::Error>
@@ -113,6 +130,21 @@ pub fn indexed_sort<T: Ord>(list: &[T]) -> Vec<usize> {
     indices.sort_by_key(|&i| &list[i]);
     indices.reverse();
     indices
+}
+
+pub fn styled_bytes_progress_bar(total: u64, message: &str) -> ProgressBar {
+    let progress_bar = ProgressBar::new(total);
+    let format_string = format!(
+        "[+]\t{}: {{bar:40.cyan/blue}} {{bytes:>10}}/{{total_bytes:12}} ({{eta}})",
+        message
+    );
+    let pb_style_result = ProgressStyle::with_template(format_string.as_str());
+    let pb_style = match pb_style_result {
+        Ok(style) => style,
+        Err(error) => panic!("Problem with the progress bar: {:?}", error),
+    };
+    progress_bar.set_style(pb_style);
+    progress_bar
 }
 
 pub fn styled_progress_bar(total: usize, message: &str) -> ProgressBar {

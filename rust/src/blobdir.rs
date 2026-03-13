@@ -739,7 +739,7 @@ pub fn parse_filters(
     }
     let mut filter_map = HashMap::new();
     for filter in filters.iter() {
-        if let Some((id, parameter)) = filter.split_once("--") {
+        if let Some((id, parameter)) = filter.split_once("--").or_else(|| filter.split_once(':')) {
             if !filter_map.contains_key(id) {
                 filter_map.insert(
                     id.to_string(),
@@ -749,15 +749,15 @@ pub fn parse_filters(
                 );
             };
             let filter_params = filter_map.get_mut(&id.to_string()).unwrap();
-            if parameter == "Inv" {
+            if parameter.eq_ignore_ascii_case("Inv") {
                 filter_params.invert = true;
                 continue;
             };
             if let Some((param, value)) = parameter.split_once("=") {
-                match param {
-                    "Max" => filter_params.max = Some(value.parse().unwrap()),
-                    "Min" => filter_params.min = Some(value.parse().unwrap()),
-                    "Keys" => {
+                match param.to_ascii_lowercase().as_str() {
+                    "max" => filter_params.max = Some(value.parse().unwrap()),
+                    "min" => filter_params.min = Some(value.parse().unwrap()),
+                    "keys" | "key" => {
                         filter_params.key = Some(
                             value
                                 .split(",")
@@ -765,7 +765,7 @@ pub fn parse_filters(
                                 .collect(),
                         )
                     }
-                    "Inv" => {
+                    "inv" => {
                         filter_params.key = Some(
                             value
                                 .split(",")
@@ -850,19 +850,25 @@ pub fn filter_string_values(
         .iter()
         .map(|x| match x.parse::<usize>() {
             Ok(value) => value,
-            Err(_) => keys[x],
+            Err(_) => keys.get(x).copied().unwrap_or(usize::MAX),
         })
         .collect();
-    let set: HashSet<usize> = filter
-        .key
-        .clone()
-        .unwrap()
-        .iter()
-        .map(|x| match x.parse::<usize>() {
-            Ok(value) => value,
-            Err(_) => keys[x],
-        })
-        .collect();
+    let mut set: HashSet<usize> = HashSet::new();
+    for x in filter.key.clone().unwrap().iter() {
+        match x.parse::<usize>() {
+            Ok(value) => {
+                set.insert(value);
+            }
+            Err(_) => match keys.get(x) {
+                Some(&value) => {
+                    set.insert(value);
+                }
+                None => {
+                    eprintln!("Warning: filter key '{}' not found in field keys, skipping", x);
+                }
+            },
+        }
+    }
     for i in initial {
         let mut keep = true;
         if filter.key.is_some() && set.contains(&ints[i]) {

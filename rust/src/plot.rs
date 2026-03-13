@@ -242,6 +242,16 @@ pub fn plot_snail(
     reference_meta: &Option<blobdir::Meta>,
     options: &cli::PlotOptions,
 ) -> Result<(), anyhow::Error> {
+    let reference_blobdir_path = options
+        .reference
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string());
+    let original_reference_path = options.original_reference.clone();
+    let reference_is_fasta_input = match (&original_reference_path, &reference_blobdir_path) {
+        (Some(original), Some(blobdir_path)) => original != blobdir_path,
+        _ => false,
+    };
+
     // Build DataSource for main assembly from original inputs
     // If FASTA was provided, don't include the temporary blobdir
     let source = DataSource {
@@ -259,12 +269,17 @@ pub fn plot_snail(
 
     // Build DataSource for reference assembly if provided
     let reference = DataSource {
-        fasta: None, // Reference FASTA not tracked separately for now
+        fasta: if reference_is_fasta_input {
+            original_reference_path.clone()
+        } else {
+            None
+        },
         busco: None,
-        blobdir: options
-            .reference
-            .as_ref()
-            .map(|p| p.to_string_lossy().to_string()),
+        blobdir: if reference_is_fasta_input {
+            None
+        } else {
+            reference_blobdir_path.clone()
+        },
     };
 
     let mut snail_stats =
@@ -278,12 +293,17 @@ pub fn plot_snail(
             ));
         }
         let ref_source = DataSource {
-            fasta: None,
+            fasta: if reference_is_fasta_input {
+                original_reference_path.clone()
+            } else {
+                None
+            },
             busco: None,
-            blobdir: options
-                .reference
-                .as_ref()
-                .map(|p| p.to_string_lossy().to_string()),
+            blobdir: if reference_is_fasta_input {
+                None
+            } else {
+                reference_blobdir_path.clone()
+            },
         };
         Some(generate_snail_stats(
             ref_meta,
@@ -304,6 +324,9 @@ pub fn plot_snail(
 
     if let Some(ref_stats) = &mut ref_snail_stats {
         ref_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+        snail_stats.set_reference_score(Some(ref_stats.raun_n()));
+    } else {
+        snail_stats.set_reference_score(None);
     }
 
     let mut outputs = options.output.clone();
@@ -334,6 +357,9 @@ pub fn plot_snail(
         snail_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
         if let Some(ref_stats) = &mut ref_snail_stats {
             ref_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+            snail_stats.set_reference_score(Some(ref_stats.raun_n()));
+        } else {
+            snail_stats.set_reference_score(None);
         }
         if let Some(parent) = PathBuf::from(&output).parent() {
             std::fs::create_dir_all(parent)?;

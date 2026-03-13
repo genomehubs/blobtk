@@ -343,7 +343,6 @@ pub fn create(options: &crate::cli::CreateOptions) -> Result<(), anyhow::Error> 
     }
     let span = seqs.iter().map(|(_, l, _, _)| *l).sum::<usize>();
     // extract the file basename as id and name prefix for meta.json
-    dbg!(&fasta_path);
     let id = fasta_path
         .file_stem()
         .and_then(|s| s.to_str())

@@ -4,10 +4,11 @@ use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Result, Write};
 use std::path::{Path, PathBuf};
 
+use crate::utils::styled_bytes_progress_bar;
 use flate2::read::GzDecoder;
 use flate2::write;
 use flate2::Compression;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 use std::ffi::OsStr;
 use std::io::Read;
 
@@ -209,16 +210,7 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     if response.status().is_success() {
         let content_len = response.content_length();
-        let pb = content_len.map(|len| {
-            let pb = ProgressBar::new(len);
-            let _ = pb.set_style(
-                ProgressStyle::default_bar()
-                    .template("{spinner:.green} {bytes}/{total_bytes} ({eta})")
-                    .unwrap()
-                    .progress_chars("#>-"),
-            );
-            pb
-        });
+        let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
 
         let is_gz_ext = url.ends_with(".gz");
         let is_gz_encoding = response
@@ -244,16 +236,7 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         if response.status().is_success() {
             let content_len = response.content_length();
-            let pb = content_len.map(|len| {
-                let pb = ProgressBar::new(len);
-                let _ = pb.set_style(
-                    ProgressStyle::default_bar()
-                        .template("{spinner:.green} {bytes}/{total_bytes} ({eta})")
-                        .unwrap()
-                        .progress_chars("#>-"),
-                );
-                pb
-            });
+            let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
 
             let is_gz_encoding = response
                 .headers()
