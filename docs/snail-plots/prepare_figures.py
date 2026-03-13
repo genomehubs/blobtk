@@ -878,8 +878,6 @@ def save_figure7_data(directory, filename):
         }
         rows.append(row)
 
-    print(rows)
-
     if rows:
         table_path = f"{directory}/{filename}"
         with open(table_path, "w") as f:
