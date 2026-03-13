@@ -864,7 +864,10 @@ pub fn filter_string_values(
                     set.insert(value);
                 }
                 None => {
-                    eprintln!("Warning: filter key '{}' not found in field keys, skipping", x);
+                    eprintln!(
+                        "Warning: filter key '{}' not found in field keys, skipping",
+                        x
+                    );
                 }
             },
         }
