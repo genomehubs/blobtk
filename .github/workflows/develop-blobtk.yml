@@ -5,12 +5,9 @@ on:
     branches:
       # - main
       - develop
-      - feature/x*
-    tags:
-      - "*"
-
-env:
-  VERSION: 0.5.8
+      - feature/*
+    # tags:
+    #   - "*"
 
 jobs:
   macos-binary:

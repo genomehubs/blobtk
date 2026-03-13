@@ -10,7 +10,8 @@ use svg::node::element::{Circle, Group, Line, Path, Rectangle, Text};
 use svg::node::Text as nodeText;
 
 use crate::utils::{
-    format_si, linear_scale, linear_scale_float, min_float, scale_float, scale_floats,
+    format_element_id, format_si, linear_scale, linear_scale_float, min_float, scale_float,
+    scale_floats,
 };
 
 use super::axis::{AxisOptions, Position, Scale, TickOptions, TickStatus};
@@ -59,11 +60,18 @@ pub enum LegendShape {
     None,
 }
 
+#[derive(Clone, Debug)]
+pub enum LegendAlignment {
+    Start,
+    Center,
+    End,
+}
+
 pub struct LegendEntry {
     pub title: String,
     pub subtitle: Option<String>,
-    pub color: String,
-    pub shape: LegendShape,
+    pub color: Option<String>,
+    pub shape: Option<LegendShape>,
 }
 
 impl Default for LegendEntry {
@@ -71,8 +79,8 @@ impl Default for LegendEntry {
         LegendEntry {
             title: "".to_string(),
             subtitle: None,
-            color: "#000000".to_string(),
-            shape: LegendShape::Rect,
+            color: None,
+            shape: Some(LegendShape::Rect),
         }
     }
 }
@@ -89,6 +97,7 @@ pub fn legend_group(
     entries: Vec<LegendEntry>,
     subtitle: Option<String>,
     columns: u8,
+    alignment: LegendAlignment,
 ) -> Group {
     let processed_font_family = font_family("Roboto, Open sans, DejaVu Sans, Arial, sans-serif");
     let title_text = if title.is_empty() {
@@ -97,42 +106,128 @@ pub fn legend_group(
         Text::new()
             .set("font-family", processed_font_family.clone())
             .set("font-size", "24")
-            .set("text-anchor", "start")
+            .set(
+                "text-anchor",
+                match alignment {
+                    LegendAlignment::Start => "start",
+                    LegendAlignment::Center => "middle",
+                    LegendAlignment::End => "end",
+                },
+            )
             .set("dominant-baseline", "bottom")
             .set("stroke", "none")
             .set("fill", "black")
             .add(nodeText::new(title.clone()))
     };
-    let mut group = Group::new().add(title_text);
+    let mut group = Group::new()
+        .set("id", format_element_id(&format!("{} legend", title)))
+        .add(title_text);
     let cell: i32 = 18;
     let gap = 8;
     let mut offset_y = 0;
-    let mut offset_x: i32 = -175;
+    let total_width = columns as i32 * 175;
+    let alignment_offset = match alignment {
+        LegendAlignment::Start => 0,
+        LegendAlignment::Center => -total_width / 2,
+        LegendAlignment::End => -total_width,
+    };
+    let mut offset_x: i32 = -175 + alignment_offset;
     let per_column = entries.len() / columns as usize;
     for (i, entry) in entries.iter().enumerate() {
+        let entry_color = if let Some(color) = entry.color.clone() {
+            color
+        } else {
+            "none".to_string()
+        };
         if i % per_column == 0 {
             offset_x += 175;
             offset_y = if title.is_empty() { 0 } else { gap / 2 };
         }
         let title_width = cell + gap + entry.title.len() as i32 * cell * 11 / 20;
         let mut rect_width = title_width;
+        let mut text_color = "#000000".to_string();
+        let mut left_padding = cell + gap;
+        let shape = match entry.shape {
+            Some(LegendShape::Rect) => Group::new().add(
+                Rectangle::new()
+                    .set("stroke", "black")
+                    .set("stroke-width", 2)
+                    .set("fill", entry_color.clone())
+                    .set("x", 0)
+                    .set("y", 6)
+                    .set("height", cell)
+                    .set("width", cell),
+            ),
+            Some(LegendShape::Circumference) => Group::new()
+                .add(
+                    Circle::new()
+                        .set("stroke", "black")
+                        .set("stroke-width", 2)
+                        .set("fill", entry_color.clone())
+                        .set("cx", cell / 2)
+                        .set("cy", 6 + cell / 2)
+                        .set("r", cell / 2),
+                )
+                .add(
+                    Line::new()
+                        .set("fill", "none")
+                        .set("stroke", "black")
+                        .set("stroke-width", 1)
+                        .set("x1", cell / 2)
+                        .set("y1", 6 + cell / 2)
+                        .set("x2", cell / 2)
+                        .set("y2", 6),
+                ),
+            Some(LegendShape::Radius) => Group::new()
+                .add(
+                    Circle::new()
+                        .set("stroke", "black")
+                        .set("stroke-width", 1)
+                        .set("fill", entry_color.clone())
+                        .set("cx", cell / 2)
+                        .set("cy", 6 + cell / 2)
+                        .set("r", cell / 2),
+                )
+                .add(
+                    Line::new()
+                        .set("fill", "none")
+                        .set("stroke", "black")
+                        .set("stroke-width", 2)
+                        .set("x1", cell / 2)
+                        .set("y1", 6 + cell / 2)
+                        .set("x2", cell / 2)
+                        .set("y2", 6),
+                ),
+            Some(LegendShape::None) => {
+                text_color = entry_color.clone();
+                left_padding = 0;
+                Group::new()
+            }
+            None => {
+                text_color = entry_color.clone();
+                left_padding = 0;
+                Group::new()
+            }
+        };
         let (anchor, position, rect_x) = match entry.subtitle {
             Some(_) => {
                 rect_width += gap + entry.subtitle.clone().unwrap().len() as i32 * cell * 11 / 20;
                 ("end", -gap, -gap - title_width)
             }
-            None => ("start", cell + gap, -gap / 2),
+            None => ("start", left_padding, -gap / 2),
         };
+
         let entry_text = Text::new()
             .set("font-family", processed_font_family.clone())
             .set("font-size", cell)
             .set("text-anchor", anchor)
             .set("dominant-baseline", "bottom")
             .set("stroke", "none")
-            .set("fill", "black")
+            .set("fill", text_color.clone())
             .set("x", position)
             .set("y", cell + gap / 2)
             .add(nodeText::new(&entry.title));
+
         let entry_subtext = if entry.subtitle.is_some() {
             Text::new()
                 .set("font-family", processed_font_family.clone())
@@ -140,8 +235,8 @@ pub fn legend_group(
                 .set("text-anchor", "start")
                 .set("dominant-baseline", "bottom")
                 .set("stroke", "none")
-                .set("fill", "black")
-                .set("x", cell + gap)
+                .set("fill", text_color.clone())
+                .set("x", left_padding)
                 .set("y", cell * 9 / 10 + gap / 2)
                 .add(nodeText::new(entry.subtitle.clone().unwrap()))
         } else {
@@ -157,59 +252,7 @@ pub fn legend_group(
                 .set("width", rect_width)
                 .set("opacity", 0.95),
         );
-        let shape = match entry.shape {
-            LegendShape::Rect => Group::new().add(
-                Rectangle::new()
-                    .set("stroke", "black")
-                    .set("stroke-width", 2)
-                    .set("fill", entry.color.clone())
-                    .set("x", 0)
-                    .set("y", 6)
-                    .set("height", cell)
-                    .set("width", cell),
-            ),
-            LegendShape::Circumference => Group::new()
-                .add(
-                    Circle::new()
-                        .set("stroke", "black")
-                        .set("stroke-width", 2)
-                        .set("fill", entry.color.clone())
-                        .set("cx", cell / 2)
-                        .set("cy", 6 + cell / 2)
-                        .set("r", cell / 2),
-                )
-                .add(
-                    Line::new()
-                        .set("fill", "none")
-                        .set("stroke", "black")
-                        .set("stroke-width", 1)
-                        .set("x1", cell / 2)
-                        .set("y1", 6 + cell / 2)
-                        .set("x2", cell / 2)
-                        .set("y2", 6),
-                ),
-            LegendShape::Radius => Group::new()
-                .add(
-                    Circle::new()
-                        .set("stroke", "black")
-                        .set("stroke-width", 1)
-                        .set("fill", entry.color.clone())
-                        .set("cx", cell / 2)
-                        .set("cy", 6 + cell / 2)
-                        .set("r", cell / 2),
-                )
-                .add(
-                    Line::new()
-                        .set("fill", "none")
-                        .set("stroke", "black")
-                        .set("stroke-width", 2)
-                        .set("x1", cell / 2)
-                        .set("y1", 6 + cell / 2)
-                        .set("x2", cell / 2)
-                        .set("y2", 6),
-                ),
-            LegendShape::None => Group::new(),
-        };
+
         let entry_group = Group::new()
             .set(
                 "transform",

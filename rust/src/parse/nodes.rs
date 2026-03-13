@@ -1068,7 +1068,7 @@ impl Nodes {
                 ..Default::default()
             },
         );
-        let mut rdr = io::get_csv_reader(&Some(gbif_backbone), b'\t', false, None, 0, false);
+        let mut rdr = io::get_csv_reader(&Some(gbif_backbone), b'\t', false, None, 0, false)?;
         let mut ignore = HashSet::new();
         ignore.insert("DOUBTFUL");
         ignore.insert("MISAPPLIED");

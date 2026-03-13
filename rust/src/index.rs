@@ -1303,7 +1303,7 @@ fn parse_busco(
         None,
         2,
         true,
-    );
+    )?;
     let by_status = parse_busco_full_table(
         sequences,
         &mut features,
@@ -1924,9 +1924,7 @@ pub fn index(options: &cli::IndexOptions) -> Result<(), anyhow::Error> {
                     busco_stats.lineage.to_lowercase()
                 ));
                 let lineage_config = busco_stats.to_ghubs_config();
-                lineage_config
-                    .write_yaml(&lineage_yaml_file)
-                    .expect("Failed to write lineage config to file");
+                lineage_config.write_yaml(&lineage_yaml_file)?;
                 busco_stats.to_file(&lineage_file)?;
                 busco_values.append_to_file(&options.out)?;
             }

@@ -9,6 +9,7 @@ use svg::Document;
 
 use crate::blobdir::FieldMeta;
 use crate::cli::Shape;
+use crate::plot::component::LegendAlignment;
 use crate::utils::{max_float, min_float, scale_floats};
 use crate::{blobdir, cli, plot};
 
@@ -16,7 +17,7 @@ use plot::category::Category;
 
 use super::axis::{AxisName, AxisOptions, ChartAxes, Position, Scale, TickOptions};
 use super::chart::{Chart, Dimensions, TopRightBottomLeft};
-use super::component::{font_family, legend_group, LegendEntry, LegendShape};
+use super::component::{font_family, legend_group, LegendEntry};
 use super::data::{Bin, HistogramData, Reducer, ScatterData, ScatterPoint};
 use super::{GridSize, ShowLegend};
 
@@ -330,7 +331,7 @@ pub fn blob_points(
     }
     let z_axis = AxisOptions {
         label: axes["z"].clone(),
-        scale: options.scale_function.clone(),
+        scale: options.resolved_scale_function(),
         domain: z_domain,
         range: [2.0, 2.0 + dimensions.height / 15.0 * options.scale_factor],
         ..Default::default()
@@ -409,7 +410,6 @@ pub fn category_legend_full(categories: Vec<Category>, show_legend: ShowLegend) 
     if let ShowLegend::Full = show_legend {
         entries.push(LegendEntry {
             subtitle: Some("[count; span; n50]".to_string()),
-            shape: LegendShape::None,
             ..Default::default()
         })
     };
@@ -423,16 +423,18 @@ pub fn category_legend_full(categories: Vec<Category>, show_legend: ShowLegend) 
         let subtitle = match show_legend {
             ShowLegend::Compact => None,
             ShowLegend::Default | ShowLegend::Full => Some(cat.clone().subtitle()),
-            ShowLegend::None => return legend_group(title, entries, None, 1),
+            ShowLegend::None => {
+                return legend_group(title, entries, None, 1, LegendAlignment::Start)
+            }
         };
         entries.push(LegendEntry {
             title: cat.title.to_string(),
-            color: cat.color.clone(),
+            color: Some(cat.color.clone()),
             subtitle,
             ..Default::default()
         });
     }
-    legend_group(title, entries, None, 1)
+    legend_group(title, entries, None, 1, LegendAlignment::Start)
 }
 
 pub fn plot(

@@ -11,6 +11,7 @@ use num_integer::sqrt;
 
 #[cfg(feature = "python-extension")]
 use pyo3::pyclass;
+use serde_json::json;
 
 use crate::blobdir;
 use crate::blobdir::parse_field_identifiers;
@@ -20,6 +21,9 @@ use crate::cli::Shape;
 use crate::error;
 use crate::plot::blob::BlobData;
 use crate::plot::cumulative::CumulativeData;
+use crate::plot::snail::get_score_and_type;
+use crate::plot::snail::{DataSource, SnailStats};
+use crate::utils::format_si;
 // use crate::io;
 
 use clap::ValueEnum;
@@ -59,17 +63,27 @@ pub mod snail;
 /// SVG styling functions.
 pub mod style;
 
-pub fn save_svg(document: &Document, options: &PlotOptions) {
-    svg::save(options.output.as_str(), document).unwrap();
+pub fn save_svg(document: &Document, options: &PlotOptions) -> Result<(), anyhow::Error> {
+    // create parent directories if they don't exist
+    let output_str = options
+        .output
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("output.svg");
+    if let Some(parent) = PathBuf::from(&output_str).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    svg::save(output_str, document)?;
+    Ok(())
 }
 
-pub fn save_png(document: &Document, options: &PlotOptions) {
+pub fn save_png(document: &Document, options: &PlotOptions) -> Result<(), anyhow::Error> {
     let mut fontdb = fontdb::Database::new();
     fontdb.load_system_fonts();
     let mut buf = Vec::new();
-    svg::write(&mut buf, document).unwrap();
+    svg::write(&mut buf, document)?;
     let opt = usvg::Options::default();
-    let mut tree = usvg::Tree::from_data(buf.as_slice(), &opt).unwrap();
+    let mut tree = usvg::Tree::from_data(buf.as_slice(), &opt)?;
     tree.convert_text(&fontdb);
 
     let width = 2000;
@@ -82,7 +96,18 @@ pub fn save_png(document: &Document, options: &PlotOptions) {
         pixmap.as_mut(),
     )
     .unwrap();
-    pixmap.save_png(options.output.as_str()).unwrap();
+    // Save the pixmap as a PNG file
+    let output_str = options
+        .output
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("output.png");
+    // create parent directories if they don't exist
+    if let Some(parent) = PathBuf::from(&output_str).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    pixmap.save_png(output_str)?;
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -129,17 +154,23 @@ impl FromStr for ShowLegend {
     }
 }
 
-/// Make a snail plot
-pub fn plot_snail(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<(), anyhow::Error> {
-    let gc_values = blobdir::parse_field_float("gc".to_string(), &options.blobdir)?;
-    let length_values = blobdir::parse_field_int("length".to_string(), &options.blobdir)?;
-    let n_values = blobdir::parse_field_float("n".to_string(), &options.blobdir);
-    let ncount_values = blobdir::parse_field_int("ncount".to_string(), &options.blobdir)?;
+/// Generate snail stats for a given blobdir metadata
+fn generate_snail_stats(
+    meta: &blobdir::Meta,
+    blobdir_path: &std::path::PathBuf,
+    options: &cli::PlotOptions,
+    source: DataSource,
+    reference: DataSource,
+) -> Result<SnailStats, anyhow::Error> {
+    let gc_values = blobdir::parse_field_float("gc".to_string(), blobdir_path)?;
+    let length_values = blobdir::parse_field_int("length".to_string(), blobdir_path)?;
+    let n_values = blobdir::parse_field_float("n".to_string(), blobdir_path);
+    let ncount_values = blobdir::parse_field_int("ncount".to_string(), blobdir_path)?;
     let id = meta.id.clone();
     let record_type = meta.record_type.clone();
 
     let filters = blobdir::parse_filters(options, None);
-    let wanted_indices = blobdir::set_filters(filters, meta, &options.blobdir);
+    let wanted_indices = blobdir::set_filters(filters, meta, blobdir_path);
 
     let gc_filtered = blobdir::apply_filter_float(&gc_values, &wanted_indices);
     let n_filtered = match n_values {
@@ -152,7 +183,7 @@ pub fn plot_snail(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<()
     let (busco_total, busco_lineage, busco_filtered) = match busco_list {
         Some(list) if !list.is_empty() => {
             let busco_field = list[0].clone();
-            let busco_values = blobdir::parse_field_busco(busco_field.0, &options.blobdir).unwrap();
+            let busco_values = blobdir::parse_field_busco(busco_field.0, blobdir_path).unwrap();
             let busco_total = busco_field.1;
             let busco_lineage = busco_field.2;
             let busco_filtered = blobdir::apply_filter_busco(&busco_values, &wanted_indices);
@@ -161,7 +192,7 @@ pub fn plot_snail(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<()
         _ => (None, None, vec![]),
     };
 
-    let snail_stats = snail::snail_stats(
+    snail::snail_stats(
         &length_filtered,
         &gc_filtered,
         &n_filtered,
@@ -172,28 +203,200 @@ pub fn plot_snail(meta: &blobdir::Meta, options: &cli::PlotOptions) -> Result<()
         id,
         record_type,
         options,
-    );
-    let suffix = get_suffix(options)?;
-    match suffix {
-        Suffix::JSON => {
-            serde_json::to_writer_pretty(std::fs::File::create(&options.output)?, &snail_stats)?;
-            Ok(())
+        source,
+        reference,
+    )
+}
+
+fn determine_max_values(
+    ref_snail_stats: &Option<SnailStats>,
+    options: &cli::PlotOptions,
+) -> (Option<usize>, Option<usize>) {
+    let mut max_span = options.max_span;
+    let mut max_scaffold = options.max_scaffold;
+
+    if let Some(ref_stats) = ref_snail_stats {
+        if let Some(max) = max_span {
+            if ref_stats.span() > max {
+                max_span = Some(ref_stats.span());
+            }
+        } else {
+            max_span = Some(ref_stats.span());
         }
-        Suffix::YAML => {
-            serde_yaml::to_writer(std::fs::File::create(&options.output)?, &snail_stats)?;
-            Ok(())
-        }
-        _ => {
-            // For SVG/PNG, continue to create the document and save
-            let document: Document = snail::svg(&snail_stats, options);
-            save_by_suffix(options, document)?;
-            Ok(())
+
+        if let Some(max) = max_scaffold {
+            if ref_stats.scaffolds()[0] > max {
+                max_scaffold = Some(ref_stats.scaffolds()[0]);
+            }
+        } else {
+            max_scaffold = Some(ref_stats.scaffolds()[0]);
         }
     }
+
+    (max_span, max_scaffold)
+}
+
+/// Make a snail plot
+pub fn plot_snail(
+    meta: &blobdir::Meta,
+    reference_meta: &Option<blobdir::Meta>,
+    options: &cli::PlotOptions,
+) -> Result<(), anyhow::Error> {
+    let reference_blobdir_path = options
+        .reference
+        .as_ref()
+        .map(|p| p.to_string_lossy().to_string());
+    let original_reference_path = options.original_reference.clone();
+    let reference_is_fasta_input = match (&original_reference_path, &reference_blobdir_path) {
+        (Some(original), Some(blobdir_path)) => original != blobdir_path,
+        _ => false,
+    };
+
+    // Build DataSource for main assembly from original inputs
+    // If FASTA was provided, don't include the temporary blobdir
+    let source = DataSource {
+        fasta: options.original_fasta.clone(),
+        busco: options.original_busco.clone(),
+        blobdir: if options.original_fasta.is_none() {
+            options
+                .original_blobdir
+                .clone()
+                .or_else(|| Some(options.blobdir.to_string_lossy().to_string()))
+        } else {
+            None
+        },
+    };
+
+    // Build DataSource for reference assembly if provided
+    let reference = DataSource {
+        fasta: if reference_is_fasta_input {
+            original_reference_path.clone()
+        } else {
+            None
+        },
+        busco: None,
+        blobdir: if reference_is_fasta_input {
+            None
+        } else {
+            reference_blobdir_path.clone()
+        },
+    };
+
+    let mut snail_stats =
+        generate_snail_stats(meta, &options.blobdir, options, source, reference.clone())?;
+
+    // Generate stats for the reference assembly if provided
+    let mut ref_snail_stats = if let Some(ref_meta) = reference_meta {
+        if ref_meta.id == meta.id {
+            return Err(anyhow::anyhow!(
+                "Reference BlobDir cannot be the same as the input BlobDir"
+            ));
+        }
+        let ref_source = DataSource {
+            fasta: if reference_is_fasta_input {
+                original_reference_path.clone()
+            } else {
+                None
+            },
+            busco: None,
+            blobdir: if reference_is_fasta_input {
+                None
+            } else {
+                reference_blobdir_path.clone()
+            },
+        };
+        Some(generate_snail_stats(
+            ref_meta,
+            options.reference.as_ref().unwrap(),
+            options,
+            ref_source,
+            DataSource {
+                fasta: None,
+                busco: None,
+                blobdir: None,
+            },
+        )?)
+    } else {
+        None
+    };
+    let (max_span, max_scaffold) = determine_max_values(&ref_snail_stats, options);
+    snail_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+
+    if let Some(ref_stats) = &mut ref_snail_stats {
+        ref_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+        snail_stats.set_reference_score(Some(ref_stats.raun_n()));
+    } else {
+        snail_stats.set_reference_score(None);
+    }
+
+    let mut outputs = options.output.clone();
+
+    // 1. Report to stdout if requested
+    if options.score_only {
+        let (value, _) = get_score_and_type(&snail_stats, options);
+        println!(
+            "{}",
+            format_si(&value, options.significant_digits, options.rounding.clone())
+        );
+    } else if options.score_json {
+        let (value, score_type) = get_score_and_type(&snail_stats, options);
+        let score_obj = json!({
+            "id": snail_stats.id(),
+            "score_type": score_type,
+            "value": format_si(&value, options.significant_digits, options.rounding.clone()),
+        });
+        println!("{}", serde_json::to_string_pretty(&score_obj)?);
+    } else if options.output.is_empty() {
+        outputs = vec!["output.svg".to_string()];
+    };
+
+    for output in outputs {
+        let mut plot_options = (*options).clone();
+        plot_options.output = vec![output.clone()];
+        let (max_span, max_scaffold) = determine_max_values(&ref_snail_stats, &plot_options);
+        snail_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+        if let Some(ref_stats) = &mut ref_snail_stats {
+            ref_stats.calculate_genome_adjusted_scores(max_span, max_scaffold);
+            snail_stats.set_reference_score(Some(ref_stats.raun_n()));
+        } else {
+            snail_stats.set_reference_score(None);
+        }
+        if let Some(parent) = PathBuf::from(&output).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let suffix = get_suffix(&plot_options)?;
+
+        match suffix {
+            Suffix::JSON => {
+                serde_json::to_writer_pretty(std::fs::File::create(&output)?, &snail_stats)?;
+            }
+            Suffix::YAML => {
+                serde_yaml::to_writer(std::fs::File::create(&output)?, &snail_stats)?;
+            }
+            _ => {
+                // For SVG/PNG, continue to create the document and save
+                // Pass both snail_stats and ref_snail_stats to the svg function
+                let document: Document = snail::svg(
+                    &snail_stats,
+                    &ref_snail_stats,
+                    &plot_options,
+                    max_span,
+                    max_scaffold,
+                );
+                save_by_suffix(&plot_options, document)?;
+            }
+        };
+    }
+    Ok(())
 }
 
 fn get_suffix(options: &PlotOptions) -> Result<Suffix, error::Error> {
-    let output_str = options.output.as_str();
+    let output_str = options
+        .output
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or("output.svg");
     let suffix_str = PathBuf::from(output_str)
         .extension()
         .unwrap()
@@ -207,8 +410,8 @@ fn save_by_suffix(options: &PlotOptions, document: Document) -> Result<(), error
     let suffix = get_suffix(options)?;
 
     match suffix {
-        Suffix::PNG => save_png(&document, options),
-        Suffix::SVG => save_svg(&document, options),
+        Suffix::PNG => save_png(&document, options)?,
+        Suffix::SVG => save_svg(&document, options)?,
         _ => return Err(error::Error::InvalidImageSuffix(format!("{:?}", suffix))),
     };
     Ok(())
@@ -761,6 +964,11 @@ pub fn plot_cumulative(
 /// Execute the `plot` subcommand from `blobtk`.
 pub fn plot(options: &cli::PlotOptions) -> Result<(), anyhow::Error> {
     let meta = blobdir::parse_blobdir(&options.blobdir)?;
+    let reference_meta = if let Some(reference) = options.reference.as_ref() {
+        Some(blobdir::parse_blobdir(reference)?)
+    } else {
+        None
+    };
     let view = &options.view;
     let shape = &options.shape;
     match view {
@@ -770,7 +978,7 @@ pub fn plot(options: &cli::PlotOptions) -> Result<(), anyhow::Error> {
         },
         cli::View::Cumulative => plot_cumulative(&meta, options)?,
         cli::View::Legend => plot_legend(&meta, options)?,
-        cli::View::Snail => plot_snail(&meta, options)?,
+        cli::View::Snail => plot_snail(&meta, &reference_meta, options)?,
     }
     Ok(())
 }

@@ -76,12 +76,18 @@ pub enum SubCommand {
     /// Process a BlobDir and produce static plots.
     /// Called as `blobtk plot`
     Plot(PlotOptions),
+    /// Produce a snail plot from a BlobDir or FASTA file.
+    /// Called as `blobtk snail`
+    Snail(SnailOptions),
     /// [experimental] Process a taxonomy and lookup lineages, or start the API server with --api
     /// Called as `blobtk taxonomy [--api] ...`
     Taxonomy(TaxonomyOptions),
     /// [experimental] Validate BlobToolKit and GenomeHubs files.
     /// Called as `blobtk validate`
     Validate(ValidateOptions),
+    /// Create a minimal BlobDir from input files (FASTA and optional BUSCO)
+    /// Called as `blobtk create`
+    Create(CreateOptions),
 }
 
 /// Options to pass to `blobtk depth`
@@ -212,6 +218,21 @@ pub struct IndexOptions {
     pub out: Option<PathBuf>,
 }
 
+/// Options to pass to `blobtk create`
+#[derive(Parser, Debug, Default)]
+#[cfg_attr(feature = "python-extension", pyclass)]
+pub struct CreateOptions {
+    /// Path to input assembly FASTA file
+    #[arg(short = 'a', long = "fasta", value_name = "FASTA")]
+    pub fasta: Option<PathBuf>,
+    /// Path to BUSCO full_table.tsv or similar
+    #[arg(short = 'b', long = "busco", value_name = "BUSCO")]
+    pub busco: Option<PathBuf>,
+    /// Output BlobDir directory
+    #[arg(short = 'd', long = "out", value_name = "BLOB_DIR")]
+    pub out: Option<PathBuf>,
+}
+
 fn window_size_parser(s: &str) -> Result<f64, String> {
     let val = match s.parse::<f64>() {
         Ok(v) => v,
@@ -302,12 +323,51 @@ impl FromStr for Palette {
     }
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+#[cfg_attr(feature = "python-extension", pyclass)]
+pub enum ScoreType {
+    #[value(name = "base")]
+    Base, // unadjusted snail score
+    #[value(name = "g")]
+    G, // genome-size-adjusted
+    #[value(name = "gs")]
+    Gs, // genome + scaffold-adjusted
+    #[value(name = "ag")]
+    GAbsolute, // absolute (penalizes both directions)
+    #[value(name = "ags")]
+    GsAbsolute, // absolute with both corrections
+}
+
+impl FromStr for ScoreType {
+    type Err = ();
+    fn from_str(input: &str) -> Result<ScoreType, Self::Err> {
+        match input {
+            "base" => Ok(ScoreType::Base),
+            "g" => Ok(ScoreType::G),
+            "gs" => Ok(ScoreType::Gs),
+            "ag" => Ok(ScoreType::GAbsolute),
+            "ags" => Ok(ScoreType::GsAbsolute),
+            _ => Err(()),
+        }
+    }
+}
+
 fn less_than_5(s: &str) -> Result<f64, String> {
     Ok(number_range(&format!("{}", s.parse::<f64>().unwrap() * 10.0), 2, 50)? as f64 / 10.0)
 }
 
+const BADGE_LINEAR_SCALE_ERROR: &str =
+    "--badge requires --scale-function linear (badge mode only supports linear scaling)";
+
+fn validate_badge_scale(badge: bool, scale_function: &Scale) -> Result<(), anyhow::Error> {
+    if badge && scale_function != &Scale::LINEAR {
+        return Err(anyhow::anyhow!(BADGE_LINEAR_SCALE_ERROR));
+    }
+    Ok(())
+}
+
 /// Options to pass to `blobtk plot`
-#[derive(Parser, Debug, Default)]
+#[derive(Clone, Parser, Debug, Default)]
 #[command(arg_required_else_help = true)]
 #[cfg_attr(feature = "python-extension", pyclass)]
 pub struct PlotOptions {
@@ -325,10 +385,34 @@ pub struct PlotOptions {
     /// Window size for grid shape plot
     #[arg(long = "window-size", short = 'w')]
     pub window_size: Option<String>,
-    /// Output filename
-    #[arg(long, short = 'o', default_value_t = String::from("output.svg"))]
-    pub output: String,
-    #[arg(long, short = 'f')]
+    /// Output filename(s) - can be specified multiple times
+    /// Supports .svg, .png, .json, .yaml extensions
+    #[arg(long, short = 'o', value_name = "FILE", action = clap::ArgAction::Append)]
+    pub output: Vec<String>,
+    /// Optional reference BlobDir for snail plot
+    #[arg(long = "reference", value_name = "REFERENCE")]
+    pub reference: Option<PathBuf>,
+    /// Filters to apply to BlobDir data.
+    ///
+    /// Preferred syntax: <field>:<type>=<value>
+    /// Legacy BlobToolKit URL-compatible syntax is also supported: <field>--<Type>=<value>
+    ///
+    /// Types:
+    /// - min / max for numeric fields (inclusive bounds)
+    /// - keys for categorical/string fields (comma-separated)
+    /// - inv to invert a filter (either as <field>:inv or <field>:inv=<keys>)
+    ///
+    /// Examples:
+    /// - --filter length:min=1000
+    /// - --filter gc:max=0.6
+    /// - --filter buscogenes_phylum:keys=Arthropoda,Chordata
+    /// - --filter buscogenes_phylum:inv=Arthropoda,Chordata
+    #[arg(
+        long,
+        short = 'f',
+        value_name = "FILTER",
+        help = "Filter expression(s), e.g. length:min=1000 or gc:max=0.6"
+    )]
     pub filter: Vec<String>,
     /// Segment count for snail plot
     #[arg(long, short = 's', default_value_t = 1000)]
@@ -364,8 +448,10 @@ pub struct PlotOptions {
     #[arg(long, value_enum, default_value_t = Reducer::Sum)]
     pub reducer_function: Reducer,
     /// Scale function for blob/snail plot
-    #[arg(long, value_enum, default_value_t = Scale::SQRT)]
-    pub scale_function: Scale,
+    ///
+    /// Defaults to `sqrt` for blob view and `linear` for snail view.
+    #[arg(long, value_enum)]
+    pub scale_function: Option<Scale>,
     /// Scale factor for blob plot (0.2 - 5.0)
     #[arg(long, default_value_t = 1.0, value_parser=less_than_5)]
     pub scale_factor: f64,
@@ -393,27 +479,97 @@ pub struct PlotOptions {
     /// Individual colours to modify palette (<index>=<hexcode>)
     #[arg(long)]
     pub color: Option<Vec<String>>,
-    /// [experimental] Significant digits to use when rounding numbers for display
+    /// Significant digits to use when rounding numbers for display
     #[arg(long = "significant-digits", default_value_t = 3)]
     pub significant_digits: u32,
-    /// [experimental] Decimal precision (number of decimal places) to use when percentages for display
+    /// Decimal precision (number of decimal places) to use when percentages for display
     #[arg(long = "decimal-precision", default_value_t = 2)]
     pub decimal_precision: u32,
     // [experimental] Flag to choose the rounding method
     #[arg(long = "rounding", value_enum)]
     pub rounding: Option<RoundingStrategyWrapper>,
-    /// [experimental] Flag to show numbers instead of percentages in snail plot legend
+    /// Flag to show numbers instead of percentages in snail plot legend
     #[arg(long = "show-numbers", default_value_t = false)]
     pub show_numbers: bool,
-    /// [experimental] Flag to show busco numbers instead of percentages in snail plot legend
+    /// Flag to show busco numbers instead of percentages in snail plot legend
     #[arg(long = "busco-numbers", default_value_t = false)]
     pub busco_numbers: bool,
-    /// [experimental] Flag to show minimal snail plot as assembly badge
+    /// Flag to show minimal snail plot as assembly badge
     #[arg(long = "badge", default_value_t = false)]
     pub badge: bool,
-    /// [experimental] Flag to show snail score in snail plot legend
+    /// Flag to show snail score in snail plot legend
     #[arg(long = "show-score", default_value_t = false)]
     pub show_score: bool,
+    /// Score variant to display with --show-score
+    ///
+    /// - base: unadjusted snail score
+    /// - g: genome-size-adjusted (requires --max-span or --reference)
+    /// - gs: genome and scaffold-adjusted (requires --max-span/--reference and --max-scaffold)
+    /// - ag: absolute adjustment (penalizes both over/underassembly)
+    /// - ags: absolute with both corrections
+    #[arg(long, value_name = "TYPE")]
+    pub score_type: Option<ScoreType>,
+    /// Internal field to track original FASTA input (for snail command)
+    #[clap(skip)]
+    pub original_fasta: Option<String>,
+    /// Internal field to track original BUSCO input (for snail command)
+    #[clap(skip)]
+    pub original_busco: Option<String>,
+    /// Internal field to track original BlobDir input (for snail command)
+    #[clap(skip)]
+    pub original_blobdir: Option<String>,
+    /// Internal field to track original reference input (for snail command)
+    #[clap(skip)]
+    pub original_reference: Option<String>,
+    /// Internal field to track score-only mode (for snail command)
+    #[clap(skip)]
+    pub score_only: bool,
+    /// Internal field to track score JSON output mode (for snail command)
+    #[clap(skip)]
+    pub score_json: bool,
+}
+
+impl PlotOptions {
+    /// Resolve scale function, applying view-specific defaults when unset.
+    pub fn resolved_scale_function(&self) -> Scale {
+        self.scale_function
+            .clone()
+            .unwrap_or_else(|| match self.view {
+                View::Snail => Scale::LINEAR,
+                _ => Scale::SQRT,
+            })
+    }
+
+    /// Validate that score_type requirements are met
+    pub fn validate_score_type(&self) -> Result<(), anyhow::Error> {
+        validate_badge_scale(self.badge, &self.resolved_scale_function())?;
+
+        match &self.score_type {
+            Some(ScoreType::Base) | None => Ok(()),
+            Some(ScoreType::G) | Some(ScoreType::GAbsolute) => {
+                if self.max_span.is_some() || self.reference.is_some() {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "--score-type g or ag requires either --max-span or --reference"
+                    ))
+                }
+            }
+            Some(ScoreType::Gs) | Some(ScoreType::GsAbsolute) => {
+                let has_max_span = self.max_span.is_some();
+                let has_max_scaffold = self.max_scaffold.is_some();
+                let has_ref = self.reference.is_some();
+
+                if has_ref || (has_max_span && has_max_scaffold) {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "--score-type gs or ags requires both --max-span and --max-scaffold, or a --reference"
+                    ))
+                }
+            }
+        }
+    }
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
@@ -461,6 +617,139 @@ impl RoundingStrategyWrapper {
 
     pub fn default() -> RoundingStrategy {
         RoundingStrategy::MidpointAwayFromZero
+    }
+}
+
+/// Options to pass to `blobtk plot`
+#[derive(Parser, Debug, Default)]
+#[command(arg_required_else_help = true)]
+#[cfg_attr(feature = "python-extension", pyclass)]
+pub struct SnailOptions {
+    /// Path to input assembly FASTA file
+    #[arg(long = "fasta", value_name = "FASTA")]
+    pub fasta: Option<PathBuf>,
+    /// Path to BUSCO full_table.tsv or similar
+    #[arg(long = "busco", value_name = "BUSCO")]
+    pub busco: Option<PathBuf>,
+    /// Path to BlobDir directory
+    #[arg(long, short = 'd')]
+    pub blobdir: Option<PathBuf>,
+    /// Reference assembly for snail plot (BlobDir or FASTA)
+    #[arg(long = "reference", value_name = "REFERENCE")]
+    pub reference: Option<PathBuf>,
+    /// Output filename(s) - can be specified multiple times
+    /// Supports .svg, .png, .json, .yaml extensions
+    #[arg(long, short = 'o', value_name = "FILE", action = clap::ArgAction::Append)]
+    pub output: Vec<String>,
+    /// Assembly name for display in snail plot legend (defaults to filename or BlobDir name)
+    #[arg(long = "assembly-name", short = 'n')]
+    pub assembly_name: Option<String>,
+    /// Reference assembly name for display in snail plot legend (defaults to filename or BlobDir name)
+    #[arg(long = "reference-name", short = 'r')]
+    pub reference_name: Option<String>,
+    /// Report snail score to stdout (base type by default)
+    #[arg(long)]
+    pub score_only: bool,
+    /// Report snail score as JSON to stdout
+    #[arg(long)]
+    pub score_json: bool,
+    /// Filters to apply to scaffold data before snail stats are computed.
+    ///
+    /// Preferred syntax: <field>:<type>=<value>
+    /// Legacy BlobToolKit URL-compatible syntax is also supported: <field>--<Type>=<value>
+    ///
+    /// Types:
+    /// - min / max for numeric fields (inclusive bounds)
+    /// - keys for categorical/string fields (comma-separated)
+    /// - inv to invert a filter (either as <field>:inv or <field>:inv=<keys>)
+    ///
+    /// Examples:
+    /// - --filter length:min=1000
+    /// - --filter gc:max=0.6
+    /// - --filter buscogenes_phylum:keys=Arthropoda,Chordata
+    /// - --filter buscogenes_phylum:inv=Arthropoda,Chordata
+    #[arg(
+        long,
+        short = 'f',
+        value_name = "FILTER",
+        help = "Filter expression(s), e.g. length:min=1000 or gc:max=0.6"
+    )]
+    pub filter: Vec<String>,
+    /// Segment count for snail plot
+    #[arg(long, short = 's', default_value_t = 1000)]
+    pub segments: usize,
+    /// Max span for snail plot
+    #[arg(long = "max-span")]
+    pub max_span: Option<usize>,
+    /// max scaffold length for snail plot
+    #[arg(long = "max-scaffold")]
+    pub max_scaffold: Option<usize>,
+    /// Scale function for snail plot
+    #[arg(long, value_enum, default_value_t = Scale::LINEAR)]
+    pub scale_function: Scale,
+    /// Significant digits to use when rounding numbers for display
+    #[arg(long = "significant-digits", default_value_t = 3)]
+    pub significant_digits: u32,
+    /// Decimal precision (number of decimal places) to use when percentages for display
+    #[arg(long = "decimal-precision", default_value_t = 2)]
+    pub decimal_precision: u32,
+    // [experimental] Flag to choose the rounding method
+    #[arg(long = "rounding", value_enum)]
+    pub rounding: Option<RoundingStrategyWrapper>,
+    /// Flag to show numbers instead of percentages in snail plot legend
+    #[arg(long = "show-numbers", default_value_t = false)]
+    pub show_numbers: bool,
+    /// Flag to show busco numbers instead of percentages in snail plot legend
+    #[arg(long = "busco-numbers", default_value_t = false)]
+    pub busco_numbers: bool,
+    /// Flag to show minimal snail plot as assembly badge
+    #[arg(long = "badge", default_value_t = false)]
+    pub badge: bool,
+    /// Flag to show snail score in snail plot legend
+    #[arg(long = "show-score", default_value_t = false)]
+    pub show_score: bool,
+
+    /// Score variant to display with --show-score
+    ///
+    /// - base: unadjusted snail score
+    /// - g: genome-size-adjusted (requires --max-span or --reference)
+    /// - gs: genome and scaffold-adjusted (requires --max-span/--reference and --max-scaffold)
+    /// - ag: absolute adjustment (penalizes both over/underassembly)
+    /// - ags: absolute with both corrections
+    #[arg(long, value_name = "TYPE")]
+    pub score_type: Option<ScoreType>,
+}
+
+impl SnailOptions {
+    /// Validate that score_type requirements are met
+    pub fn validate_score_type(&self) -> Result<(), anyhow::Error> {
+        validate_badge_scale(self.badge, &self.scale_function)?;
+
+        match &self.score_type {
+            Some(ScoreType::Base) | None => Ok(()),
+            Some(ScoreType::G) | Some(ScoreType::GAbsolute) => {
+                if self.max_span.is_some() || self.reference.is_some() {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "--score-type g or ag requires either --max-span or --reference"
+                    ))
+                }
+            }
+            Some(ScoreType::Gs) | Some(ScoreType::GsAbsolute) => {
+                let has_max_span = self.max_span.is_some();
+                let has_max_scaffold = self.max_scaffold.is_some();
+                let has_ref = self.reference.is_some();
+
+                if has_ref || (has_max_span && has_max_scaffold) {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "--score-type gs or ags requires both --max-span and --max-scaffold, or a --reference"
+                    ))
+                }
+            }
+        }
     }
 }
 
@@ -596,4 +885,45 @@ pub struct ValidateOptions {
 /// Command line argument parser
 pub fn parse() -> Arguments {
     Arguments::parse()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plot_badge_rejects_non_linear_scale() {
+        let options = PlotOptions {
+            badge: true,
+            scale_function: Some(Scale::SQRT),
+            ..Default::default()
+        };
+
+        let err = options.validate_score_type().unwrap_err();
+        assert_eq!(err.to_string(), BADGE_LINEAR_SCALE_ERROR);
+    }
+
+    #[test]
+    fn plot_badge_accepts_snail_default_linear_scale() {
+        let options = PlotOptions {
+            badge: true,
+            view: View::Snail,
+            scale_function: None,
+            ..Default::default()
+        };
+
+        assert!(options.validate_score_type().is_ok());
+    }
+
+    #[test]
+    fn snail_badge_rejects_non_linear_scale() {
+        let options = SnailOptions {
+            badge: true,
+            scale_function: Scale::SQRT,
+            ..Default::default()
+        };
+
+        let err = options.validate_score_type().unwrap_err();
+        assert_eq!(err.to_string(), BADGE_LINEAR_SCALE_ERROR);
+    }
 }

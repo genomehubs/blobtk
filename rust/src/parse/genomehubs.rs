@@ -61,6 +61,31 @@ impl fmt::Display for StringOrVec {
     }
 }
 
+impl StringOrVec {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StringOrVec::Single(s) => s.as_str(),
+            StringOrVec::Multiple(v) => v.get(0).map(|s| s.as_str()).unwrap_or(""),
+        }
+    }
+
+    pub fn into_vec(self) -> Vec<String> {
+        match self {
+            StringOrVec::Single(s) => vec![s],
+            StringOrVec::Multiple(v) => v,
+        }
+    }
+}
+
+impl std::str::FromStr for StringOrVec {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Single occurrence becomes Single variant
+        Ok(StringOrVec::Single(s.to_string()))
+    }
+}
+
 // Value may be u32 or Vec of u32
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
@@ -965,6 +990,10 @@ impl GHubsConfig {
     }
 
     pub fn write_yaml(&self, output_file: &PathBuf) -> Result<(), error::Error> {
+        // Ensure parent directory exists
+        if let Some(parent) = output_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let yaml = self.to_yaml()?;
         let mut file = OpenOptions::new()
             .write(true)
@@ -1004,7 +1033,7 @@ impl GHubsConfig {
             file_config.comment_char,
             0,
             false,
-        );
+        )?;
 
         if let Some(keys) = keys {
             if file_config.header {
@@ -1085,14 +1114,17 @@ impl GHubsConfig {
             GHubsFileFormat::CSV => b',',
             GHubsFileFormat::TSV => b'\t',
         };
-        let mut rdr = io::get_csv_reader(
+        let mut rdr = match io::get_csv_reader(
             &Some(file_path),
             delimiter,
             true,
             file_config.comment_char,
             0,
             false,
-        );
+        ) {
+            Ok(reader) => reader,
+            Err(_) => return fixed_names,
+        };
         let expected_headers = ["taxon_id", "input", "rank"];
         let headers = rdr.headers().unwrap().clone();
         for (i, header) in headers.iter().enumerate() {
