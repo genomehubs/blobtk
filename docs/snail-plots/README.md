@@ -1,121 +1,211 @@
-# Snail Plots
+# Snail plots
 
-Reproducible examples for the snail plot manuscript.
+Reproducible plotting workflow for manuscript figures using `prepare_figures.py`.
 
-Panels for Figures 1-4 were generated using the `prepare_figures.py` script
+## Requirements
 
-## Figure 1
+- `blobtk` (conda install tolkit::blobtk=0.8.0)
+- Python dependencies: `requests`, `pyyaml`
+- Optional PNG conversion:
+  - Linux: `rsvg-convert` (`apt install librsvg2-bin`)
+  - macOS: `rsvg-convert` (`brew install librsvg`) or `sips`
 
-### Scripted version:
+## Run
 
-```
-./prepare_figure.py -f 1
-```
+From `docs/snail-plots`:
 
-### Equivalent command
-
-```
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1 -o figure1/1.svg
-```
-
-## Figure 2
-
-### Scripted version:
-
-```
-./prepare_figure.py -f 2
+```bash
+./prepare_figures.py -f <FIGURE_NUMBER>
 ```
 
-### A. Mus musculus GCA_949316315.1 mMusMuc1_1
+Or choose output directory:
 
-```
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1 -o figure2/2A.png
-```
-
-### B., C., D. Mus Musculus GCA_000185125.1 AEKR01
-
-```
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/AEKR01 -o figure2/2B.png
-
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/AEKR01 --max-span 2770968735 -o figure2/2C.png
-
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/AEKR01 --max-span 2770968735 --max-scaffold 200127270 -o figure2/2D.png
+```bash
+./prepare_figures.py -f <FIGURE_NUMBER> -o <OUTPUT_DIR>
 ```
 
-## Figure 3
+Supported figure numbers: `1, 2, 3, 4, 5, 6, 7`.
 
-### Scripted version:
+## What each figure command generates
 
-```
-./prepare_figure.py -f 3
-```
+### Figure 1 (`-f 1`)
 
-### A., B. Mus musculus GCA_949316315.1 mMusMuc1_1
+- Builds `figure1/1.svg` plus extracted component panels `1A.svg`–`1I.svg`
+- Assembles `figure1/figure1.png`
+- Also creates an auxiliary reference plot for panel extraction:
+  - `figure7/7A.svg`
+  - `figure7/7A.yaml`
 
-```
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1 --show-numbers -o figure3/3A.png
+**Equivalent commands:**
 
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1 --scale-function linear --show-numbers -o figure3/3B.png
+```bash
+# Main snail plot (GCA_949316315.1 – Mus musculus mMusMus1.1)
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_949316315.1 \
+  -o figure1/1.svg
 
-blobtk plot -v snail -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/mMusMuc1_1 -o figure3/GCA_949316315.1.yaml
-```
-
-## Figure 4
-
-### Scripted version:
-
-```
-./prepare_figure.py -f 1
-```
-
-### Partially equivalent commands
-
-Genomes are subsampled from a from [goat search of contig vs scaffold n50](https://goat.genomehubs.org/2025.04.21/search?query=scaffold_n50%20AND%20scaffold_n50%3E%3D10000%20AND%20assembly_span%20%3E%2010000000%20AND%20assembly_level%3Dscaffold%2Cchromosome%2Ccomplete%20genome%20AND%20busco_completeness%20%3E%2080%20AND%20contig_n50%3E1000&result=assembly&taxonomy=ncbi&size=10000&report=scatter&y=contig_n50&plotRatio=auto&pointSize=15&xField=scaffold_n50&xOpts=10000%3B10000000000%3B7&yOpts=1000%3B1000000000%3B7)
-
-The full list of results is fetched vai the API
-
-```
-curl -H 'accept: text/tab-separated-values' "https://goat.genomehubs.org/api/v2/search?query=scaffold_n50%20AND%20scaffold_n50%3E%3D10000%20AND%20assembly_span%20%3E%2010000000%20AND%20assembly_level%3Dscaffold%2Cchromosome%2Ccomplete%20genome%20AND%20busco_completeness%20%3E%2080%20AND%20contig_n50%3E1000&result=assembly&taxonomy=ncbi&size=10000&report=scatter&y=contig_n50&plotRatio=auto&pointSize=15&xField=scaffold_n50&xOpts=10000%3B10000000000%3B7&yOpts=1000%3B1000000000%3B7" > f2-assembly-data.raw.tsv
+# Auxiliary reference-comparison plot used for panel 1H (also used by Figure 7)
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_949316315.1 \
+  -o figure7/7A.svg \
+  --show-numbers \
+  --assembly-name GCA_949316315.1 \
+  --reference "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/964/188/535/GCA_964188535.1_C57BL_6J_T2T_v1/GCA_964188535.1_C57BL_6J_T2T_v1_genomic.fna.gz" \
+  --reference-name "GCA_964188535.1 T2T" \
+  --show-score \
+  --score-type g \
+  --output figure7/7A.yaml
 ```
 
-This output is processed to randomly select representative assemblies for each contig/scaffold bin, using a seed value of 1031 for reproducibility, so remaining steps must be run using the `prepare_figures.py` script.
+Panels `1A.svg`–`1I.svg` are extracted from `1.svg` and `7A.svg` by the script using SVG group IDs.
 
-## Figure 5
+### Figure 2 (`-f 2`)
 
-A taxonomy tree view of assemblies in Figure 4 was generated using GoaT.
+- Builds `figure2/2A.svg`, `figure2/2B.svg`
+- Assembles `figure2/figure2.png`
 
-### Get list of assemblies from Figure 4 tsv file
+**Equivalent commands:**
 
-```
-cut -f 6 figure4/figure4_snail_badge_table.tsv
-assembly_id
-GCA_900322205.1
-GCA_003016195.1
-GCA_001632505.1
-GCA_000261425.2
-GCA_002222395.1
-GCA_020883555.1
-GCA_001661245.1
-GCA_000204055.1
-GCA_964340765.1
-GCA_013467465.1
-GCA_014337955.1
-GCA_018257905.1
-GCA_964340405.1
-GCA_000001215.4
-GCA_003033685.1
-GCA_013339765.2
-GCA_963691655.1
-GCA_949316315.1
-GCA_019009955.1
-GCA_964205295.1
-GCA_963693085.1
+```bash
+# Panel A – high-quality assembly (GCA_949316315.1 – Mus musculus mMusMus1.1)
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_949316315.1 \
+  -o figure2/2A.svg
+
+# Panel B – fragmented assembly (GCA_000185125.1 – Aedes aegypti AaegL3)
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_000185125.1 \
+  -o figure2/2B.svg
 ```
 
-### Use to build a GoaT URL to view the tree
+### Figure 3 (`-f 3`)
 
-Resulting [GoaT URL](https://goat.genomehubs.org/search?query=assembly_id%3DGCA_900322205.1%2CGCA_003016195.1%2CGCA_001632505.1%2CGCA_000261425.2%2CGCA_002222395.1%2CGCA_020883555.1%2CGCA_001661245.1%2CGCA_000204055.1%2CGCA_964340765.1%2CGCA_013467465.1%2CGCA_014337955.1%2CGCA_018257905.1%2CGCA_964340405.1%2CGCA_000001215.4%2CGCA_003033685.1%2CGCA_013339765.2%2CGCA_963691655.1%2CGCA_949316315.1%2CGCA_019009955.1%2CGCA_964205295.1%2CGCA_963693085.1&result=assembly&includeEstimates=true&taxonomy=ncbi&report=tree&collapseMonotypic=true&treeStyle=ring&treeThreshold=2000&pointSize=15&y=assembly_span&cat=kingdom&hideSourceColors=true&size=10)
+- Builds `figure3/3A.svg`, `figure3/3B.svg`, `figure3/3C.svg`
+- Assembles `figure3/figure3.png`
 
-## Figure 6
+**Equivalent commands:**
 
-Is a version of Figure 4 manually edited to include snail score and taxonomy information.
+```bash
+# Panel A – default scale (GCA_000185125.1 – Aedes aegypti AaegL3)
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_000185125.1 \
+  -o figure3/3A.svg \
+  --show-numbers --scale-function sqrt
+
+# Panel B – fixed outer ring span (same as species genome size)
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_000185125.1 \
+  -o figure3/3B.svg \
+  --show-numbers --scale-function sqrt \
+  --max-span 2770968735
+
+# Panel C – fixed outer ring span and longest-scaffold reference
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_000185125.1 \
+  -o figure3/3C.svg \
+  --show-numbers --scale-function sqrt \
+  --max-span 2770968735 \
+  --max-scaffold 200127270
+```
+
+### Figure 4 (`-f 4`)
+
+- Fetches GoaT assembly data, bins and samples representatives (seeded)
+- Builds badge SVG/YAML for each selected representative
+- Builds grid outputs:
+  - `figure4/figure4_snail_badge_grid.svg`
+  - `figure4/figure4_snail_badge_grid.png`
+  - `figure4/figure4_snail_badge_table.tsv`
+- Builds panel B and combined outputs:
+  - `figure4/figure4_panelB.svg`
+  - `figure4/figure4.svg`
+  - `figure4/figure4.png`
+
+`figure4/figure4_snail_badge_table.tsv` is used as the source data for manuscript Table 3.
+
+**Equivalent commands:**
+
+The script queries GoaT, bins assemblies by scaffold/contig N50 order of magnitude, and selects one representative per bin (seed 1031). Badges are then generated with:
+
+```bash
+# Repeated for each representative assembly
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/<BLOBTOOLKIT_ID> \
+  -o figure4/<ASSEMBLY_ID>_snail_badge.svg \
+  --badge \
+  -o figure4/<ASSEMBLY_ID>_snail_badge.yaml
+```
+
+The badge grid SVG, panel B zoom inset (for GCA_003033685.1), and the combined figure are assembled from individual badge SVGs by the script.
+
+### Figure 5 (`-f 5`)
+
+- Prints the GoaT tree URL used for Figure 5.
+- No local SVG/PNG files are generated by this step.
+
+The figure is based on the GoaT tree report at:
+
+```
+https://goat.genomehubs.org/search?query=assembly_id%3DGCA_900322205.1%2CGCA_003016195.1%2C...&result=assembly&report=tree&treeStyle=ring&...
+```
+
+The final figure was exported from the GoaT web interface and annotated in Inkscape to ensure all GCA accessions were visible.
+
+### Figure 6 (`-f 6`)
+
+- Reuses the Figure 4 badge table when available (`figure4/figure4_snail_badge_table.tsv`)
+- Builds Figure 6 badge grid outputs:
+  - `figure6/figure6_snail_badge_grid.svg`
+  - `figure6/figure6_snail_badge_grid.png`
+  - `figure6/figure6_snail_badge_table.tsv`
+
+Figure 6 reuses the badge SVG and YAML files generated for Figure 4 (`figure4/<ASSEMBLY_ID>_snail_badge.svg`) the grid is assembled and annotated by the script.
+
+### Figure 7 (`-f 7`)
+
+- Builds three reference-comparison snail plots and YAMLs:
+  - `figure7/7A.svg`, `figure7/7A.yaml`
+  - `figure7/7B.svg`, `figure7/7B.yaml`
+  - `figure7/7C.svg`, `figure7/7C.yaml`
+- Assembles `figure7/figure7.png`
+- Writes score comparison table:
+  - `figure7/figure7_plot_data.tsv`
+
+`figure7/figure7_plot_data.tsv` is used as the source data for manuscript Table 4.
+
+**Equivalent commands:**
+
+```bash
+# Panel A – Mus musculus mMusMus1.1 vs T2T C57BL/6J
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/GCA_949316315.1 \
+  -o figure7/7A.svg \
+  --show-numbers \
+  --assembly-name GCA_949316315.1 \
+  --reference "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/964/188/535/GCA_964188535.1_C57BL_6J_T2T_v1/GCA_964188535.1_C57BL_6J_T2T_v1_genomic.fna.gz" \
+  --reference-name "GCA_964188535.1 T2T" \
+  --show-score --score-type g \
+  --output figure7/7A.yaml
+
+# Panel B – Nelumbo nucifera (GCA_003033685.1) vs T2T China Antique
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/DLUB01.1 \
+  -o figure7/7B.svg \
+  --show-numbers \
+  --assembly-name GCA_003033685.1 \
+  --reference "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/055/504/915/GCA_055504915.1_China_Antique-T2T/GCA_055504915.1_China_Antique-T2T_genomic.fna.gz" \
+  --reference-name "GCA_055504915.1 T2T" \
+  --show-score --score-type g \
+  --output figure7/7B.yaml
+
+# Panel C – Pyricularia oryzae (GCA_003016195.1) vs PoP131
+blobtk snail \
+  -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/MQPG01 \
+  -o figure7/7C.svg \
+  --show-numbers \
+  --assembly-name GCA_003016195.1 \
+  --reference "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/292/605/GCA_000292605.2_PoP131/GCA_000292605.2_PoP131_genomic.fna.gz" \
+  --reference-name "GCA_000292605.2 T2T" \
+  --show-score --score-type g \
+  --output figure7/7C.yaml
+```
