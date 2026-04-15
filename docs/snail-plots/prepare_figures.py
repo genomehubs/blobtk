@@ -538,11 +538,11 @@ def make_figure4_full(directory, grid_svg_path, panel_b_svg_path, dpi=150):
     lines = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{canvas_width}" height="{canvas_height}" viewBox="0 0 {canvas_width} {canvas_height}">',
         '<rect x="0" y="0" width="100%" height="100%" fill="white"/>',
-        f'<text x="{label_offset_x}" y="{top_margin + label_size}" font-family="{label_font}" font-size="{label_size}" font-weight="normal" fill="black">A</text>',
+        f'<text x="{label_offset_x}" y="{top_margin + label_size}" font-family="{label_font}" font-size="{label_size}" font-weight="normal" fill="black">a</text>',
         f'<svg x="{left_margin}" y="{panel_a_y}" width="{panel_a_width}" height="{panel_a_height}" viewBox="{panel_a_viewbox or f"0 0 {panel_a_width} {panel_a_height}"}">',
         *panel_a_children,
         "</svg>",
-        f'<text x="{label_offset_x}" y="{panel_a_y + panel_a_height + inter_panel_gap + label_size}" font-family="{label_font}" font-size="{label_size}" font-weight="normal" fill="black">B</text>',
+        f'<text x="{label_offset_x}" y="{panel_a_y + panel_a_height + inter_panel_gap + label_size}" font-family="{label_font}" font-size="{label_size}" font-weight="normal" fill="black">b</text>',
         f'<svg x="{left_margin + 500}" y="{panel_b_y}" width="{panel_a_width}" height="{panel_b_height}" viewBox="{panel_b_viewbox or f"0 0 {panel_a_width} {panel_b_height}"}">',
         *panel_b_children,
         "</svg>",
@@ -788,7 +788,7 @@ def assemble_figure(
 
         lines.extend(
             (
-                f'    <text x="{label_offset_x}" y="{label_size * 0.85}" font-family="{label_font}" font-size="{label_size}" font-weight="normal" fill="black">{label}</text>',
+                f'    <text x="{label_offset_x}" y="{label_size * 0.85}" font-family="{label_font}" font-size="{label_size}" font-weight="normal" fill="black">{label.lower()}</text>',
                 "  </g>",
             )
         )
