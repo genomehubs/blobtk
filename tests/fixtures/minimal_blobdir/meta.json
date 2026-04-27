@@ -1,0 +1,58 @@
+{
+  "id": "minimal",
+  "name": "minimal",
+  "record_type": "scaffold",
+  "records": 3,
+  "revision": 0,
+  "version": 1,
+  "assembly": {
+    "accession": "draft",
+    "level": "scaffold",
+    "prefix": "minimal"
+  },
+  "fields": [
+    {
+      "id": "identifiers",
+      "type": "identifiers",
+      "datatype": "string",
+      "count": 3,
+      "preload": true,
+      "active": true
+    },
+    {
+      "id": "position_windows",
+      "datatype": "mixed"
+    },
+    {
+      "id": "gc_windows",
+      "datatype": "mixed"
+    },
+    {
+      "id": "length_windows",
+      "datatype": "mixed"
+    },
+    {
+      "id": "position",
+      "datatype": "float",
+      "range": [0.0, 1.0],
+      "scale": "linear"
+    },
+    {
+      "id": "gc",
+      "datatype": "float",
+      "range": [0.0, 1.0],
+      "scale": "linear"
+    },
+    {
+      "id": "length",
+      "datatype": "float",
+      "range": [0.0, 300.0],
+      "scale": "linear"
+    }
+  ],
+  "plot": {},
+  "taxon": {
+    "name": "unnamed",
+    "taxid": "0"
+  }
+}
