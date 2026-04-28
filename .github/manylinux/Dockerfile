@@ -4,16 +4,16 @@ FROM quay.io/pypa/manylinux2014_x86_64
 # Install system build deps and tooling
 RUN yum -y update && \
     yum -y install --setopt=tsflags=nodocs \
-      openssl-devel \
-      zlib-devel \
-      perl \
-      perl-ExtUtils-MakeMaker \
-      make \
-      gcc \
-      gcc-c++ \
-      which \
-      pkgconfig \
-      curl && \
+    openssl-devel \
+    zlib-devel \
+    perl \
+    perl-ExtUtils-MakeMaker \
+    make \
+    gcc \
+    gcc-c++ \
+    which \
+    pkgconfig \
+    curl && \
     yum clean all && rm -rf /var/cache/yum
 
 # Install rustup/cargo into a global location and add toolchain
