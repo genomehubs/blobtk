@@ -50,7 +50,11 @@
       "scale": "linear"
     }
   ],
-  "plot": {},
+  "plot": {
+    "x": "position",
+    "y": "gc",
+    "z": "length"
+  },
   "taxon": {
     "name": "unnamed",
     "taxid": "0"
