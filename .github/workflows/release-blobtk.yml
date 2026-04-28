@@ -726,7 +726,7 @@ jobs:
           else
             IMG=genomehubs/blobtk:${{ env.VERSION }}
           fi
-          docker run --rm -v ${{ github.workspace }}/tests/fixtures/minimal_blobdir:/data/fixtures -v ${{ github.workspace }}/dist:/out $IMG plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
+          docker run --rm -v ${{ github.workspace }}/tests/fixtures/minimal_blobdir:/data/fixtures -v ${{ github.workspace }}/dist:/out $IMG blobtk plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
           ls -l dist/out-docker.svg || true
 
   upload-to-conda:

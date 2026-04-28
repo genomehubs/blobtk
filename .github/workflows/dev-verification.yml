@@ -164,6 +164,12 @@ jobs:
                   # Run the grid smoke command against the minimal fixture to exercise plotting
                   dist/blobtk-linux plot --shape grid --view blob -d tests/fixtures/minimal_blobdir -o dist/out.svg
                   ls -l dist/out.svg || true
+                  # Test remote excecution using a blobdir URL
+                  dist/blobtk-linux plot --shape circle --view blob -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/CAJEUD01.1 -o dist/remote.svg
+                  ls -l dist/remote.svg || true
+                  # Test png output
+                  dist/blobtk-linux plot --shape grid --view blob -d tests/fixtures/minimal_blobdir -o dist/out.png
+                  ls -l dist/out.png || true
 
     verify-docker-image:
         runs-on: ubuntu-latest
@@ -175,5 +181,5 @@ jobs:
                   IMG_TAG=genomehubs/blobtk:dev-${{ github.run_id }}
                   docker build -t "$IMG_TAG" ./rust
                   mkdir -p dist
-                  docker run --rm -v ${{ github.workspace }}/tests/fixtures/minimal_blobdir:/data/fixtures -v ${{ github.workspace }}/dist:/out "$IMG_TAG" plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
+                  docker run --rm -v ${{ github.workspace }}/tests/fixtures/minimal_blobdir:/data/fixtures -v ${{ github.workspace }}/dist:/out "$IMG_TAG" blobtk plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
                   ls -l dist/out-docker.svg || true

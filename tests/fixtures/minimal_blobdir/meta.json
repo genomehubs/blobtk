@@ -45,8 +45,14 @@
     },
     {
       "id": "length",
-      "datatype": "float",
-      "range": [0.0, 300.0],
+      "datatype": "integer",
+      "range": [0.0, 150],
+      "scale": "linear"
+    },
+    {
+      "id": "ncount",
+      "datatype": "integer",
+      "range": [0, 2],
       "scale": "linear"
     }
   ],
