@@ -244,19 +244,27 @@ jobs:
           context: ./.github/manylinux
           file: ./.github/manylinux/Dockerfile
           push: false
+          load: true
           tags: genomehubs/blobtk-manylinux:latest
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist -i python${{ matrix.python }} --target
-            x86_64-unknown-linux-gnu -m rust/Cargo.toml
-          sccache: "true"
-          rust-toolchain: 1.91.0
-          manylinux: genomehubs/blobtk-manylinux:latest
+      - name: Build wheels inside custom manylinux container
         env:
-          RUSTUP_TOOLCHAIN: 1.91.0
+          PY: ${{ matrix.python }}
+        run: |
+          mkdir -p dist
+          docker run --rm -e PY=${{ matrix.python }} -v "${{ github.workspace }}":/io -w /io genomehubs/blobtk-manylinux:latest /bin/bash -lc '
+            set -e
+            PYBIN=""
+            for p in /opt/python/*/bin/python; do
+              if "$p" -V 2>&1 | grep -q "Python $PY"; then
+                PYBIN="$p"
+                break
+              fi
+            done
+            if [ -z "$PYBIN" ]; then echo "No Python $PY found in image"; exit 1; fi
+            "$PYBIN" -m pip install --upgrade pip setuptools wheel
+            "$PYBIN" -m pip install maturin
+            "$PYBIN" -m maturin build --release --out /io/dist -i "$PYBIN" -m /io/rust/Cargo.toml --manylinux off
+          '
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
