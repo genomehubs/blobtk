@@ -1,0 +1,40 @@
+on:
+    workflow_call:
+        inputs:
+            python_versions:
+                required: false
+                type: string
+                default: "[\"3.11\"]"
+            artifact_prefix:
+                required: false
+                type: string
+                default: wheels-linux-
+            test_path:
+                required: false
+                type: string
+                default: tests/test_grid_smoke.py::test_grid_smoke
+
+jobs:
+    verify-wheels:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python: ${{ fromJson(inputs.python_versions) }}
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions/download-artifact@v4
+              with:
+                  name: ${{ inputs.artifact_prefix }}${{ matrix.python }}
+                  path: dist
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: ${{ matrix.python }}
+            - name: Install wheel and run import + smoke test
+              run: |
+                  python -m venv .venv
+                  . .venv/bin/activate
+                  pip install --upgrade pip
+                  pip install dist/*.whl
+                  pip install pytest
+                  pytest -q ${{ inputs.test_path }}

@@ -1,185 +1,114 @@
 name: dev-release-verification
 
 on:
-    push:
-        branches:
-            - develop
-            - feature/*
-    pull_request:
-        branches:
-            - develop
+  push:
+    branches:
+      - develop
+      - "feature/*"
+  pull_request:
+    branches:
+      - develop
 
 env:
-    VERSION: ${{ github.ref_name }}
+  VERSION: ${{ github.ref_name }}
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/cache@v3
-              with:
-                  path: |
-                      ~/.cargo/bin/
-                      ~/.cargo/registry/index/
-                      ~/.cargo/registry/cache/
-                      ~/.cargo/git/db/
-                      rust/target/
-                  key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@v1
-              with:
-                  toolchain: 1.91.0
-                  targets: x86_64-unknown-linux-gnu
-                  components: rustfmt, clippy
-            - name: Run tests
-              working-directory: ./rust
-              run: cargo test --all --lib --bins --target x86_64-unknown-linux-gnu
-            - name: Check formatting
-              working-directory: ./rust
-              run: cargo fmt --check
-            - name: Run clippy
-              working-directory: ./rust
-              run: cargo clippy --all --target x86_64-unknown-linux-gnu -- -W
-                  clippy::correctness -W clippy::perf -A unused
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.91.0
+          targets: x86_64-unknown-linux-gnu
+          components: rustfmt, clippy
+      - name: Run tests
+        working-directory: ./rust
+        run: cargo test --all --lib --bins --target x86_64-unknown-linux-gnu
+      - name: Check formatting
+        working-directory: ./rust
+        run: cargo fmt --check
+      - name: Run clippy
+        working-directory: ./rust
+        run: |
+          cargo clippy --all --target x86_64-unknown-linux-gnu -- \
+            -W clippy::correctness \
+            -W clippy::perf \
+            -A unused
 
-    linux-binary:
-        runs-on: ubuntu-latest
-        needs: [ test ]
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/cache@v3
-              with:
-                  path: |
-                      ~/.cargo/bin/
-                      ~/.cargo/registry/index/
-                      ~/.cargo/registry/cache/
-                      ~/.cargo/git/db/
-                      rust/target/
-                  key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-
-            - name: Install static libraries for C
-              run: sudo apt-get install -y libc6-dev
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@v1
-              with:
-                  toolchain: 1.91.0
-                  targets: x86_64-unknown-linux-gnu
-            - name: Build
-              working-directory: ./rust
-              run: RUSTFLAGS="-C target-feature=+crt-static -C relocation-model=static" cargo
-                  build --target x86_64-unknown-linux-gnu --release
-            - name: Rename binary
-              run: |
-                  mv ./rust/target/x86_64-unknown-linux-gnu/release/blobtk ./rust/target/release/blobtk-linux
-            - name: Upload binary
-              uses: actions/upload-artifact@v4
-              with:
-                  name: binaries-linux
-                  path: ./rust/target/release/blobtk-*
+  linux-binary:
+    uses: ./.github/workflows/build-linux-binary.yml
+    with:
+      rust_directory: ./rust
+      target: x86_64-unknown-linux-gnu
+      output_name: blobtk-linux
+      artifact_name: binaries-linux
+      rust_toolchain: "1.91.0"
+      rustflags: "-C target-feature=+crt-static -C relocation-model=static"
+    needs: [ test ]
 
-    linux-wheels:
-        runs-on: ubuntu-latest
-        needs: [ test ]
-        strategy:
-            matrix:
-                python:
-                    - "3.11"
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/cache@v3
-              with:
-                  path: |
-                      ~/.cargo/bin/
-                      ~/.cargo/registry/index/
-                      ~/.cargo/registry/cache/
-                      ~/.cargo/git/db/
-                      rust/target/
-                  key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-
-            - uses: actions/setup-python@v4
-              with:
-                  python-version: ${{ matrix.python }}
-            - name: Build wheels
-              uses: PyO3/maturin-action@v1
-              with:
-                  target: x86_64-unknown-linux-gnu
-                  args: --release --out dist -i python${{ matrix.python }} --target
-                      x86_64-unknown-linux-gnu -m rust/Cargo.toml
-                  sccache: "true"
-                  rust-toolchain: 1.91.0
-              env:
-                  RUSTUP_TOOLCHAIN: 1.91.0
-            - name: Upload wheels
-              uses: actions/upload-artifact@v4
-              with:
-                  name: wheels-linux-${{ matrix.python }}
-                  path: dist
+  macos-binary:
+    uses: ./.github/workflows/build-macos-binary.yml
+    with:
+      rust_directory: ./rust
+      target: x86_64-apple-darwin
+      output_name: blobtk-macos-x64
+      artifact_name: binaries-macos-x64
+      rust_toolchain: "1.91.0"
+      mac_deployment_target: "10.13"
+    needs: [ test ]
 
-    verify-linux-wheels:
-        runs-on: ubuntu-latest
-        needs:
-            - linux-wheels
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/download-artifact@v4
-              with:
-                  name: wheels-linux-3.11
-                  path: dist
-            - name: Set up Python
-              uses: actions/setup-python@v4
-              with:
-                  python-version: "3.11"
-            - name: Install wheel and run import + smoke test
-              run: |
-                  python -m venv .venv
-                  . .venv/bin/activate
-                  pip install --upgrade pip
-                  pip install dist/*.whl
-                  pip install pytest
-                  pytest -q tests/test_grid_smoke.py::test_grid_smoke
+  macos-binary-arm64:
+    uses: ./.github/workflows/build-macos-binary.yml
+    with:
+      rust_directory: ./rust
+      target: aarch64-apple-darwin
+      output_name: blobtk-macos-arm64
+      artifact_name: binaries-macos-arm64
+      rust_toolchain: "1.91.0"
+      mac_deployment_target: "11.0"
+    needs: [ test ]
 
-    verify-linux-binary:
-        runs-on: ubuntu-latest
-        needs:
-            - linux-binary
-        steps:
-            - uses: actions/checkout@v3
-            - uses: actions/download-artifact@v4
-              with:
-                  name: binaries-linux
-                  path: dist
-            - name: Inspect and run binary smoke test
-              run: |
-                  ls -l dist
-                  chmod +x dist/blobtk-*
-                  file dist/blobtk-*
-                  # Basic version check
-                  dist/blobtk-linux --version || true
-                  if command -v ldd >/dev/null 2>&1; then ldd dist/blobtk-linux || true; fi
-                  # Run the grid smoke command against the minimal fixture to exercise plotting
-                  dist/blobtk-linux plot --shape grid --view blob -d tests/fixtures/minimal_blobdir -o dist/out.svg
-                  ls -l dist/out.svg || true
-                  # Test remote excecution using a blobdir URL
-                  dist/blobtk-linux plot --shape circle --view blob -d https://blobtoolkit.genomehubs.org/api/v1/dataset/id/CAJEUD01.1 -o dist/remote.svg
-                  ls -l dist/remote.svg || true
-                  # Test png output
-                  dist/blobtk-linux plot --shape grid --view blob -d tests/fixtures/minimal_blobdir -o dist/out.png
-                  ls -l dist/out.png || true
+  linux-wheels:
+    uses: ./.github/workflows/build-wheels.yml
+    with:
+      rust_directory: ./rust
+      python_versions: "[\"3.11\"]"
+      target: x86_64-unknown-linux-gnu
+      platform: linux
+      rust_toolchain: "1.91.0"
+    needs: [ test ]
 
-    verify-docker-image:
-        runs-on: ubuntu-latest
-        needs: [ test ]
-        steps:
-            - uses: actions/checkout@v3
-            - name: Build image and run smoke test
-              run: |
-                  IMG_TAG=genomehubs/blobtk:dev-${{ github.run_id }}
-                  docker build -t "$IMG_TAG" ./rust
-                  mkdir -p dist
-                  docker run --rm -v ${{ github.workspace }}/tests/fixtures/minimal_blobdir:/data/fixtures -v ${{ github.workspace }}/dist:/out "$IMG_TAG" blobtk plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
-                  ls -l dist/out-docker.svg || true
+  verify-linux-wheels:
+    uses: ./.github/workflows/verify-wheels.yml
+    with:
+      python_versions: "[\"3.11\"]"
+      artifact_prefix: "wheels-linux-"
+      test_path: "tests/test_grid_smoke.py::test_grid_smoke"
+    needs: [ linux-wheels ]
+
+  verify-linux-binary:
+    uses: ./.github/workflows/verify-binary.yml
+    with:
+      artifact_name: binaries-linux
+      binary_glob: "blobtk-*"
+    needs: [ linux-binary ]
+
+  verify-docker-image:
+    uses: ./.github/workflows/verify-docker.yml
+    with:
+      build_context: ./rust
+      fixture_dir: tests/fixtures/minimal_blobdir
+    needs: [ test ]

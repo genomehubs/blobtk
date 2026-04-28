@@ -1,0 +1,68 @@
+on:
+    workflow_call:
+        inputs:
+            rust_directory:
+                required: false
+                type: string
+                default: ./rust
+            target:
+                required: false
+                type: string
+                default: x86_64-apple-darwin
+            artifact_name:
+                required: false
+                type: string
+                default: binaries-macos-x64
+            output_name:
+                required: false
+                type: string
+                default: blobtk-macos-x64
+            rust_toolchain:
+                required: false
+                type: string
+                default: "1.91.0"
+            mac_deployment_target:
+                required: false
+                type: string
+                default: "10.13"
+
+jobs:
+    build-macos:
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/.cargo/bin/
+                      ~/.cargo/registry/index/
+                      ~/.cargo/registry/cache/
+                      ~/.cargo/git/db/
+                      ${{ inputs.rust_directory }}/target/
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-
+            - uses: actions/setup-python@v4
+              with:
+                  python-version: "3.10"
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@v1
+              with:
+                  toolchain: ${{ inputs.rust_toolchain }}
+                  targets: ${{ inputs.target }}
+            - name: Build
+              working-directory: ${{ inputs.rust_directory }}
+              run: |
+                  cargo build --target=${{ inputs.target }} --release
+            - name: Rename binary
+              run: |
+                  mv ${{ inputs.rust_directory }}/target/${{ inputs.target }}/release/blobtk ${{ inputs.rust_directory }}/target/${{ inputs.target }}/release/${{ inputs.output_name }}
+            - name: Verify macOS deployment target
+              run: |
+                  bash ./.github/scripts/check-macos-min-version.sh ${{ inputs.rust_directory }}/target/${{ inputs.target }}/release/${{ inputs.output_name }} ${{ inputs.mac_deployment_target }}
+            - name: Upload binary
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ inputs.artifact_name }}
+                  path: ${{ inputs.rust_directory }}/target/${{ inputs.target }}/release/${{
+                      inputs.output_name }}*

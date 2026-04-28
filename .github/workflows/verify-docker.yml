@@ -1,0 +1,33 @@
+on:
+    workflow_call:
+        inputs:
+            image:
+                required: false
+                type: string
+                default: ""
+            build_context:
+                required: false
+                type: string
+                default: ./rust
+            fixture_dir:
+                required: false
+                type: string
+                default: tests/fixtures/minimal_blobdir
+
+jobs:
+    verify-docker:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - name: Build or pull image and run smoke test
+              run: |
+                  mkdir -p dist
+                  if [ -n "${{ inputs.image }}" ]; then
+                    IMG=${{ inputs.image }}
+                    docker pull "$IMG" || true
+                  else
+                    IMG=genomehubs/blobtk:dev-${{ github.run_id }}
+                    docker build -t "$IMG" ${{ inputs.build_context }}
+                  fi
+                  docker run --rm -v ${{ github.workspace }}/${{ inputs.fixture_dir }}:/data/fixtures -v ${{ github.workspace }}/dist:/out "$IMG" blobtk plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
+                  ls -l dist/out-docker.svg || true

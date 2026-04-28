@@ -1,0 +1,35 @@
+on:
+    workflow_call:
+        inputs:
+            artifact_name:
+                required: false
+                type: string
+                default: binaries-linux
+            binary_glob:
+                required: false
+                type: string
+                default: blobtk-*
+
+jobs:
+    verify-binary:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions/download-artifact@v4
+              with:
+                  name: ${{ inputs.artifact_name }}
+                  path: dist
+            - name: Inspect and run binary smoke test
+              run: |
+                  ls -l dist
+                  chmod +x dist/${{ inputs.binary_glob }} || true
+                  file dist/${{ inputs.binary_glob }} || true
+                  for f in dist/${{ inputs.binary_glob }}; do
+                    if [ -f "$f" ]; then
+                      echo "== $f =="
+                      "$f" --version || true
+                      if command -v ldd >/dev/null 2>&1; then ldd "$f" || true; fi
+                      "$f" plot --shape grid --view blob -d tests/fixtures/minimal_blobdir -o dist/out.svg || true
+                      ls -l dist/out.svg || true
+                    fi
+                  done

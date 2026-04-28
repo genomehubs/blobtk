@@ -2,9 +2,6 @@ name: release-blobtk
 
 on:
   push:
-    branches:
-      - develop
-      - feature/*
     tags:
       - "*"
   workflow_dispatch:
@@ -47,8 +44,8 @@ jobs:
         run: cargo fmt --check
       - name: Run clippy
         working-directory: ./rust
-        run: cargo clippy --all --target x86_64-unknown-linux-gnu -- -W
-          clippy::correctness -W clippy::perf -A unused
+        run: |
+          cargo clippy --all --target x86_64-unknown-linux-gnu -- -W clippy::correctness -W clippy::perf -A unused
 
   macos-binary:
     runs-on: macos-latest
@@ -163,8 +160,8 @@ jobs:
           targets: x86_64-unknown-linux-gnu
       - name: Build
         working-directory: ./rust
-        run: RUSTFLAGS="-C target-feature=+crt-static -C relocation-model=static" cargo
-          build --target x86_64-unknown-linux-gnu --release
+        run: |
+          RUSTFLAGS="-C target-feature=+crt-static -C relocation-model=static" cargo build --target x86_64-unknown-linux-gnu --release
       - name: Rename binary
         run: |
           mv ./rust/target/x86_64-unknown-linux-gnu/release/blobtk ./rust/target/release/blobtk-linux
