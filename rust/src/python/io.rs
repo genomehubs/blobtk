@@ -9,7 +9,9 @@ use std::io::{BufRead, BufWriter, Read, Write};
 use std::os::unix::io::{AsRawFd, IntoRawFd};
 use std::path::{Path, PathBuf};
 
+use crate::fastq as rust_fastq;
 use crate::io as rust_io;
+use needletail::FastxReader;
 
 use pyo3::Py;
 use pyo3::PyRefMut;
@@ -157,6 +159,79 @@ pub fn open_lines_iter(py: Python, path: String) -> PyResult<Py<LineIter>> {
 pub struct PyWriter {
     writer: Option<Box<dyn Write>>,
     file: Option<File>,
+}
+
+#[pyclass(unsendable)]
+pub struct FastxIter {
+    reader: Option<Box<dyn FastxReader>>,
+}
+
+#[pymethods]
+impl FastxIter {
+    fn __iter__(slf: PyRefMut<Self>) -> PyResult<Py<FastxIter>> {
+        Ok(slf.into())
+    }
+
+    fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<(String, String, Option<String>)>> {
+        let mut rdr_opt = slf.reader.take();
+        let mut ret: Option<(String, String, Option<String>)> = None;
+        if let Some(mut rdr) = rdr_opt {
+            match rdr.next() {
+                Some(Ok(rec)) => {
+                    let id = String::from_utf8_lossy(rec.id().as_ref()).to_string();
+                    let seq = String::from_utf8_lossy(rec.seq().as_ref()).to_string();
+                    let qual = rec
+                        .qual()
+                        .map(|q| String::from_utf8_lossy(q.as_ref()).to_string());
+                    ret = Some((id, seq, qual));
+                }
+                Some(Err(e)) => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyIOError, _>(format!(
+                        "{}",
+                        e
+                    )))
+                }
+                None => ret = None,
+            }
+            slf.reader = Some(rdr);
+        }
+        Ok(ret)
+    }
+}
+
+#[pyfunction]
+pub fn read_fastx(file_path: Option<PathBuf>) -> PyResult<Vec<(String, String, Option<String>)>> {
+    let mut out: Vec<(String, String, Option<String>)> = Vec::new();
+    if let Some(pb) = file_path {
+        if let Some(mut rdr) = rust_fastq::open_fastx(&Some(pb)) {
+            while let Some(rec_res) = rdr.next() {
+                match rec_res {
+                    Ok(rec) => {
+                        let id = String::from_utf8_lossy(rec.id().as_ref()).to_string();
+                        let seq = String::from_utf8_lossy(rec.seq().as_ref()).to_string();
+                        let qual = rec
+                            .qual()
+                            .map(|q| String::from_utf8_lossy(q.as_ref()).to_string());
+                        out.push((id, seq, qual));
+                    }
+                    Err(e) => {
+                        return Err(PyErr::new::<pyo3::exceptions::PyIOError, _>(format!(
+                            "{}",
+                            e
+                        )))
+                    }
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+#[pyfunction]
+pub fn fastx_record_iter(py: Python, file_path: Option<PathBuf>) -> PyResult<Py<FastxIter>> {
+    let rdr_opt = rust_fastq::open_fastx(&file_path);
+    let iter = FastxIter { reader: rdr_opt };
+    Py::new(py, iter)
 }
 
 #[pymethods]

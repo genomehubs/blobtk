@@ -38,6 +38,8 @@ fn _blobtk(py: Python<'_>, m: Bound<'_, PyModule>) -> PyResult<()> {
     io.add_function(wrap_pyfunction!(io::write_csv, &io)?)?;
     io.add_function(wrap_pyfunction!(io::open_lines_iter, &io)?)?;
     io.add_function(wrap_pyfunction!(io::csv_record_iter, &io)?)?;
+    io.add_function(wrap_pyfunction!(io::read_fastx, &io)?)?;
+    io.add_function(wrap_pyfunction!(io::fastx_record_iter, &io)?)?;
     m.add_submodule(&io)?;
 
     Ok(())

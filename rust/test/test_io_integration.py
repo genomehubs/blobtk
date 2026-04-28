@@ -4,21 +4,25 @@ from blobtk import io as rust_io
 import io as stdlib_io
 import csv
 import os
+
+# make paths robust when running pytest from repo root (CI)
+THIS_DIR = os.path.dirname(__file__)
 try:
     import blobtk.adapters as shim_io
 except Exception:
     import sys
+
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python"))
     import blobtk_io as shim_io
 
 # Read the committed test list
-lst = rust_io.read_list("test/test.list")
+lst = rust_io.read_list(os.path.join(THIS_DIR, "test.list"))
 print("read_list:", lst)
 assert isinstance(lst, list)
 assert "FJNM01000076.1" in lst
 
 # Write a small list and read it back
-out_path = "test/out_list.tmp"
+out_path = os.path.join(THIS_DIR, "out_list.tmp")
 if os.path.exists(out_path):
     os.remove(out_path)
 
@@ -28,7 +32,7 @@ assert read_back == {"alpha", "beta"}
 print("write/read ok")
 
 # CSV and writer tests
-tmp_txt = "test/tmp_text.txt"
+tmp_txt = os.path.join(THIS_DIR, "tmp_text.txt")
 if os.path.exists(tmp_txt):
     os.remove(tmp_txt)
 w = rust_io.open_writer(tmp_txt)
@@ -38,7 +42,7 @@ lines = rust_io.open_lines(tmp_txt)
 assert lines == ["hello", "world"]
 print("text write/read ok")
 
-tmp_csv = "test/tmp.csv"
+tmp_csv = os.path.join(THIS_DIR, "tmp.csv")
 if os.path.exists(tmp_csv):
     os.remove(tmp_csv)
 rows = [["col1", "col2"], ["a", "1"], ["b", "2"]]
@@ -48,7 +52,7 @@ assert read_rows[0] == ["a", "1"]
 print("csv write/read ok")
 
 # Iterator tests (lines + CSV)
-it = rust_io.open_lines_iter("test/test.list")
+it = rust_io.open_lines_iter(os.path.join(THIS_DIR, "test.list"))
 collected = [x for x in it]
 assert "FJNM01000076.1" in collected
 print("open_lines_iter ok")
