@@ -100,6 +100,14 @@ jobs:
       test_path: "tests/test_grid_smoke.py::test_grid_smoke"
     needs: [ linux-wheels ]
 
+  verify-linux-wheels-rust-tests:
+    uses: ./.github/workflows/verify-wheels.yml
+    with:
+      python_versions: "[\"3.11\"]"
+      artifact_prefix: "wheels-linux-"
+      test_path: "rust/test"
+    needs: [ linux-wheels ]
+
   verify-linux-binary:
     uses: ./.github/workflows/verify-binary.yml
     with:
