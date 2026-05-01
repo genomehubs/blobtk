@@ -59,6 +59,7 @@ pub fn validate(options: &cli::ValidateOptions) -> Result<(), anyhow::Error> {
                 false,
                 None,
                 options.skip_tsv,
+                &options.experimental_fixes,
             )?;
         }
     }

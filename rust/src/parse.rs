@@ -14,6 +14,9 @@ pub mod lookup;
 /// Functions for handling names and nodes
 pub mod nodes;
 
+/// Feature gate system for experimental taxonomy fixes
+pub mod feature_gates;
+
 /// Functions for handling GenomeHubs configuration files
 pub mod genomehubs;
 
@@ -119,6 +122,7 @@ fn nodes_from_file(
     create_taxa: bool,
     xref_label: Option<String>,
     skip_tsv: bool,
+    experimental_fixes: &crate::parse::feature_gates::ExperimentalFixes,
 ) -> Result<(HashMap<String, Vec<Name>>, HashMap<String, Node>), error::Error> {
     let keys = vec!["attributes", "taxon_names", "taxonomy"];
     let mut fixed_names = HashMap::new();
@@ -178,7 +182,7 @@ fn nodes_from_file(
         let taxonomy_section = processed.get(&"taxonomy".to_string());
         let taxon_names_section = processed.get(&"taxon_names".to_string());
         let (assigned_taxon, taxon_match) =
-            match_taxonomy_section(taxonomy_section.unwrap(), id_map, Some(&fixed_names));
+            match_taxonomy_section(taxonomy_section.unwrap(), id_map, Some(&fixed_names), experimental_fixes);
         let taxon_name = taxon_match.taxon.name.clone();
         // add taxon name to combined report
         combined_report.taxon_name = Some(taxon_name.clone());
@@ -258,7 +262,7 @@ fn nodes_from_file(
             let mut parent_tax_id = None;
             let tax_section = taxonomy_section.unwrap();
             // Try to get genus from taxonomy_section or from species/subspecies name
-            let genus_name = if let Some(genus) = tax_section.get("genus") {
+            let mut genus_name = if let Some(genus) = tax_section.get("genus") {
                 if !genus.is_empty() {
                     Some(genus.clone())
                 } else {
@@ -272,14 +276,33 @@ fn nodes_from_file(
                 None
             };
 
+            // FIX #1: Strip brackets from incertae sedis names like [Family] sp.
+            if experimental_fixes.bracket_name_stripping {
+                if let Some(ref gn) = genus_name {
+                    if gn.starts_with('[') && gn.ends_with(']') {
+                        let cleaned = gn.trim_matches(|c| c == '[' || c == ']').to_string();
+                        genus_name = Some(cleaned);
+                    }
+                }
+            }
+
             // Try to find or create genus node
             if let Some(ref genus) = genus_name {
                 // Look up genus in id_map
                 let genus_tax_id = if let Some(genus_infos) =
                     id_map.get(&CString::new(clean_name(genus)).unwrap())
                 {
-                    // Use first match if available
-                    genus_infos.first().map(|info| info.tax_id.clone())
+                    // FIX #2: Prefer genus rank over synonyms when multiple matches exist
+                    if experimental_fixes.genus_rank_filtering {
+                        // First, try to find entry with rank="genus"
+                        let best = genus_infos.iter()
+                            .find(|info| info.rank == "genus")
+                            .or_else(|| genus_infos.first());
+                        best.map(|info| info.tax_id.clone())
+                    } else {
+                        // Original behavior: just use first match
+                        genus_infos.first().map(|info| info.tax_id.clone())
+                    }
                 } else {
                     None
                 };
@@ -400,6 +423,7 @@ pub fn parse_file(
     create_taxa: bool,
     xref_label: Option<String>,
     skip_tsv: bool,
+    experimental_fixes: &crate::parse::feature_gates::ExperimentalFixes,
 ) -> Result<(Nodes, HashMap<String, Vec<Name>>, Source), error::Error> {
     // let mut children = HashMap::new();
 
@@ -413,6 +437,7 @@ pub fn parse_file(
         create_taxa,
         xref_label.clone(),
         skip_tsv,
+        experimental_fixes,
     )?;
     let mut nodes = Nodes {
         nodes: HashMap::new(),

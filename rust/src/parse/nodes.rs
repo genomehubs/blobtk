@@ -1386,6 +1386,7 @@ impl Nodes {
             options.create_taxa,
             options.xref_label.clone(),
             false,
+            &options.experimental_fixes,
         )?;
         // Try to add names to existing nodes
         let mut nodes_struct = Nodes { nodes, children };

@@ -839,6 +839,10 @@ pub struct TaxonomyOptions {
     #[arg(long, short = 'p', default_value_t = 3000)]
     #[serde(default = "default_port")]
     pub port: u16,
+    /// Experimental taxonomy improvements with feature gates
+    #[clap(skip)]
+    #[serde(default)]
+    pub experimental_fixes: crate::parse::feature_gates::ExperimentalFixes,
 }
 
 fn default_name_classes() -> Vec<String> {
@@ -880,6 +884,10 @@ pub struct ValidateOptions {
     // Skip TSV flag
     #[arg(long = "skip-tsv", short = 'k')]
     pub skip_tsv: bool,
+    /// Experimental feature gates for taxonomy fixes
+    #[clap(skip)]
+    #[serde(default)]
+    pub experimental_fixes: crate::parse::feature_gates::ExperimentalFixes,
 }
 
 /// Command line argument parser

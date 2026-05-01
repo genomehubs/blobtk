@@ -97,6 +97,7 @@ pub fn lookup_nodes(
     name_classes: &Vec<String>,
     xref_label: Option<String>,
     _create_taxa: bool,
+    experimental_fixes: &crate::parse::feature_gates::ExperimentalFixes,
 ) {
     let id_map = build_fast_lookup(nodes, name_classes);
     let node_count = new_nodes.nodes.len();
@@ -105,7 +106,7 @@ pub fn lookup_nodes(
         progress_bar.inc(1);
         let taxonomy_section = node.to_taxonomy_section(new_nodes);
         let (assigned_taxon, _taxon_match) =
-            match_taxonomy_section(&taxonomy_section, &id_map, None);
+            match_taxonomy_section(&taxonomy_section, &id_map, None, experimental_fixes);
         if let Some(taxon) = assigned_taxon {
             let tax_id = taxon.tax_id.clone().unwrap();
             let new_tax_id = node.tax_id();
@@ -222,6 +223,7 @@ pub fn lookup_nodes_by_id(
     id_source: &str,
     xref_label: Option<String>,
     create_taxa: bool,
+    experimental_fixes: &crate::parse::feature_gates::ExperimentalFixes,
 ) {
     fn add_names_to_node(target_node: &mut Node, new_names: &[Name], xref_label: &str) {
         if let Some(names) = target_node.names.as_mut() {
@@ -492,6 +494,7 @@ pub fn match_taxonomy_section(
     taxonomy_section: &HashMap<String, String>,
     id_map: &TreeMap<CString, Vec<TaxonInfo>>,
     fixed_names: Option<&HashMap<String, HashMap<String, String>>>,
+    experimental_fixes: &crate::parse::feature_gates::ExperimentalFixes,
 ) -> (Option<Candidate>, TaxonMatch) {
     let (ranks, lower_ranks) = set_ranks(taxonomy_section);
     let mut taxonomy_section = taxonomy_section.clone();
@@ -557,6 +560,21 @@ pub fn match_taxonomy_section(
                             anc_ids: Some(id.anc_ids.clone()),
                         });
                     }
+                    
+                    // FIX #3: Rank candidates by match quality when enabled
+                    if experimental_fixes.multimatch_candidate_ranking {
+                        // Sort by: (1) exact rank match with requested rank, (2) higher-ranked taxa first
+                        candidates.sort_by(|a, b| {
+                            let a_matches_rank = a.rank == *rank;
+                            let b_matches_rank = b.rank == *rank;
+                            match (a_matches_rank, b_matches_rank) {
+                                (true, false) => std::cmp::Ordering::Less,    // a better (exact match)
+                                (false, true) => std::cmp::Ordering::Greater, // b better (exact match)
+                                _ => std::cmp::Ordering::Equal,               // Both match or both don't
+                            }
+                        });
+                    }
+                    
                     if i == 0 {
                         // Same rank as record
                         if let Some(tax_id) = taxon_match.clone().taxon.tax_id {

@@ -11,6 +11,14 @@ name_classes:
   - scientific name
   - synonym
 xref_label: ncbi
+
+# Feature gates for experimental taxonomy improvements
+# Set to 'true' to enable each fix, 'false' to use original behavior
+experimental_fixes:
+  bracket_name_stripping: true # Fix #1: Strip [Family] sp. bracket patterns
+  genus_rank_filtering: true # Fix #2: Prefer genus rank for synonym selection
+  multimatch_candidate_ranking: true # Fix #3: Rank MultiMatch candidates by quality
+
 taxonomies:
   - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
     taxonomy_format: ena

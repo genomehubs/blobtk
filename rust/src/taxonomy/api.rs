@@ -54,6 +54,7 @@ async fn validate_handler(
     Json(req): Json<ValidateRequest>,
 ) -> Json<ValidateResponse> {
     let service = state.service.read().unwrap();
+    let experimental_fixes = crate::parse::feature_gates::ExperimentalFixes::default();
     let result = parse_file(
         std::path::PathBuf::from(&req.file_path),
         &service.id_map,
@@ -61,6 +62,7 @@ async fn validate_handler(
         false,
         None,
         false,
+        &experimental_fixes,
     );
     match result {
         Ok(_) => Json(ValidateResponse {

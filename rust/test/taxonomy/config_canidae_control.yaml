@@ -1,0 +1,24 @@
+path: test/taxonomy/canidae/ncbi
+out: test/taxonomy/canidae/combined_control
+output_format:
+  - jsonl
+  - ncbi
+taxonomy_format: ncbi
+root_taxon_id:
+  - 33208
+base_taxon_id: 33208
+name_classes:
+  - scientific name
+  - synonym
+xref_label: ncbi
+
+# Control: All experimental fixes DISABLED (original behavior)
+experimental_fixes:
+  bracket_name_stripping: false
+  genus_rank_filtering: false
+  multimatch_candidate_ranking: false
+
+taxonomies:
+  - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
+    taxonomy_format: ena
+    xref_label: ena

@@ -94,6 +94,7 @@ fn load_options(options: &cli::TaxonomyOptions) -> Result<cli::TaxonomyOptions, 
             } else {
                 taxonomy_options.port
             },
+            experimental_fixes: taxonomy_options.experimental_fixes.clone(),
 
             ..Default::default()
         });
@@ -222,6 +223,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                         &options.name_classes,
                         taxonomy_options.xref_label.clone(),
                         taxonomy_options.create_taxa,
+                        &options.experimental_fixes,
                     );
                 }
                 Some(cli::TaxonomyFormat::NCBI) => {
@@ -232,6 +234,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                         &options.name_classes,
                         taxonomy_options.xref_label.clone(),
                         taxonomy_options.create_taxa,
+                        &options.experimental_fixes,
                     );
                 }
                 Some(cli::TaxonomyFormat::OTT) => {
@@ -241,6 +244,7 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                         "ncbi",
                         taxonomy_options.xref_label.clone(),
                         taxonomy_options.create_taxa,
+                        &options.experimental_fixes,
                     );
                 }
                 _ => {
