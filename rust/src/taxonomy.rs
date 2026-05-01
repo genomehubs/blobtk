@@ -244,7 +244,6 @@ pub fn taxonomy(options: &cli::TaxonomyOptions) -> Result<(), anyhow::Error> {
                         "ncbi",
                         taxonomy_options.xref_label.clone(),
                         taxonomy_options.create_taxa,
-                        &options.experimental_fixes,
                     );
                 }
                 _ => {

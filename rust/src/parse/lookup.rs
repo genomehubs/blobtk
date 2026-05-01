@@ -27,8 +27,6 @@ pub fn build_lookup(
 ) -> HashMap<String, Vec<String>> {
     let mut table = HashMap::new();
 
-    let rank_set: HashSet<&str> = HashSet::from_iter(RANKS.iter().cloned());
-    let higher_rank_set: HashSet<&str> = HashSet::from_iter(HIGHER_RANKS.iter().cloned());
     let node_count = nodes.nodes.len();
     let progress_bar = styled_progress_bar(node_count, "Building lookup hash");
 
@@ -223,7 +221,6 @@ pub fn lookup_nodes_by_id(
     id_source: &str,
     xref_label: Option<String>,
     create_taxa: bool,
-    experimental_fixes: &crate::parse::feature_gates::ExperimentalFixes,
 ) {
     fn add_names_to_node(target_node: &mut Node, new_names: &[Name], xref_label: &str) {
         if let Some(names) = target_node.names.as_mut() {
@@ -560,7 +557,7 @@ pub fn match_taxonomy_section(
                             anc_ids: Some(id.anc_ids.clone()),
                         });
                     }
-                    
+
                     // FIX #3: Rank candidates by match quality when enabled
                     if experimental_fixes.multimatch_candidate_ranking {
                         // Sort by: (1) exact rank match with requested rank, (2) higher-ranked taxa first
@@ -568,13 +565,13 @@ pub fn match_taxonomy_section(
                             let a_matches_rank = a.rank == *rank;
                             let b_matches_rank = b.rank == *rank;
                             match (a_matches_rank, b_matches_rank) {
-                                (true, false) => std::cmp::Ordering::Less,    // a better (exact match)
+                                (true, false) => std::cmp::Ordering::Less, // a better (exact match)
                                 (false, true) => std::cmp::Ordering::Greater, // b better (exact match)
-                                _ => std::cmp::Ordering::Equal,               // Both match or both don't
+                                _ => std::cmp::Ordering::Equal, // Both match or both don't
                             }
                         });
                     }
-                    
+
                     if i == 0 {
                         // Same rank as record
                         if let Some(tax_id) = taxon_match.clone().taxon.tax_id {

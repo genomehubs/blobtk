@@ -181,8 +181,12 @@ fn nodes_from_file(
         }
         let taxonomy_section = processed.get(&"taxonomy".to_string());
         let taxon_names_section = processed.get(&"taxon_names".to_string());
-        let (assigned_taxon, taxon_match) =
-            match_taxonomy_section(taxonomy_section.unwrap(), id_map, Some(&fixed_names), experimental_fixes);
+        let (assigned_taxon, taxon_match) = match_taxonomy_section(
+            taxonomy_section.unwrap(),
+            id_map,
+            Some(&fixed_names),
+            experimental_fixes,
+        );
         let taxon_name = taxon_match.taxon.name.clone();
         // add taxon name to combined report
         combined_report.taxon_name = Some(taxon_name.clone());
@@ -295,7 +299,8 @@ fn nodes_from_file(
                     // FIX #2: Prefer genus rank over synonyms when multiple matches exist
                     if experimental_fixes.genus_rank_filtering {
                         // First, try to find entry with rank="genus"
-                        let best = genus_infos.iter()
+                        let best = genus_infos
+                            .iter()
                             .find(|info| info.rank == "genus")
                             .or_else(|| genus_infos.first());
                         best.map(|info| info.tax_id.clone())
