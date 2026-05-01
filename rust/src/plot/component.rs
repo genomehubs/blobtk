@@ -502,7 +502,57 @@ pub fn create_axis_ticks(options: &AxisOptions, status: TickStatus) -> Vec<Tick>
         options.range[0] + options.padding[0],
         options.range[1] + options.padding[0],
     ];
+
     let domain = options.domain;
+    let mut ticks: Vec<Tick> = vec![];
+
+    // For LOG scale with narrow range, just show min/max limits
+    if matches!(options.scale, Scale::LOG) {
+        let min_val_abs = domain[0].abs();
+        if min_val_abs > 0.0 {
+            let max_val_abs = domain[1].abs().max(min_val_abs);
+            let log_diff = max_val_abs.log10() - min_val_abs.log10();
+
+            if log_diff < 1.0 {
+                // For narrow LOG scale ranges, just show the limits with a midpoint
+                // Only generate ticks for the requested status
+                match status {
+                    TickStatus::Major => {
+                        // Add tick at minimum
+                        ticks.push(create_tick(
+                            domain[0],
+                            format_si(&domain[0], 3, None),
+                            &range,
+                            options,
+                            options.major_ticks.as_ref().unwrap(),
+                        ));
+                        // Add tick at midpoint (geometric mean on log scale)
+                        let midpoint =
+                            10f64.powf((min_val_abs.log10() + domain[1].abs().log10()) / 2.0);
+                        ticks.push(create_tick(
+                            midpoint,
+                            format_si(&midpoint, 3, None),
+                            &range,
+                            options,
+                            options.major_ticks.as_ref().unwrap(),
+                        ));
+                        // Add tick at maximum
+                        ticks.push(create_tick(
+                            domain[1],
+                            format_si(&domain[1], 3, None),
+                            &range,
+                            options,
+                            options.major_ticks.as_ref().unwrap(),
+                        ));
+                    }
+                    TickStatus::Minor => {
+                        // No minor ticks for narrow ranges
+                    }
+                }
+                return ticks;
+            }
+        }
+    }
 
     let mut power: i32 = 0;
     let mut min_value = domain[0].abs();
@@ -1223,11 +1273,29 @@ pub fn chart_axis(plot_axis: &AxisOptions) -> (Group, Group) {
     if plot_axis.minor_ticks.is_some() {
         let minor_ticks = create_axis_ticks(plot_axis, TickStatus::Minor);
         if major_tick_count == 0 {
-            add_ticks_to_axis(
-                minor_ticks,
-                &mut minor_tick_group,
-                &mut major_gridline_group,
-            );
+            if !minor_ticks.is_empty() {
+                add_ticks_to_axis(
+                    minor_ticks,
+                    &mut minor_tick_group,
+                    &mut major_gridline_group,
+                );
+            } else {
+                eprintln!(
+                    "Warning: Failed to generate ticks for axis '{}'.\n\
+                     - domain: [{}, {}]\n\
+                     - range: [{}, {}]\n\
+                     - scale: {:?}\n\
+                     - tick_count: {}\n\
+                     This may indicate invalid axis configuration or data range.",
+                    plot_axis.label,
+                    plot_axis.domain[0],
+                    plot_axis.domain[1],
+                    plot_axis.range[0],
+                    plot_axis.range[1],
+                    plot_axis.scale,
+                    plot_axis.tick_count
+                );
+            }
         } else {
             for tick in minor_ticks {
                 minor_tick_group = minor_tick_group.add(tick.path);
@@ -1326,6 +1394,13 @@ fn add_ticks_to_axis(
     major_tick_group: &mut Group,
     major_gridline_group: &mut Group,
 ) {
+    if major_ticks.is_empty() {
+        eprintln!(
+            "Warning: No ticks available to add to axis. This may result in missing axis labels."
+        );
+        return;
+    }
+
     let mut first_position = major_ticks[0].position;
     let mut last_position = major_ticks[major_ticks.len() - 1].position;
     let mut major_ticks = major_ticks;

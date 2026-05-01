@@ -251,12 +251,23 @@ fn set_domain(
     } else {
         None
     };
-    if domain[0] == domain[1] {
-        if domain[0] == 0.0 {
-            domain[1] += 0.1;
+    // Handle single or nearly-single values with conservative expansion
+    // Threshold: if range is less than 10% of the center value, expand conservatively
+    if domain[0] == domain[1]
+        || (domain[1] - domain[0]).abs() < ((domain[0].abs() + domain[1].abs()) / 2.0 * 0.1)
+    {
+        let center = (domain[0] + domain[1]) / 2.0;
+        if center == 0.0 {
+            // For zero, use symmetric range around zero
+            domain = [-0.05, 0.05];
+        } else if center > 0.0 {
+            // For positive values, expand conservatively by 10% on each side
+            let margin = (center.abs() * 0.1).max(center.abs() * 0.01);
+            domain = [center - margin, center + margin];
         } else {
-            domain[0] /= 0.1;
-            domain[1] *= 0.1;
+            // For negative values, expand conservatively by 10% on each side
+            let margin = (center.abs() * 0.1).max(center.abs() * 0.01);
+            domain = [center - margin, center + margin];
         }
     }
     // if domain[0] == 0.005 {
@@ -321,12 +332,22 @@ pub fn blob_points(
 
     let z_meta = fields[axes["z"].as_str()].clone();
     let mut z_domain = z_meta.range.unwrap();
-    if z_domain[0] == z_domain[1] {
-        if z_domain[0] == 0.0 {
-            z_domain[1] += 0.1;
+    // Threshold: if range is less than 10% of the center value, expand conservatively
+    if z_domain[0] == z_domain[1]
+        || (z_domain[1] - z_domain[0]).abs() < ((z_domain[0].abs() + z_domain[1].abs()) / 2.0 * 0.1)
+    {
+        let center = (z_domain[0] + z_domain[1]) / 2.0;
+        if center == 0.0 {
+            // For zero, use symmetric range around zero
+            z_domain = [-0.05, 0.05];
+        } else if center > 0.0 {
+            // For positive values, expand conservatively by 10% on each side
+            let margin = (center.abs() * 0.1).max(center.abs() * 0.01);
+            z_domain = [center - margin, center + margin];
         } else {
-            z_domain[0] /= 2.0;
-            z_domain[1] *= 2.0;
+            // For negative values, expand conservatively by 10% on each side
+            let margin = (center.abs() * 0.1).max(center.abs() * 0.01);
+            z_domain = [center - margin, center + margin];
         }
     }
     let z_axis = AxisOptions {
