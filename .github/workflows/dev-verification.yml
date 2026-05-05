@@ -89,7 +89,7 @@ jobs:
       target: x86_64-unknown-linux-gnu
       platform: linux
       rust_toolchain: "1.91.0"
-      manylinux: "off"
+      manylinux: "2014"
     needs: [ test ]
 
   verify-linux-wheels:

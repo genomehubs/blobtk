@@ -261,7 +261,7 @@ jobs:
             if [ -z "$PYBIN" ]; then echo "No Python $PY found in image"; exit 1; fi
             "$PYBIN" -m pip install --upgrade pip setuptools wheel
             "$PYBIN" -m pip install maturin
-            "$PYBIN" -m maturin build --release --out /io/dist -i "$PYBIN" -m /io/rust/Cargo.toml --manylinux off
+            "$PYBIN" -m maturin build --release --out /io/dist -i "$PYBIN" -m /io/rust/Cargo.toml --manylinux 2014
           '
       - name: Upload wheels
         uses: actions/upload-artifact@v4
