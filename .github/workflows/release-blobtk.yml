@@ -467,9 +467,13 @@ jobs:
     name: Create GitHub release
     runs-on: ubuntu-latest
     needs:
+      - verify-linux-wheels
+      - verify-linux-binary
+      - verify-macos-wheels
+      - verify-macos-binary
+      - verify-docker-image
       - create-conda-release-linux
       - create-conda-release-macos
-      - macos-binary-arm64
     if: startsWith(github.ref, 'refs/tags/') || (github.event_name ==
       'workflow_dispatch' && github.event.inputs.dry_run == 'false')
     steps:
@@ -510,11 +514,6 @@ jobs:
       'workflow_dispatch' && github.event.inputs.dry_run == 'false') }}
     needs:
       - create-github-release
-      - verify-linux-wheels
-      - verify-linux-binary
-      - verify-macos-wheels
-      - verify-macos-binary
-      - verify-docker-image
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -667,8 +666,8 @@ jobs:
 
   build-and-push-docker-release:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name ==
-      'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name ==
+      'workflow_dispatch' && github.event.inputs.dry_run == 'false')
     needs:
       - create-github-release
     steps:
@@ -701,34 +700,18 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name ==
       'workflow_dispatch' }}
     needs:
-      - build-and-push-docker-release
+      - test
     steps:
       - uses: actions/checkout@v3
-      - name: Login to Docker Hub (tags only)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-      - name: Pull image (tags)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Build Docker image
         run: |
-          docker pull genomehubs/blobtk:${{ env.VERSION }} || docker pull genomehubs/blobtk:latest
-      - name: Build image (workflow_dispatch dry run)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          IMG_TAG=genomehubs/blobtk:dry-run-${{ github.run_id }}
+          IMG_TAG=genomehubs/blobtk:verify-${{ github.run_id }}
           docker build -t "$IMG_TAG" ./rust
-          echo "Built $IMG_TAG"
+          echo "IMG_TAG=$IMG_TAG" >> $GITHUB_ENV
       - name: Run smoke test in container
         run: |
           mkdir -p dist
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            IMG=genomehubs/blobtk:dry-run-${{ github.run_id }}
-          else
-            IMG=genomehubs/blobtk:${{ env.VERSION }}
-          fi
-          docker run --rm -v ${{ github.workspace }}/tests/fixtures/minimal_blobdir:/data/fixtures -v ${{ github.workspace }}/dist:/out $IMG blobtk plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
+          docker run --rm -v ${{ github.workspace }}/tests/fixtures/minimal_blobdir:/data/fixtures -v ${{ github.workspace }}/dist:/out ${{ env.IMG_TAG }} blobtk plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
           ls -l dist/out-docker.svg || true
 
   upload-to-conda:
