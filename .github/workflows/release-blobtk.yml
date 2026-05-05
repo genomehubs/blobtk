@@ -563,7 +563,37 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          pip install dist/*.whl
+
+          # Install only compatible wheels (skip architecture mismatches)
+          python << 'EOF'
+          import glob
+          import subprocess
+          import sys
+
+          wheels = sorted(glob.glob('dist/*.whl'))
+          installed_any = False
+
+          for wheel in wheels:
+              result = subprocess.run(
+                  [sys.executable, '-m', 'pip', 'install', wheel],
+                  capture_output=True,
+                  text=True
+              )
+              if result.returncode == 0:
+                  print(f"✓ Installed {wheel}")
+                  installed_any = True
+              elif "is not a supported wheel on this platform" in result.stderr:
+                  print(f"⊘ Skipped {wheel} (architecture mismatch)")
+              else:
+                  print(f"✗ Failed to install {wheel}")
+                  print(result.stderr)
+                  sys.exit(1)
+
+          if not installed_any:
+              print("ERROR: No compatible wheels found to install")
+              sys.exit(1)
+          EOF
+
           pip install pytest
           # Run a focused smoke test that generates an SVG using the minimal fixture
           pytest -q tests/test_grid_smoke.py::test_grid_smoke
@@ -624,7 +654,37 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          pip install dist/*.whl
+
+          # Install only compatible wheels (skip architecture mismatches)
+          python << 'EOF'
+          import glob
+          import subprocess
+          import sys
+
+          wheels = sorted(glob.glob('dist/*.whl'))
+          installed_any = False
+
+          for wheel in wheels:
+              result = subprocess.run(
+                  [sys.executable, '-m', 'pip', 'install', wheel],
+                  capture_output=True,
+                  text=True
+              )
+              if result.returncode == 0:
+                  print(f"✓ Installed {wheel}")
+                  installed_any = True
+              elif "is not a supported wheel on this platform" in result.stderr:
+                  print(f"⊘ Skipped {wheel} (architecture mismatch)")
+              else:
+                  print(f"✗ Failed to install {wheel}")
+                  print(result.stderr)
+                  sys.exit(1)
+
+          if not installed_any:
+              print("ERROR: No compatible wheels found to install")
+              sys.exit(1)
+          EOF
+
           pip install pytest
           pytest -q tests/test_grid_smoke.py::test_grid_smoke
 
