@@ -22,9 +22,8 @@ pub mod genomehubs;
 
 use crate::error;
 
-use genomehubs::{
-    GHubsConfig, SkipPartial, Source, StringOrVec, ValidationCounts, ValidationStatus,
-};
+use crate::validation::types::{ValidationCounts, ValidationStatus};
+use genomehubs::{GHubsConfig, SkipPartial, Source, StringOrVec};
 use lookup::{
     clean_name, match_taxonomy_section, Candidate, MatchCounts, MatchStatus, TaxonInfo, TaxonMatch,
 };

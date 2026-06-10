@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use cpc::{eval, units::Unit};
 use csv::StringRecord;
-
+use derive_more::Debug;
 use schemars::JsonSchema;
 use serde;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -16,9 +16,9 @@ use unicode_normalization::UnicodeNormalization;
 
 use crate::error;
 use crate::io;
-use crate::parse::lookup;
-
-use lookup::TaxonMatch;
+use crate::validation::spec::{ConstraintConfig, FieldSpec, FieldType};
+use crate::validation::types::{ValidationCounts, ValidationReport, ValidationStatus};
+use crate::validation::validator::apply_validation;
 
 use super::lookup::clean_name;
 
@@ -102,40 +102,6 @@ pub enum PathBufOrVec {
     Multiple(Vec<PathBuf>),
 }
 
-// Field types
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
-pub enum FieldType {
-    #[serde(rename = "byte")]
-    Byte,
-    #[serde(rename = "date")]
-    Date,
-    #[serde(rename = "double")]
-    Double,
-    #[serde(rename = "float")]
-    Float,
-    #[serde(rename = "geo_point")]
-    GeoPoint,
-    #[serde(rename = "half_float")]
-    HalfFloat,
-    #[default]
-    #[serde(rename = "keyword")]
-    Keyword,
-    #[serde(rename = "integer")]
-    Integer,
-    #[serde(rename = "long")]
-    Long,
-    #[serde(rename = "short")]
-    Short,
-    #[serde(rename = "1dp")]
-    OneDP,
-    #[serde(rename = "2dp")]
-    TwoDP,
-    #[serde(rename = "3dp")]
-    ThreeDP,
-    #[serde(rename = "4dp")]
-    FourDP,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub enum SkipPartial {
     #[serde(rename = "row")]
@@ -145,7 +111,7 @@ pub enum SkipPartial {
 }
 
 /// GenomeHubs file configuration options
-#[derive(Default, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GHubsFileConfig {
     /// Comment character
@@ -270,7 +236,7 @@ impl GHubsFileConfig {
 }
 
 /// GenomeHubs analysis configuration options
-#[derive(Default, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GHubsAnalysisConfig {
     // Unique analysis ID
@@ -287,43 +253,6 @@ pub struct GHubsAnalysisConfig {
     pub title: Option<String>,
 }
 
-/// GenomeHubs field constraint configuration options
-#[derive(Default, Serialize, Deserialize, Clone, Debug, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ConstraintConfig {
-    // List of valid values
-    #[serde(
-        rename = "enum",
-        deserialize_with = "deserialize_to_lowercase",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    pub enum_values: Option<Vec<String>>,
-    // Value length
-    #[serde(rename = "len", skip_serializing_if = "Option::is_none")]
-    pub len: Option<usize>,
-    // Maximum value
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "format_number"
-    )]
-    pub max: Option<f64>,
-    // Minimum value
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "format_number"
-    )]
-    pub min: Option<f64>,
-}
-
-fn deserialize_to_lowercase<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let v: Vec<String> = Vec::deserialize(deserializer)?;
-    Ok(Some(v.into_iter().map(|s| s.to_lowercase()).collect()))
-}
-
 // Field types
 #[derive(Default, Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub enum FieldScale {
@@ -334,7 +263,7 @@ pub enum FieldScale {
     Log2,
     #[serde(rename = "log10")]
     Log10,
-    #[serde(rename = "double")]
+    #[serde(rename = "sqrt")]
     SQRT,
 }
 
@@ -806,6 +735,16 @@ impl GHubsFieldConfig {
     }
 }
 
+// convert GHubsFieldConfig to FieldSpec
+impl From<GHubsFieldConfig> for FieldSpec {
+    fn from(config: GHubsFieldConfig) -> Self {
+        FieldSpec {
+            field_type: config.field_type,
+            constraint: config.constraint,
+        }
+    }
+}
+
 /// Merges 2 GenomeHubs configuration files
 fn merge_attributes(
     self_attributes: Option<HashMap<String, GHubsFieldConfig>>,
@@ -842,7 +781,7 @@ fn merge_attributes(
 }
 
 /// GenomeHubs configuration options
-#[derive(Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GHubsConfig {
     /// File configuration options
@@ -864,7 +803,7 @@ pub struct GHubsConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, GHubsFieldConfig>>,
     /// Taxon names
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(alias = "names", skip_serializing_if = "Option::is_none")]
     pub taxon_names: Option<HashMap<String, GHubsFieldConfig>>,
     /// Taxonomy fields
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -880,15 +819,18 @@ pub struct GHubsConfig {
     #[serde(skip)]
     pub validation_counts: ValidationCounts,
 
-    /// CSV reader
+    /// CSV reader, skip serializing and deserializing this field and skip for debug output
     #[serde(skip)]
+    #[debug(skip)]
     pub csv_reader: Option<csv::Reader<Box<dyn BufRead>>>,
     /// CSV writer
     #[serde(skip)]
+    #[debug(skip)]
     pub csv_writer: Option<csv::Writer<Box<dyn Write>>>,
     /// Exception writer
     /// JSONL writer for exceptions
     #[serde(skip)]
+    #[debug(skip)]
     pub exception_writer: Option<std::fs::File>,
     /// List of output headers
     /// Used to write validated records
@@ -901,7 +843,7 @@ pub struct GHubsConfig {
 }
 
 /// GenomeHubs configuration options
-#[derive(Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GHubsDefaultsConfig {
     /// File configuration options
@@ -1220,7 +1162,11 @@ impl GHubsConfig {
         let mut partial: HashMap<String, Vec<String>> = HashMap::new();
         let blank: Vec<String> = vec![];
         let mut field_counts = ValidationCounts::default();
-        let skip_partial = self.file.as_ref().unwrap().skip_partial.clone();
+        let skip_partial = self
+            .file
+            .as_ref()
+            .map(|f| f.skip_partial.clone())
+            .unwrap_or(None);
 
         for (field_name, field) in self.borrow_mut().get_mut(key).unwrap().iter_mut() {
             if let Some(index) = &field.index {
@@ -1335,6 +1281,165 @@ impl GHubsConfig {
         if combined_report.status != ValidationStatus::Valid {
             self.write_exception(&combined_report);
         }
+        (processed, combined_report)
+    }
+
+    // // Validate a row provided as header->value map. Reuses process_value/validate_values.
+    // pub fn validate_record_from_map(
+    //     &mut self,
+    //     row_map: &HashMap<String, String>,
+    //     row_index: usize,
+    //     keys: &Vec<&str>,
+    // ) -> (
+    //     HashMap<String, HashMap<String, String>>,
+    //     crate::validation::types::ValidationReport,
+    // ) {
+    //     // convert hashmap to StringRecord and call validate_record
+    //     let headers: Vec<String> = row_map.keys().cloned().collect();
+    //     let values: Vec<String> = row_map.values().cloned().collect();
+    //     //let record = StringRecord::from(values);
+    //     // create a StringRecord with headers as keys and values as values
+    //     let record = StringRecord::from(values);
+    //     // add headers to config and update config indexes
+    //     for key in keys.iter() {
+    //         if self.get(key).is_some() {
+    //             self.update_config(key, &StringRecord::from(headers.clone()));
+    //         }
+    //     }
+    //     self.validate_record(&record, row_index, keys)
+    // }
+
+    pub fn validate_record_from_map(
+        &mut self,
+        row_map: &HashMap<String, String>,
+        row_index: usize,
+        keys: &Vec<&str>,
+    ) -> (HashMap<String, HashMap<String, String>>, ValidationReport) {
+        let mut processed = HashMap::new();
+        let mut combined_report = ValidationReport {
+            row_index,
+            ..Default::default()
+        };
+
+        for key in keys.iter() {
+            if let Some(field_map) = self.get(key) {
+                let mut validated = HashMap::new();
+                let mut field_counts = ValidationCounts::default();
+
+                for (field_name, field) in field_map.iter() {
+                    // build string_value from header or fallback to field_name
+                    let string_value = if let Some(header) = &field.header {
+                        match header {
+                            StringOrVec::Single(h) => row_map
+                                .get(h)
+                                .cloned()
+                                .unwrap_or_else(|| "None".to_string()),
+                            StringOrVec::Multiple(list) => list
+                                .iter()
+                                .map(|h| row_map.get(h).map(|s| s.as_str()).unwrap_or(""))
+                                .collect::<Vec<&str>>()
+                                .join(field.join.as_ref().unwrap_or(&"".to_string())),
+                        }
+                    } else {
+                        row_map
+                            .get(field_name)
+                            .cloned()
+                            .unwrap_or_else(|| "None".to_string())
+                    };
+
+                    // reuse existing processing
+                    let (values, invalid_values, status) =
+                        match crate::parse::genomehubs::process_value(string_value, field) {
+                            Ok(tuple) => tuple,
+                            Err(_) => (vec![], vec![], ValidationStatus::Error),
+                        };
+
+                    field_counts.total += 1;
+                    let is_valid =
+                        matches!(status, ValidationStatus::Valid | ValidationStatus::Blank);
+
+                    match status {
+                        ValidationStatus::Valid => field_counts.valid += 1,
+                        ValidationStatus::Invalid => {
+                            field_counts.invalid += 1;
+                        }
+                        ValidationStatus::Partial => {
+                            field_counts.partial += 1;
+                        }
+                        ValidationStatus::Blank => {
+                            field_counts.blank += 1;
+                            field_counts.valid += 1;
+                        }
+                        ValidationStatus::Error => {
+                            field_counts.errors += 1;
+                            field_counts.invalid += 1;
+                        }
+                        ValidationStatus::None => {
+                            field_counts.total -= 1;
+                        }
+                        _ => {}
+                    }
+
+                    let mut validated_value: String = values
+                        .iter()
+                        .map(|(v, _)| v.clone())
+                        .collect::<Vec<String>>()
+                        .join(";");
+
+                    if !is_valid {
+                        if let Some(skip) = self.file.as_ref().and_then(|f| f.skip_partial.clone())
+                        {
+                            use crate::parse::genomehubs::SkipPartial;
+                            if skip == SkipPartial::Cell {
+                                validated_value = "None".to_string();
+                            }
+                        }
+                    }
+
+                    if !invalid_values.is_empty() {
+                        // store invalid values per-field for report
+                        // will be merged into combined_report below
+                    }
+
+                    validated.insert(field_name.clone(), validated_value);
+                }
+
+                // build a per-section report and merge into combined_report
+                let status = if field_counts.valid == field_counts.total {
+                    ValidationStatus::Valid
+                } else if field_counts.valid > 0 {
+                    ValidationStatus::Partial
+                } else if field_counts.blank == field_counts.total {
+                    ValidationStatus::Blank
+                } else {
+                    ValidationStatus::Invalid
+                };
+
+                let section_report = ValidationReport {
+                    row_index,
+                    status,
+                    counts: field_counts,
+                    ..Default::default()
+                };
+                combined_report.combine_reports(section_report);
+                processed.insert(key.to_string(), validated);
+            }
+        }
+
+        self.validation_counts.total += 1;
+        match combined_report.status {
+            ValidationStatus::Valid => self.validation_counts.valid += 1,
+            ValidationStatus::Invalid => self.validation_counts.invalid += 1,
+            ValidationStatus::Partial => self.validation_counts.partial += 1,
+            ValidationStatus::Blank => self.validation_counts.blank += 1,
+            ValidationStatus::Error => self.validation_counts.errors += 1,
+            _ => {}
+        }
+
+        if combined_report.status != ValidationStatus::Valid {
+            self.write_exception(&combined_report);
+        }
+
         (processed, combined_report)
     }
 }
@@ -1483,292 +1588,6 @@ fn key_index(headers: &StringRecord, key: &str) -> Result<usize, error::Error> {
     }
 }
 
-fn check_bounds<T: Into<f64> + Copy>(value: &T, constraint: &ConstraintConfig) -> bool {
-    let val: f64 = Into::<f64>::into(value.to_owned());
-    if let Some(min) = constraint.min {
-        if val < min {
-            eprintln!("Value {} is less than minimum {}", val, min);
-            return false;
-        }
-    }
-    if let Some(max) = constraint.max {
-        if val > max {
-            eprintln!("Value {} is greater than maximum {}", val, max);
-            return false;
-        }
-    }
-    if let Some(len) = constraint.len {
-        if val.to_string().len() > len {
-            eprintln!("Value {} is longer than {}", val, len);
-            return false;
-        }
-    }
-    if let Some(enum_values) = &constraint.enum_values {
-        if !enum_values.contains(&val.to_string().to_lowercase()) {
-            // eprintln!("Value {} is not in {:?}", val, enum_values);
-            return false;
-        }
-    }
-    true
-}
-
-fn check_string_bounds(value: &String, constraint: &ConstraintConfig) -> bool {
-    if let Some(len) = constraint.len {
-        if value.len() > len {
-            eprintln!("Value {} is longer than {}", value, len);
-            return false;
-        }
-    }
-    if let Some(enum_values) = &constraint.enum_values {
-        if !enum_values.contains(&value.to_lowercase()) {
-            // eprintln!("Value {} is not in {:?}", value, enum_values);
-            return false;
-        }
-    }
-    true
-}
-
-// fn apply_constraint(value: &mut GHubsConfig, constraint: &ConstraintConfig) {}
-
-fn validate_double(value: &String, constraint: &ConstraintConfig) -> Result<bool, error::Error> {
-    let v = value
-        .parse::<f64>()
-        .map_err(|_| error::Error::ParseError(format!("Invalid double value: {}", value)))?;
-    Ok(check_bounds(&v, constraint))
-}
-
-fn apply_validation(value: String, field: &GHubsFieldConfig) -> Result<bool, error::Error> {
-    let constraint = match field.constraint.to_owned() {
-        Some(c) => c,
-        None => ConstraintConfig {
-            ..Default::default()
-        },
-    };
-    let field_type = &field.field_type;
-    let valid = match field_type {
-        FieldType::Byte => {
-            let dot_pos = value.find(".").unwrap_or(value.len());
-            let v = value[..dot_pos]
-                .parse::<i8>()
-                .map_err(|_| error::Error::ParseError(format!("Invalid byte value: {}", value)))?;
-            check_bounds(&v, &constraint)
-        }
-        FieldType::Date => true,
-        FieldType::Double => validate_double(&value, &constraint)?,
-
-        FieldType::Float => {
-            let v = value
-                .parse::<f32>()
-                .map_err(|_| error::Error::ParseError(format!("Invalid float value: {}", value)))?;
-            check_bounds(&v, &constraint)
-        }
-        FieldType::GeoPoint => true,
-        FieldType::HalfFloat => {
-            let v = value.parse::<f32>().map_err(|_| {
-                error::Error::ParseError(format!("Invalid half_float value: {}", value))
-            })?;
-            check_bounds(&v, &constraint)
-        }
-        FieldType::Keyword => {
-            let v = value.parse::<String>().map_err(|_| {
-                error::Error::ParseError(format!("Invalid keyword value: {}", value))
-            })?;
-            check_string_bounds(&v, &constraint)
-        }
-        FieldType::Integer => {
-            let dot_pos = value.find(".").unwrap_or(value.len());
-            let v = value[..dot_pos].parse::<i32>().map_err(|_| {
-                error::Error::ParseError(format!("Invalid integer value: {}", value))
-            })?;
-            check_bounds(&v, &constraint)
-        }
-        FieldType::Long => {
-            let dot_pos = value.find(".").unwrap_or(value.len());
-            value[..dot_pos]
-                .parse::<i64>()
-                .map_err(|_| error::Error::ParseError(format!("Invalid long value: {}", value)))?;
-            validate_double(&value, &constraint)?
-        }
-        FieldType::Short => {
-            let dot_pos = value.find(".").unwrap_or(value.len());
-            let v = value[..dot_pos]
-                .parse::<i16>()
-                .map_err(|_| error::Error::ParseError(format!("Invalid short value: {}", value)))?;
-            check_bounds(&v, &constraint)
-        }
-        FieldType::OneDP => true,
-        FieldType::TwoDP => true,
-        FieldType::ThreeDP => true,
-        FieldType::FourDP => true,
-    };
-    Ok(valid)
-}
-
-#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum ValidationStatus {
-    Valid,
-    Invalid,
-    Partial,
-    Blank,
-    Error,
-    #[default]
-    None,
-    Spellcheck,
-    Putative,
-    Mismatch,
-    Multimatch,
-    Nomatch,
-}
-
-#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ValidationCounts {
-    pub total: usize,
-    pub valid: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub invalid: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub partial: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub blank: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub errors: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub spellcheck: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub putative: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub mismatch: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub multimatch: usize,
-    #[serde(skip_serializing_if = "is_zero")]
-    pub nomatch: usize,
-}
-
-fn is_zero(value: &usize) -> bool {
-    *value == 0
-}
-
-impl ValidationCounts {
-    pub fn to_json(&self) -> String {
-        // summarise as json
-        serde_json::to_string_pretty(&self).unwrap()
-    }
-
-    pub fn to_jsonl(&self) -> String {
-        // summarise as jsonl
-        serde_json::to_string(&self).unwrap()
-    }
-
-    pub fn update(&mut self, other: &ValidationCounts) {
-        if other.total >= 1 {
-            self.total += 1
-        };
-        if other.valid >= 1 {
-            self.valid += 1
-        };
-        if other.invalid >= 1 {
-            self.invalid += 1
-        };
-        if other.partial >= 1 {
-            self.partial += 1
-        };
-        if other.blank >= 1 {
-            self.blank += 1
-        };
-        if other.errors >= 1 {
-            self.errors += 1
-        };
-        if other.spellcheck >= 1 {
-            self.spellcheck += 1
-        };
-        if other.putative >= 1 {
-            self.putative += 1
-        };
-        if other.mismatch >= 1 {
-            self.mismatch += 1
-        };
-        if other.multimatch >= 1 {
-            self.multimatch += 1
-        };
-        if other.nomatch >= 1 {
-            self.nomatch += 1
-        };
-    }
-}
-
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct ValidationReport {
-    pub row_index: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub taxon_name: Option<String>,
-    pub status: ValidationStatus,
-    pub counts: ValidationCounts,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub invalid: HashMap<String, Vec<String>>,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub partial: HashMap<String, Vec<String>>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub blank: Vec<String>,
-    #[serde(skip_serializing)]
-    pub validated: HashMap<String, String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub errors: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub spellcheck: Vec<TaxonMatch>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub putative: Vec<TaxonMatch>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub mismatch: Vec<TaxonMatch>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub multimatch: Vec<TaxonMatch>,
-}
-
-impl ValidationReport {
-    pub fn to_json(&self) -> String {
-        // summarise as json
-        serde_json::to_string_pretty(&self).unwrap()
-    }
-
-    pub fn to_jsonl(&self) -> String {
-        // summarise as jsonl
-        serde_json::to_string(&self).unwrap()
-    }
-
-    pub fn combine_reports(&mut self, other: ValidationReport) {
-        self.status = match other.status {
-            ValidationStatus::Partial => ValidationStatus::Partial,
-            ValidationStatus::Error => ValidationStatus::Error,
-            _ => {
-                if self.status == other.status {
-                    self.status.clone()
-                } else if self.status == ValidationStatus::None {
-                    other.status
-                } else if self.status == ValidationStatus::Valid
-                    && other.status == ValidationStatus::Invalid
-                {
-                    ValidationStatus::Partial
-                } else if self.status == ValidationStatus::Invalid
-                    && other.status == ValidationStatus::Valid
-                {
-                    ValidationStatus::Partial
-                } else {
-                    self.status.clone()
-                }
-            }
-        };
-        self.counts.valid += other.counts.valid;
-        self.counts.invalid += other.counts.invalid;
-        self.counts.partial += other.counts.partial;
-        self.counts.blank += other.counts.blank;
-        self.counts.errors += other.counts.errors;
-        self.counts.total += other.counts.total;
-        self.invalid.extend(other.invalid);
-        self.partial.extend(other.partial);
-        self.blank.extend(other.blank);
-        self.validated.extend(other.validated);
-    }
-}
-
 fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, ValidationStatus) {
     if value.is_empty() || value == "None" || value == "NA" {
         return ("None".to_string(), ValidationStatus::Blank);
@@ -1779,7 +1598,8 @@ fn apply_function(value: String, field: &GHubsFieldConfig) -> (String, Validatio
         let value = eval(equation.as_str(), false, Unit::NoUnit, false).unwrap();
         val = format!("{}", value);
     }
-    match apply_validation(val.clone(), field) {
+    let field_spec = FieldSpec::from(field.clone());
+    match apply_validation(val.clone(), &field_spec) {
         Ok(is_valid) => {
             if is_valid {
                 (val, ValidationStatus::Valid)

@@ -2,6 +2,8 @@
 //! Invoked by calling:
 //! `blobtk index <args>`
 
+pub mod es;
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::BufRead;
@@ -22,8 +24,6 @@ use crate::io::file_reader;
 use crate::io::get_csv_reader;
 use crate::io::get_file_writer;
 use crate::io::get_writer;
-use crate::parse::genomehubs::ConstraintConfig;
-use crate::parse::genomehubs::FieldType;
 use crate::parse::genomehubs::GHubsAnalysisConfig;
 use crate::parse::genomehubs::GHubsConfig;
 use crate::parse::genomehubs::GHubsFieldConfig;
@@ -34,6 +34,8 @@ use crate::parse::genomehubs::StringOrVec;
 use crate::parse::genomehubs::SummaryFunction;
 use crate::parse::genomehubs::SummaryFunctionOrVec;
 use crate::parse::genomehubs::TraverseDirection;
+use crate::validation::spec::ConstraintConfig;
+use crate::validation::spec::FieldType;
 use std::process::Command;
 
 pub use cli::IndexOptions;
