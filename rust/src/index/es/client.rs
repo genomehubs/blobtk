@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::index::es::config::IndexConfig;
 use crate::index::es::mappings::common::Mappings;
-use crate::index::es::models::{EsError, IndexDocument};
+use crate::index::es::models::{EsError, IndexDocument, IndexGroup};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IndexInfo {
@@ -45,15 +45,18 @@ impl IndexDocument for Document {
         self.id.clone()
     }
 
-    fn index_name(&self) -> String {
+    fn index_group(&self) -> IndexGroup {
         // This method should return the name of the index that the document belongs to.
         // the index name is the first part of the document ID, - separator.
         // For example, if the document ID is "feature-12345", the index name would be "feature".
-        self.id
-            .split('-')
-            .next()
-            .unwrap_or("default_index")
-            .to_string()
+        match self.id.split('-').next().unwrap_or("default_index") {
+            "feature" => IndexGroup::Feature,
+            "taxon" => IndexGroup::Taxon,
+            "assembly" => IndexGroup::Assembly,
+            "sample" => IndexGroup::Sample,
+            "attribute" => IndexGroup::Attribute,
+            _ => IndexGroup::None, // default to None if unknown
+        }
     }
 
     fn validate(&self) -> Result<(), EsError> {

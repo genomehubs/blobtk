@@ -671,3 +671,74 @@ pub fn nested_identifier_properties() -> HashMap<String, Property> {
         ),
     ])
 }
+
+pub fn nested_lineage_properties() -> HashMap<String, Property> {
+    HashMap::from([
+        (
+            "taxon_id".to_string(),
+            keyword_property(
+                "Taxon ID of ancestral taxon",
+                Some(64),
+                Some(Normalizer::Lowercase),
+            ),
+        ),
+        (
+            "taxon_rank".to_string(),
+            keyword_property("Ancestral rank", Some(64), Some(Normalizer::Lowercase)),
+        ),
+        (
+            "scientific_name".to_string(),
+            keyword_with_fields_property(
+                "Scientific name",
+                Some(128),
+                Some(Normalizer::Lowercase),
+                HashMap::from([("raw".to_string(), keyword_property("raw", None, None))]),
+            ),
+        ),
+        (
+            "node_depth".to_string(),
+            numeric_property("Cumulative branch length to ancestral taxon", "float", None),
+        ),
+        (
+            "support_value".to_string(),
+            numeric_property("Support value for node", "float", None),
+        ),
+    ])
+}
+
+pub fn nested_taxon_names_properties() -> HashMap<String, Property> {
+    HashMap::from([
+        (
+            "name".to_string(),
+            keyword_with_lookup_property("Taxon name", Some(128), Some(Normalizer::Lowercase)),
+        ),
+        (
+            "class".to_string(),
+            keyword_property(
+                "Name class (e.g. common name, synonym, etc.)",
+                Some(64),
+                Some(Normalizer::Lowercase),
+            ),
+        ),
+        (
+            "source".to_string(),
+            keyword_property(
+                "Source DB for taxon name",
+                Some(64),
+                Some(Normalizer::Lowercase),
+            ),
+        ),
+        (
+            "source_url_stub".to_string(),
+            keyword_property("URL slug for taxon name xref", None, None),
+        ),
+        (
+            "source_url".to_string(),
+            keyword_property("Source URL", Some(128), None),
+        ),
+        (
+            "source_url_template".to_string(),
+            keyword_property("URL template", None, None),
+        ),
+    ])
+}

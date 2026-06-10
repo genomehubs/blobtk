@@ -35,6 +35,10 @@ pub enum FieldType {
     FourDP,
 }
 
+pub fn default_field_type() -> FieldType {
+    FieldType::Keyword
+}
+
 pub struct FieldSpec {
     pub field_type: FieldType,
     pub constraint: Option<ConstraintConfig>,

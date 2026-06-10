@@ -16,7 +16,7 @@ use unicode_normalization::UnicodeNormalization;
 
 use crate::error;
 use crate::io;
-use crate::validation::spec::{ConstraintConfig, FieldSpec, FieldType};
+use crate::validation::spec::{default_field_type, ConstraintConfig, FieldSpec, FieldType};
 use crate::validation::types::{ValidationCounts, ValidationReport, ValidationStatus};
 use crate::validation::validator::apply_validation;
 
@@ -654,10 +654,6 @@ pub struct GHubsFieldConfig {
     // Value metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_metadata: Option<HashMap<String, ValueMetadataConfig>>,
-}
-
-fn default_field_type() -> FieldType {
-    FieldType::Keyword
 }
 
 fn deserialize_bool_from_int_or_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>

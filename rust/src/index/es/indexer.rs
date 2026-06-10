@@ -43,7 +43,8 @@ impl Indexer {
         let target_index = docs
             .first()
             .ok_or_else(|| EsError::ValidationError("No documents to index".to_string()))?
-            .index_name();
+            .index_group()
+            .to_string();
         let index_name =
             generate_index_name(&target_index, &self.taxonomy, &self.hub_name, &self.release);
         // if self.client.get_index_info(&index_name).is_err() {
@@ -138,7 +139,7 @@ mod tests {
                 content: serde_json::to_value("Document 2").unwrap(),
             },
         ];
-        let target_prefix = documents.first().unwrap().index_name();
+        let target_prefix = documents.first().unwrap().index_group().to_string();
         let result = indexer.bulk_index(documents);
         assert!(
             result.is_ok(),
