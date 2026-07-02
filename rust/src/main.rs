@@ -6,6 +6,7 @@ use blobtk::cli;
 use blobtk::create;
 use blobtk::depth;
 use blobtk::filter;
+use blobtk::import;
 use blobtk::index;
 use blobtk::plot;
 use blobtk::snail;
@@ -16,6 +17,7 @@ fn cmd(args: cli::Arguments) -> Result<(), anyhow::Error> {
     match args.cmd {
         cli::SubCommand::Depth(options) => depth::depth(&options)?,
         cli::SubCommand::Filter(options) => filter::filter(&options)?,
+        cli::SubCommand::Import(options) => import::import(&options)?,
         cli::SubCommand::Index(options) => index::index(&options)?,
         cli::SubCommand::Create(options) => create::create(&options)?,
         cli::SubCommand::Plot(options) => {

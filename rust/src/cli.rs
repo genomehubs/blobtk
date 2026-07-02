@@ -73,6 +73,9 @@ pub enum SubCommand {
     /// [experimental] Index files for GenomeHubs.
     /// Called as `blobtk index`
     Index(IndexOptions),
+    /// [experimental] Import files for GenomeHubs.
+    /// Called as `blobtk import`
+    Import(ImportOptions),
     /// Process a BlobDir and produce static plots.
     /// Called as `blobtk plot`
     Plot(PlotOptions),
@@ -186,6 +189,15 @@ pub struct FilterOptions {
     /// Path to output list of read IDs
     #[arg(long = "read-list", short = 'O', value_name = "TXT")]
     pub read_list: Option<PathBuf>,
+}
+
+/// options to pass to `blobtk import`
+#[derive(Parser, Debug)]
+#[command(arg_required_else_help = true)]
+pub struct ImportOptions {
+    /// Path to import configuration file
+    #[arg(long = "config", short = 'c', value_name = "YAML")]
+    pub config: PathBuf,
 }
 
 /// Options to pass to `blobtk index`

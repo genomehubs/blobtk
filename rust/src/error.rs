@@ -1,4 +1,4 @@
-use std::convert::From;
+use std::{convert::From, string::FromUtf8Error};
 use thiserror;
 
 #[derive(Clone, Debug, thiserror::Error)]
@@ -25,6 +25,8 @@ pub enum Error {
     SerdeError(String),
     #[error("Unable to process JSON: {0} {1}: unknown field `{2}`")]
     UnknownField(String, String, String),
+    #[error("Unsupported file type: {0}")]
+    UnsupportedFileType(String),
     #[error("YAML error: {0}")]
     YamlError(String),
 }
@@ -56,5 +58,11 @@ impl From<serde_json::Error> for Error {
 impl From<serde_yaml::Error> for Error {
     fn from(err: serde_yaml::Error) -> Error {
         Error::YamlError(err.to_string())
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Self {
+        Error::ParseError(err.to_string())
     }
 }

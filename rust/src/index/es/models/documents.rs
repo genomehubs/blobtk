@@ -5,9 +5,12 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    index::es::models::{
-        nested_documents::{NestedAttribute, NestedIdentifier},
-        EsError, IndexDocument, IndexGroup,
+    index::es::{
+        builders::feature,
+        models::{
+            nested_documents::{NestedAttribute, NestedIdentifier},
+            BuildDocument, EsError, IndexDocument, IndexGroup,
+        },
     },
     parse::genomehubs::{
         StringOrVec, SummaryFunction, SummaryFunctionOrVec, TraverseDirection, ValueMetadataConfig,
@@ -15,10 +18,18 @@ use crate::{
     validation::spec::{default_field_type, FieldType},
 };
 
+fn expand_feature_types(primary_type: &str) -> Vec<String> {
+    let mut feature_types = vec![primary_type.to_string()];
+    if primary_type.starts_with("win") {
+        feature_types.push("window".to_string());
+    }
+    feature_types
+}
+
 // The `FeatureDocument` struct represents a structured representation of a feature for indexing and searching features in Elasticsearch.
 // Its structure matches the properties defined in the `feature_index_properties` function, which defines the mapping for the feature index in Elasticsearch.
 // Fields share the same restrictions as the mapping to ensure compatibility with the Elasticsearch index.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct FeatureDocument {
     // the `feature_id` field is a unique identifier for the feature, which is required and must be a string with a maximum length of 128 characters. It is normalized to lowercase and indexed as a keyword for efficient searching.
     pub feature_id: String,
@@ -46,6 +57,121 @@ pub struct FeatureDocument {
     pub attributes: Option<Vec<NestedAttribute>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identifiers: Option<Vec<NestedIdentifier>>,
+}
+
+impl FeatureDocument {
+    pub fn new(
+        feature_id: String,
+        parent_feature_id: Option<String>,
+        primary_type: String,
+        start: usize,
+        end: usize,
+        //length: usize,
+        strand: Option<i8>,
+        container_ids: Option<Vec<String>>,
+        sequence_id: String,
+        sequence_length: usize,
+        assembly_id: String,
+        taxon_id: String,
+        ancestors: Option<Vec<String>>,
+        file_id: Option<String>,
+        analysis_id: Option<String>,
+        // attributes: Option<Vec<NestedAttribute>>,
+        // identifiers: Option<Vec<NestedIdentifier>>,
+    ) -> Self {
+        let length = end - start;
+        let seq_proportion = if sequence_length > 0 {
+            (length as f64 / sequence_length as f64) as f32
+        } else {
+            0.0
+        };
+        let midpoint = start + (length / 2);
+        let midpoint_proportion = if sequence_length > 0 {
+            (midpoint as f64 / sequence_length as f64) as f32
+        } else {
+            0.0
+        };
+        let feature_types = expand_feature_types(&primary_type);
+        let mut attributes_list = vec![
+            NestedAttribute {
+                key: "start".to_string(),
+                long_value: Some(start as i64),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "end".to_string(),
+                long_value: Some(end as i64),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "length".to_string(),
+                long_value: Some(length as i64),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "seq_proportion".to_string(),
+                half_float_value: Some(seq_proportion),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "midpoint".to_string(),
+                long_value: Some(midpoint as i64),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "midpoint_proportion".to_string(),
+                half_float_value: Some(midpoint_proportion),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "feature_type".to_string(),
+                keyword_value: Some(StringOrVec::Multiple(feature_types)),
+                ..Default::default()
+            },
+        ];
+        if let Some(strand_value) = strand {
+            attributes_list.push(NestedAttribute {
+                key: "strand".to_string(),
+                byte_value: Some(strand_value),
+                ..Default::default()
+            });
+        }
+        FeatureDocument {
+            feature_id,
+            parent_feature_id,
+            primary_type,
+            start,
+            end,
+            length,
+            strand,
+            container_ids,
+            sequence_id,
+            sequence_length,
+            assembly_id,
+            taxon_id,
+            ancestors,
+            file_id,
+            analysis_id,
+            attributes: Some(attributes_list),
+            identifiers: None,
+        }
+    }
+}
+
+impl BuildDocument for FeatureDocument {
+    fn add_attribute(
+        &mut self,
+        attribute: super::nested_documents::NestedAttribute,
+    ) -> Result<(), EsError> {
+        {
+            if let Some(attrs) = &mut self.attributes {
+                attrs.push(attribute);
+            } else {
+                self.attributes = Some(vec![attribute]);
+            }
+        }
+        Ok(())
+    }
 }
 
 // implement the `IndexDocument` trait for `FeatureDocument` to allow it to be indexed in Elasticsearch
@@ -88,7 +214,7 @@ impl IndexDocument for FeatureDocument {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct AttributeDocument {
     pub group: IndexGroup,
     pub name: String,

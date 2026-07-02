@@ -9,7 +9,7 @@ pub trait DocumentBuilder<D: IndexDocument> {
         processed: &HashMap<String, HashMap<String, String>>,
     ) -> Result<Vec<D>, Error>;
     fn build_from_yaml(&self, cfg_path: &Path) -> Result<Vec<D>, Error>;
-    fn build_from_tsv(&self, tsv_path: &Path) -> Result<Vec<D>, Error>;
+    fn build_from_tsv(&self, tsv_path: &Path, flavour: &str) -> Result<Vec<D>, Error>;
 }
 
 pub mod feature;

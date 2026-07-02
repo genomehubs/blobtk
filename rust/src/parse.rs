@@ -8,6 +8,9 @@ use blart::TreeMap;
 use indicatif::ProgressBar;
 use serde::{Deserialize, Deserializer, Serialize};
 
+/// Functions for parsing BED files and extracting relevant information for indexing into Elasticsearch.
+pub mod bed_data;
+
 /// Functions for name lookup.
 pub mod lookup;
 
@@ -19,6 +22,9 @@ pub mod feature_gates;
 
 /// Functions for handling GenomeHubs configuration files
 pub mod genomehubs;
+
+/// Functions for parsing sequence reports in JSON or TSV format
+pub mod sequence_report;
 
 use crate::error;
 

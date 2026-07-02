@@ -14,6 +14,13 @@ pub trait IndexDocument: Serialize {
     fn validate(&self) -> Result<(), EsError>;
 }
 
+pub trait BuildDocument: Serialize {
+    fn add_attribute(
+        &mut self,
+        attribute: nested_documents::NestedAttribute,
+    ) -> Result<(), EsError>;
+}
+
 #[derive(Debug)]
 pub enum EsError {
     ValidationError(String),
@@ -24,10 +31,11 @@ pub enum EsError {
     Other(String),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum IndexGroup {
     Feature,
+    #[default]
     Taxon,
     Assembly,
     Sample,

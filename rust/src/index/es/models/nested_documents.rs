@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::parse::genomehubs::StringOrVec;
+
 // Defines the structure of a nested ontology entry for indexing and searching nested documents in Elasticsearch.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NestedOntology {
@@ -78,11 +80,11 @@ pub struct NestedAttributeValue {
 
 // Defines the structure of a nested attribute for indexing and searching nested documents in Elasticsearch.
 // includes all the shared non-value properties in addition to the NestedAttributeValue keys.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct NestedAttribute {
     pub key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub keyword_value: Option<String>,
+    pub keyword_value: Option<StringOrVec>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flattened_value: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]

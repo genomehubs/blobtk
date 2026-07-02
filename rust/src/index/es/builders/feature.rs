@@ -43,9 +43,24 @@ impl DocumentBuilder<FeatureDocument> for FeatureDocumentBuilder {
         unimplemented!()
     }
 
-    fn build_from_tsv(&self, tsv_path: &std::path::Path) -> Result<Vec<FeatureDocument>, Error> {
+    fn build_from_tsv(
+        &self,
+        tsv_path: &std::path::Path,
+        flavour: &str,
+    ) -> Result<Vec<FeatureDocument>, Error> {
         // Implementation goes here
-        unimplemented!()
+        if flavour == "bed" {
+            // Parse BED TSV format
+            unimplemented!()
+        } else if flavour == "busco" {
+            // Parse BUSCO TSV format
+            unimplemented!()
+        } else if flavour == "gff" {
+            // Parse GFF TSV format
+            unimplemented!()
+        } else {
+            Err(Error::UnsupportedFileType(flavour.to_string()))
+        }
     }
 }
 
