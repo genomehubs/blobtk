@@ -22,6 +22,13 @@ fn expand_feature_types(primary_type: &str) -> Vec<String> {
     let mut feature_types = vec![primary_type.to_string()];
     if primary_type.starts_with("win") {
         feature_types.push("window".to_string());
+    } else if primary_type.contains("_odb") {
+        feature_types.push("busco-gene".to_string());
+        feature_types.push("gene".to_string());
+    } else if primary_type == "chromosome" || primary_type == "scaffold" || primary_type == "contig"
+    {
+        feature_types.push("sequence".to_string());
+        feature_types.push("toplevel".to_string());
     }
     feature_types
 }
@@ -110,7 +117,7 @@ impl FeatureDocument {
             },
             NestedAttribute {
                 key: "seq_proportion".to_string(),
-                half_float_value: Some(seq_proportion),
+                float_value: Some(seq_proportion),
                 ..Default::default()
             },
             NestedAttribute {
@@ -120,7 +127,7 @@ impl FeatureDocument {
             },
             NestedAttribute {
                 key: "midpoint_proportion".to_string(),
-                half_float_value: Some(midpoint_proportion),
+                float_value: Some(midpoint_proportion),
                 ..Default::default()
             },
             NestedAttribute {

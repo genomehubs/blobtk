@@ -18,6 +18,7 @@ use crate::index::es::config;
 use crate::index::es::models::documents::FeatureDocument;
 use crate::index::es::models::nested_documents::NestedAttribute;
 use crate::io;
+use crate::parse::genomehubs::StringOrVec;
 
 #[derive(Debug, Deserialize)]
 pub struct DatasetsSequenceReport {
@@ -48,31 +49,40 @@ impl DatasetsSequenceReport {
             "unlocalized-contig" => "contig".to_string(),
             _ => "contig".to_string(),
         };
-        let feature_type = vec![
-            primary_type.clone(),
-            "sequence".to_string(),
-            "toplevel".to_string(),
-        ];
         let start = 1;
         let end = self.length;
         let strand = Some(1);
         let sequence_length = self.length;
         let gc = self.gc_percent.map(|gc_percent| gc_percent / 100.0);
-        let midpoint = sequence_length / 2;
-        let midpoint_proportion = 0.5;
-        let seq_proportion = 1.0;
-        let mut names = vec![];
+        let mut feature_names = vec![];
         if let Some(sequence_name) = &self.sequence_name {
-            names.push(sequence_name.clone());
+            feature_names.push(sequence_name.clone());
         }
+        let mut attributes = vec![];
         if let Some(chr_name) = &self.chr_name {
-            names.push(chr_name.clone());
+            if self.role == "assembled-molecule" {
+                feature_names.push(chr_name.clone());
+                attributes.push(NestedAttribute {
+                    key: "chromosome_name".to_string(),
+                    keyword_value: Some(StringOrVec::Single(chr_name.clone())),
+                    ..Default::default()
+                });
+            }
         }
-        let name = if !names.is_empty() {
-            Some(names.join(",").to_string())
-        } else {
-            None
-        };
+        if let Some(gc) = gc {
+            attributes.push(NestedAttribute {
+                key: "gc".to_string(),
+                half_float_value: Some(gc as f32),
+                ..Default::default()
+            });
+        }
+        if feature_names.len() > 0 {
+            attributes.push(NestedAttribute {
+                key: "feature_name".to_string(),
+                keyword_value: Some(StringOrVec::Multiple(feature_names)),
+                ..Default::default()
+            });
+        }
         FeatureDocument::new(
             feature_id,
             None,

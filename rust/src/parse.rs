@@ -9,7 +9,10 @@ use indicatif::ProgressBar;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// Functions for parsing BED files and extracting relevant information for indexing into Elasticsearch.
-pub mod bed_data;
+pub mod bed;
+
+/// Functions for parsing BUSCO full table files and extracting relevant information for indexing into Elasticsearch.
+pub mod busco;
 
 /// Functions for name lookup.
 pub mod lookup;

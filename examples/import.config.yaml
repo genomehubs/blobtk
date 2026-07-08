@@ -11,6 +11,7 @@ assembly:
 sequence_report:
   accession: *ACCESSION
   taxon_id: *TAXON
+  path: "~/tmp/{ACCESSION}.sequence_report.jsonl"
 bed:
   accession: *ACCESSION
   taxon_id: *TAXON
@@ -37,3 +38,20 @@ bed:
           index: 3
           type: float
           summary_functions: *SUMMARY_FUNCTIONS
+busco:
+  accession: *ACCESSION
+  taxon_id: *TAXON
+  tables:
+    - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/busco/{LINEAGE}/{ACCESSION}.{LINEAGE}.full_table.tsv.gz"
+      lineages:
+        # - anopheles_odb12
+        # - arthropoda_odb10
+        # - arthropoda_odb12
+        - diptera_odb12
+  algs:
+    - name: diptera_alg
+      lineage: diptera_odb12
+      path: https://raw.githubusercontent.com/Obscuromics/diptera-ALGs/refs/heads/main/tables/ALGs_syngraph_diptera.tsv
+    - name: brachycera_alg
+      lineage: diptera_odb12
+      path: https://raw.githubusercontent.com/Obscuromics/diptera-ALGs/refs/heads/main/tables/ALGs_syngraph_brachycera.tsv
