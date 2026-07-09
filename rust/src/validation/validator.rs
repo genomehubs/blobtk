@@ -65,6 +65,12 @@ pub fn apply_validation(value: String, field: &FieldSpec) -> Result<bool, error:
     };
     let field_type = &field.field_type;
     let valid = match field_type {
+        FieldType::Boolean => {
+            let v = value.parse::<bool>().map_err(|_| {
+                error::Error::ParseError(format!("Invalid boolean value: {}", value))
+            })?;
+            check_string_bounds(&v.to_string(), &constraint)
+        }
         FieldType::Byte => {
             let dot_pos = value.find(".").unwrap_or(value.len());
             let v = value[..dot_pos]

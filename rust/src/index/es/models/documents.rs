@@ -143,6 +143,11 @@ impl FeatureDocument {
                 ..Default::default()
             });
         }
+        let feature_id = if feature_id.starts_with(&sequence_id) {
+            feature_id.clone()
+        } else {
+            format!("{}:{}-{}:{}", sequence_id, start, end, feature_id)
+        };
         FeatureDocument {
             feature_id,
             parent_feature_id,
@@ -269,7 +274,7 @@ pub struct AttributeDocument {
 
 impl IndexDocument for AttributeDocument {
     fn get_id(&self) -> String {
-        format!("{}:{}", self.group, self.name)
+        self.name.clone()
     }
 
     fn index_group(&self) -> IndexGroup {

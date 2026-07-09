@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::import::EsConfig;
 use crate::index::es::config::IndexConfig;
 use crate::index::es::mappings::common::Mappings;
 use crate::index::es::models::{EsError, IndexDocument, IndexGroup};
@@ -71,6 +72,7 @@ pub struct ElasticsearchClient {
     pub cluster_url: String,
     pub username: Option<String>,
     pub password: Option<String>,
+    pub index_suffix: Option<String>,
 }
 
 impl ElasticsearchClient {
@@ -79,6 +81,21 @@ impl ElasticsearchClient {
             cluster_url: cluster_url.to_string(),
             username,
             password,
+            index_suffix: None,
+        }
+    }
+
+    pub fn set_index_suffix(&mut self, suffix: &str) {
+        self.index_suffix = Some(suffix.to_string());
+    }
+
+    pub fn resolve_index_name(&self, index_prefix: &str) -> Result<String, EsError> {
+        if let Some(suffix) = &self.index_suffix {
+            Ok(format!("{}{}", index_prefix, suffix))
+        } else {
+            Err(EsError::ApiError(
+                "Index suffix is not set. Cannot determine full index name.".to_string(),
+            ))
         }
     }
 
@@ -257,12 +274,29 @@ impl ElasticsearchClient {
         }
     }
 
+    /// Convert any IndexDocument to the wrapper Document type
+    pub fn wrap_for_bulk_index<T: IndexDocument>(
+        &self,
+        docs: Vec<T>,
+    ) -> Result<Vec<Document>, EsError> {
+        docs.into_iter()
+            .map(|doc| {
+                Ok(Document {
+                    id: doc.get_id(),
+                    content: serde_json::to_value(&doc)
+                        .map_err(|e| EsError::SerializationError(e.to_string()))?,
+                })
+            })
+            .collect()
+    }
+
     pub fn index_documents(
         &self,
-        index_name: &str,
+        index_prefix: &str,
         documents: Vec<Document>,
     ) -> Result<(), EsError> {
         // generate the API request to perform bulk indexing of the documents into the specified index
+        let index_name = self.resolve_index_name(index_prefix)?;
         let request_url = format!("{}/{}/_bulk", self.cluster_url, index_name);
         let mut bulk_request_body = String::new();
         for document in documents {
@@ -296,7 +330,8 @@ impl ElasticsearchClient {
         }
     }
 
-    pub fn refresh(&self, index_name: &str) -> Result<(), EsError> {
+    pub fn refresh(&self, index_prefix: &str) -> Result<(), EsError> {
+        let index_name = self.resolve_index_name(index_prefix)?;
         let url = format!("{}/{}/_refresh", self.cluster_url, index_name);
         let client = reqwest::blocking::Client::new();
         let resp = client
@@ -338,5 +373,23 @@ impl ElasticsearchClient {
                 response.text().unwrap_or_default()
             )))
         }
+    }
+}
+
+impl TryFrom<&EsConfig> for ElasticsearchClient {
+    type Error = EsError;
+
+    fn try_from(value: &EsConfig) -> Result<Self, Self::Error> {
+        let index_suffix = format!(
+            "--{}--{}--{}",
+            value.hub.taxonomy, value.hub.name, value.hub.release
+        );
+        let mut client = ElasticsearchClient::new(
+            &format!("{}:{}", value.host, value.port),
+            value.username.clone(),
+            value.password.clone(),
+        );
+        client.set_index_suffix(&index_suffix);
+        Ok(client)
     }
 }

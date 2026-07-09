@@ -519,6 +519,31 @@ pub fn parse_bed_files(
                             // summarised_values.push(values);
                         }
 
+                        let attributes = doc.attributes.as_mut().unwrap();
+                        attributes.push(NestedAttribute {
+                            key: "assembly_id".to_string(),
+                            keyword_value: Some(super::genomehubs::StringOrVec::Single(
+                                config.accession.clone(),
+                            )),
+                            ..Default::default()
+                        });
+
+                        attributes.push(NestedAttribute {
+                            key: "taxon_id".to_string(),
+                            keyword_value: Some(super::genomehubs::StringOrVec::Single(
+                                config.taxon_id.clone(),
+                            )),
+                            ..Default::default()
+                        });
+                        // add sequence_id attribute to the document
+                        attributes.push(NestedAttribute {
+                            key: "sequence_id".to_string(),
+                            keyword_value: Some(super::genomehubs::StringOrVec::Single(
+                                seq_id.clone(),
+                            )),
+                            ..Default::default()
+                        });
+
                         acc.reset();
                     }
                 }

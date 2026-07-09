@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{self, Error};
 use crate::import::SequenceReportImportConfig;
 use crate::index::es::config;
+use crate::index::es::mappings::attribute;
 use crate::index::es::models::documents::FeatureDocument;
 use crate::index::es::models::nested_documents::NestedAttribute;
 use crate::io;
@@ -58,7 +59,23 @@ impl DatasetsSequenceReport {
         if let Some(sequence_name) = &self.sequence_name {
             feature_names.push(sequence_name.clone());
         }
-        let mut attributes = vec![];
+        let mut attributes = vec![
+            NestedAttribute {
+                key: "sequence_id".to_string(),
+                keyword_value: Some(StringOrVec::Single(sequence_id.clone())),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "assembly_id".to_string(),
+                keyword_value: Some(StringOrVec::Single(assembly_id.clone())),
+                ..Default::default()
+            },
+            NestedAttribute {
+                key: "taxon_id".to_string(),
+                keyword_value: Some(StringOrVec::Single(taxon_id.clone())),
+                ..Default::default()
+            },
+        ];
         if let Some(chr_name) = &self.chr_name {
             if self.role == "assembled-molecule" {
                 feature_names.push(chr_name.clone());
@@ -83,7 +100,7 @@ impl DatasetsSequenceReport {
                 ..Default::default()
             });
         }
-        FeatureDocument::new(
+        let mut feature_doc = FeatureDocument::new(
             feature_id,
             None,
             primary_type,
@@ -98,7 +115,14 @@ impl DatasetsSequenceReport {
             None, // ancestors
             None, // file_id
             None, // analysis_id
-        )
+        );
+        // add attributes to feature_doc
+        if let Some(feature_attrs) = feature_doc.attributes.as_mut() {
+            for attr in attributes {
+                feature_attrs.push(attr);
+            }
+        }
+        feature_doc
     }
 }
 

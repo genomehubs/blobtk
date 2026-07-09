@@ -1,0 +1,205 @@
+use serde_json::{Map, Value};
+
+use crate::index::es::models::{
+    documents::AttributeDocument, nested_documents::NestedAttribute, IndexGroup,
+};
+use crate::parse::genomehubs::StringOrVec;
+use crate::validation::spec::FieldType;
+
+#[derive(Clone, Debug, Default)]
+pub struct AttributeDocOverrides {
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub constraint: Option<Value>,
+    pub field_type: Option<FieldType>,
+}
+
+pub fn build_attribute_document(
+    attr: &NestedAttribute,
+    overrides: Option<&AttributeDocOverrides>,
+) -> AttributeDocument {
+    let mut doc = AttributeDocument {
+        group: IndexGroup::Feature,
+        name: attr.key.clone(),
+        display_name: Some(attr.key.clone()),
+        description: None,
+        field_type: infer_field_type(attr),
+        constraint: infer_constraint(attr),
+        ..Default::default()
+    };
+
+    if let Some(overrides) = overrides {
+        if let Some(display_name) = &overrides.display_name {
+            doc.display_name = Some(display_name.clone());
+        }
+        if let Some(description) = &overrides.description {
+            doc.description = Some(description.clone());
+        }
+        if let Some(field_type) = &overrides.field_type {
+            doc.field_type = field_type.clone();
+        }
+        doc.constraint = merge_constraints(doc.constraint.clone(), overrides.constraint.clone());
+    }
+
+    doc
+}
+
+pub fn merge_attribute_documents(
+    existing: &AttributeDocument,
+    candidate: &AttributeDocument,
+) -> AttributeDocument {
+    let mut merged = existing.clone();
+
+    if merged.display_name.is_none() {
+        merged.display_name = candidate.display_name.clone();
+    }
+    if merged.description.is_none() {
+        merged.description = candidate.description.clone();
+    }
+    if merged.units.is_none() {
+        merged.units = candidate.units.clone();
+    }
+    if merged.value_metadata.is_none() {
+        merged.value_metadata = candidate.value_metadata.clone();
+    }
+
+    if merged.field_type == FieldType::Keyword && candidate.field_type != FieldType::Keyword {
+        merged.field_type = candidate.field_type.clone();
+    }
+
+    merged.constraint =
+        merge_constraints(existing.constraint.clone(), candidate.constraint.clone());
+    merged
+}
+
+fn infer_field_type(attr: &NestedAttribute) -> FieldType {
+    if attr.bool_value.is_some() || attr.is_primary_value.is_some() || attr.deprecated.is_some() {
+        FieldType::Boolean
+    } else if attr.byte_value.is_some() {
+        FieldType::Byte
+    } else if attr.date_value.is_some() || attr.source_date.is_some() {
+        FieldType::Date
+    } else if attr.double_value.is_some() {
+        FieldType::Double
+    } else if attr.float_value.is_some() {
+        FieldType::Float
+    } else if attr.geo_point_value.is_some() {
+        FieldType::GeoPoint
+    } else if attr.half_float_value.is_some() {
+        FieldType::HalfFloat
+    } else if attr.integer_value.is_some() || attr.count.is_some() {
+        FieldType::Integer
+    } else if attr.long_value.is_some() {
+        FieldType::Long
+    } else if attr.short_value.is_some() || attr.source_year.is_some() {
+        FieldType::Short
+    } else if attr.one_dp_value.is_some() {
+        FieldType::OneDP
+    } else if attr.two_dp_value.is_some() {
+        FieldType::TwoDP
+    } else if attr.three_dp_value.is_some() {
+        FieldType::ThreeDP
+    } else if attr.four_dp_value.is_some() {
+        FieldType::FourDP
+    } else {
+        FieldType::Keyword
+    }
+}
+
+fn infer_constraint(attr: &NestedAttribute) -> Option<Value> {
+    let mut constraint = Map::new();
+
+    if attr.key == "status" || attr.key.ends_with("_status") {
+        let values = keyword_values(attr);
+        if !values.is_empty() {
+            constraint.insert(
+                "enum".to_string(),
+                Value::Array(values.into_iter().map(Value::String).collect()),
+            );
+        }
+    }
+
+    if attr.key.contains("proportion") {
+        constraint.insert("min".to_string(), Value::from(0));
+        constraint.insert("max".to_string(), Value::from(1));
+    }
+
+    if attr.key.ends_with("_count") {
+        constraint.insert("min".to_string(), Value::from(0));
+    }
+
+    if constraint.is_empty() {
+        None
+    } else {
+        Some(Value::Object(constraint))
+    }
+}
+
+fn keyword_values(attr: &NestedAttribute) -> Vec<String> {
+    match &attr.keyword_value {
+        Some(StringOrVec::Single(value)) => vec![value.to_lowercase()],
+        Some(StringOrVec::Multiple(values)) => {
+            let mut lowered: Vec<String> =
+                values.iter().map(|value| value.to_lowercase()).collect();
+            lowered.sort();
+            lowered.dedup();
+            lowered
+        }
+        None => Vec::new(),
+    }
+}
+
+pub fn merge_constraints(existing: Option<Value>, candidate: Option<Value>) -> Option<Value> {
+    match (existing, candidate) {
+        (None, None) => None,
+        (Some(existing), None) => Some(existing),
+        (None, Some(candidate)) => Some(candidate),
+        (Some(Value::Object(mut existing_map)), Some(Value::Object(candidate_map))) => {
+            for (key, candidate_value) in candidate_map {
+                match (
+                    key.as_str(),
+                    existing_map.get(&key).cloned(),
+                    candidate_value,
+                ) {
+                    (
+                        "enum",
+                        Some(Value::Array(existing_values)),
+                        Value::Array(candidate_values),
+                    ) => {
+                        let mut merged_values: Vec<String> = existing_values
+                            .into_iter()
+                            .chain(candidate_values.into_iter())
+                            .filter_map(|value| value.as_str().map(|value| value.to_lowercase()))
+                            .collect();
+                        merged_values.sort();
+                        merged_values.dedup();
+                        existing_map.insert(
+                            key,
+                            Value::Array(merged_values.into_iter().map(Value::String).collect()),
+                        );
+                    }
+                    ("min", Some(Value::Number(existing_num)), Value::Number(candidate_num)) => {
+                        let merged = match (existing_num.as_f64(), candidate_num.as_f64()) {
+                            (Some(existing), Some(candidate)) => existing.min(candidate),
+                            _ => continue,
+                        };
+                        existing_map.insert(key, Value::from(merged));
+                    }
+                    ("max", Some(Value::Number(existing_num)), Value::Number(candidate_num)) => {
+                        let merged = match (existing_num.as_f64(), candidate_num.as_f64()) {
+                            (Some(existing), Some(candidate)) => existing.max(candidate),
+                            _ => continue,
+                        };
+                        existing_map.insert(key, Value::from(merged));
+                    }
+                    (_, None, value) => {
+                        existing_map.insert(key, value);
+                    }
+                    _ => {}
+                }
+            }
+            Some(Value::Object(existing_map))
+        }
+        (Some(existing), Some(_candidate)) => Some(existing),
+    }
+}

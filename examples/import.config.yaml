@@ -1,10 +1,10 @@
 es:
   host: "http://localhost"
   port: 9200
-hub:
-  name: goat
-  release: 2021.10.15
-  taxonomy: ncbi
+  hub:
+    name: goat
+    release: 2021.10.15
+    taxonomy: ncbi
 assembly:
   accession: &ACCESSION GCA_016920705.1
   taxon_id: &TAXON 1518534
@@ -43,10 +43,10 @@ busco:
   taxon_id: *TAXON
   tables:
     - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/busco/{LINEAGE}/{ACCESSION}.{LINEAGE}.full_table.tsv.gz"
-      lineages:
-        # - anopheles_odb12
-        # - arthropoda_odb10
-        # - arthropoda_odb12
+      lineages: &LINEAGES
+        - anopheles_odb12
+        - arthropoda_odb10
+        - arthropoda_odb12
         - diptera_odb12
   algs:
     - name: diptera_alg
@@ -55,3 +55,12 @@ busco:
     - name: brachycera_alg
       lineage: diptera_odb12
       path: https://raw.githubusercontent.com/Obscuromics/diptera-ALGs/refs/heads/main/tables/ALGs_syngraph_brachycera.tsv
+import:
+  entity_types:
+    - sequence
+    - window
+    - busco
+    - attribute
+  busco_tallies:
+    lineages: *LINEAGES
+    assembly_counts_output: "./busco_assembly_counts.tsv"

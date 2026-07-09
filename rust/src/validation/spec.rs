@@ -2,8 +2,10 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 
 // Field types
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum FieldType {
+    #[serde(rename = "boolean")]
+    Boolean,
     #[serde(rename = "byte")]
     Byte,
     #[serde(rename = "date")]

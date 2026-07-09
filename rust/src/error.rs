@@ -1,6 +1,8 @@
 use std::{convert::From, string::FromUtf8Error};
 use thiserror;
 
+use crate::index::es::models::EsError;
+
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum Error {
     #[error("{0}")]
@@ -64,5 +66,11 @@ impl From<serde_yaml::Error> for Error {
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
         Error::ParseError(err.to_string())
+    }
+}
+
+impl From<EsError> for Error {
+    fn from(err: EsError) -> Self {
+        Error::ApiError(err.to_string())
     }
 }
