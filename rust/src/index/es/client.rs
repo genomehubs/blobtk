@@ -296,6 +296,19 @@ impl ElasticsearchClient {
         documents: Vec<Document>,
     ) -> Result<(), EsError> {
         // generate the API request to perform bulk indexing of the documents into the specified index
+        // index at most 1000 documents at a time to avoid exceeding the maximum request size
+        let batch_size = 1000;
+        for chunk in documents.chunks(batch_size) {
+            self.index_documents_chunk(index_prefix, chunk.to_vec())?;
+        }
+        Ok(())
+    }
+
+    fn index_documents_chunk(
+        &self,
+        index_prefix: &str,
+        documents: Vec<Document>,
+    ) -> Result<(), EsError> {
         let index_name = self.resolve_index_name(index_prefix)?;
         let request_url = format!("{}/{}/_bulk", self.cluster_url, index_name);
         let mut bulk_request_body = String::new();
