@@ -5,7 +5,7 @@ use std::io::{self, BufRead, BufReader, BufWriter, Result, Write};
 use std::path::{Path, PathBuf};
 
 use crate::utils::styled_bytes_progress_bar;
-use flate2::read::GzDecoder;
+use flate2::read::{GzDecoder, MultiGzDecoder};
 use flate2::write;
 use flate2::Compression;
 use indicatif::ProgressBar;
@@ -204,14 +204,15 @@ pub fn local_file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
 }
 
 /// Return a BufRead object for a given URL path.
-/// The file will be fetched.
+/// For gzipped files: decompresses into memory first, then provides BufRead.
+/// This avoids line truncation issues with streaming decompressed gzip data.
 pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
+    use std::io::Cursor;
+
     let response = reqwest::blocking::get(url.to_string())
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     if response.status().is_success() {
         let content_len = response.content_length();
-        let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
-
         let is_gz_ext = url.ends_with(".gz");
         let is_gz_encoding = response
             .headers()
@@ -219,41 +220,71 @@ pub fn remote_file_reader(url: &str) -> io::Result<Box<dyn BufRead>> {
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
             .unwrap_or(false);
+
         if is_gz_ext || is_gz_encoding {
-            // Wrap the original response with ProgressRead so the progress bar
-            // measures compressed bytes (Content-Length) rather than the
-            // decompressed stream which would exceed the reported length.
-            let progress_response =
-                ProgressRead::new(response, pb, content_len, Some(url.to_string()));
-            let decoder = GzDecoder::new(progress_response);
-            Ok(Box::new(BufReader::new(decoder)))
+            // For gzipped: read compressed bytes, then decompress into memory
+            if let Some(len) = content_len {
+                eprintln!("Downloading {} bytes from {}", len, url);
+            }
+            let compressed = response
+                .bytes()
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+            // Decompress into memory; use MultiGzDecoder to handle
+            // concatenated (multi-member) gzip files
+            let cursor = Cursor::new(compressed.to_vec());
+            let mut decoder = MultiGzDecoder::new(cursor);
+            let mut decompressed = Vec::new();
+            std::io::Read::read_to_end(&mut decoder, &mut decompressed)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+            Ok(Box::new(BufReader::with_capacity(
+                256 * 1024,
+                Cursor::new(decompressed),
+            )))
         } else {
+            // For uncompressed streams: use streaming with progress tracking
+            let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
             let reader = ProgressRead::new(response, pb, content_len, Some(url.to_string()));
-            Ok(Box::new(BufReader::new(reader)))
+            Ok(Box::new(BufReader::with_capacity(256 * 1024, reader)))
         }
     } else {
+        // Fallback: try without .gz extension
         let response = reqwest::blocking::get(url.to_string().replace(".gz", ""))
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
         if response.status().is_success() {
             let content_len = response.content_length();
-            let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
-
             let is_gz_encoding = response
                 .headers()
                 .get(reqwest::header::CONTENT_ENCODING)
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_lowercase().contains("gzip") || s.to_lowercase().contains("x-gzip"))
                 .unwrap_or(false);
+
             if is_gz_encoding {
-                // See note above: count compressed bytes by wrapping the
-                // response in ProgressRead before GzDecoder.
-                let progress_response =
-                    ProgressRead::new(response, pb, content_len, Some(url.to_string()));
-                let decoder = GzDecoder::new(progress_response);
-                Ok(Box::new(BufReader::new(decoder)))
+                // Gzipped: decompress into memory
+                if let Some(len) = content_len {
+                    eprintln!("Downloading {} bytes from {}", len, url);
+                }
+                let compressed = response
+                    .bytes()
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+                let cursor = Cursor::new(compressed.to_vec());
+                let mut decoder = MultiGzDecoder::new(cursor);
+                let mut decompressed = Vec::new();
+                std::io::Read::read_to_end(&mut decoder, &mut decompressed)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+                Ok(Box::new(BufReader::with_capacity(
+                    256 * 1024,
+                    Cursor::new(decompressed),
+                )))
             } else {
+                // Uncompressed: stream with progress tracking
+                let pb = content_len.map(|len| styled_bytes_progress_bar(len, url));
                 let reader = ProgressRead::new(response, pb, content_len, Some(url.to_string()));
-                Ok(Box::new(BufReader::new(reader)))
+                Ok(Box::new(BufReader::with_capacity(256 * 1024, reader)))
             }
         } else {
             Err(io::Error::other(format!(

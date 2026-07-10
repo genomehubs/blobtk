@@ -357,7 +357,8 @@ pub fn set_window_name(
 }
 
 pub fn parse_bed_line(line: &str, value_columns: &[ValueColumn]) -> Result<Feature, error::Error> {
-    let fields: Vec<&str> = line.split('\t').collect();
+    let clean = line.trim_end_matches('\r');
+    let fields: Vec<&str> = clean.split('\t').collect();
     if fields.len() < 3 {
         return Err(error::Error::ParseError(format!(
             "Invalid BED line: {}",
@@ -440,7 +441,18 @@ pub fn parse_bed_files(
                     e
                 ))
             })?;
-            let feature = parse_bed_line(&line, &bed_config.value_columns)?;
+            // warn on bed parsing errors but continue processing
+            let feature = match parse_bed_line(&line, &bed_config.value_columns) {
+                Ok(f) => f,
+                Err(e) => {
+                    return Err(error::Error::ParseError(format!(
+                        "Failed to parse BED file: {}, line: {}: {}",
+                        bed_config.path.display(),
+                        line,
+                        e
+                    )));
+                }
+            };
             per_seq_buffers
                 .entry(feature.sequence_id.clone())
                 .or_insert_with(Vec::new)
