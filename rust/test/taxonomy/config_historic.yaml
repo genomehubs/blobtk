@@ -1,0 +1,17 @@
+path: /Users/rchallis/projects/genomehubs/boat-resources/taxdump/ncbi_20241203
+out: test/taxonomy/historic
+output_format:
+  - jsonl
+  - ncbi
+taxonomy_format: ncbi
+root_taxon_id:
+  - 2759
+base_taxon_id: 2759
+leaf_taxon_id:
+  - 1036760
+  - 566037
+  - 49329
+name_classes:
+  - scientific name
+  - synonym
+xref_label: ncbi

@@ -23,14 +23,14 @@ taxonomies:
   - path: test/taxonomy/canidae/ena/ena-taxonomy.extra.jsonl
     taxonomy_format: ena
     xref_label: ena
-  # - path: test/taxonomy/canidae/genomehubs/tolids.names.yaml
-  #   taxonomy_format: genomehubs
-  #   name_classes:
-  #     - scientific name
-  #     - synonym
-  #     - merged taxon id
-  #   xref_label: tolid
-  #   create_taxa: true
+  - path: test/taxonomy/canidae/genomehubs/tolids.names.yaml
+    taxonomy_format: genomehubs
+    name_classes:
+      - scientific name
+      - synonym
+      - merged taxon id
+    xref_label: tolid
+    create_taxa: true
   # - path: test/taxonomy/canidae/gbif
   #   taxonomy_format: ncbi
   #   root_taxon_id:

@@ -282,6 +282,145 @@ impl BuscoIdTracker {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SyntenyTracker {
+    // Identifier for the group set or clade-specific grouping scheme that this attribute belongs to.
+    group_set_id: String,
+    // Identifier for the specific group assignment of the locus within the selected group set.
+    group_id: String,
+    // True when this nested record describes the primary group set used for block summaries.
+    is_primary: bool,
+    // Identifier for the contiguous block of loci assigned to the same primary group.
+    block_id: String,
+    //Number of BUSCO loci in the contiguous same-group block.
+    block_size_loci: usize,
+    // One-based rank of the locus within its contiguous block.
+    rank_within_block: usize,
+    // Normalized position of the locus within its block, for example rank divided by block size.
+    rank_fraction: f64,
+    // Distance in loci from the locus to the nearest block edge.
+    distance_to_edge: usize,
+    // Rank of the first locus in the contiguous block.
+    block_start_rank: usize,
+    // Rank of the last locus in the contiguous block.
+    block_end_rank: usize,
+    // Count of immediately adjacent upstream or downstream loci in the same group before the first interruption.
+    same_group_continuous: bool,
+    // Count of immediately adjacent upstream or downstream loci in different groups before returning to the primary group or hitting a boundary.
+    different_group_continuous: bool,
+    // Total number of same-group loci in the chosen window or block context.
+    same_group_total: usize,
+    // Total number of different-group loci in the chosen window or block context.
+    different_group_total: usize,
+    // Number of distinct non-primary groups represented among the interruptions or neighboring loci.
+    distinct_different_group_count: usize,
+    // True when the number of interruptions passes a configured threshold, such as more than three.
+    interruption_threshold_flag: bool,
+    // True when the block may be truncated by a contig end, scaffold edge, or sparse BUSCO sampling.
+    is_edge_truncated: bool,
+}
+
+impl SyntenyTracker {
+    pub fn new(group_set_id: String, group_id: String) -> Self {
+        SyntenyTracker {
+            group_set_id,
+            group_id,
+            ..Default::default()
+        }
+    }
+
+    pub fn add_locus(&mut self, rank_within_block: usize, is_same_group: bool) {
+        if is_same_group {
+            self.same_group_total += 1;
+            self.same_group_continuous = true;
+            self.different_group_continuous = false;
+        } else {
+            self.different_group_total += 1;
+            self.same_group_continuous = false;
+            self.different_group_continuous = true;
+        }
+
+        if rank_within_block < self.block_start_rank {
+            self.block_start_rank = rank_within_block;
+        }
+        if rank_within_block > self.block_end_rank {
+            self.block_end_rank = rank_within_block;
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SyntenyBlock {
+    pub block_id: String,
+    pub block_size_loci: usize,
+    pub group_id: String,
+    pub loci: Vec<BuscoFeature>,
+}
+
+impl SyntenyBlock {
+    pub fn new(block_id: String, group_id: String) -> Self {
+        SyntenyBlock {
+            block_id,
+            group_id,
+            ..Default::default()
+        }
+    }
+
+    pub fn add_locus(&mut self, locus: BuscoFeature) {
+        self.loci.push(locus);
+        self.block_size_loci += 1;
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SyntenyBlockSet {
+    pub group_set_id: String,
+    pub total_loci: usize,
+    pub blocks: Vec<SyntenyBlock>,
+    pub latest_group_id: Option<String>,
+    pub counts: HashMap<String, usize>, // group_id -> count of loci
+    pub distinct_group_count: usize,
+}
+
+impl SyntenyBlockSet {
+    pub fn new(group_set_id: String) -> Self {
+        SyntenyBlockSet {
+            group_set_id,
+            ..Default::default()
+        }
+    }
+
+    pub fn add_block(&mut self, block: SyntenyBlock) {
+        self.total_loci += block.block_size_loci;
+        self.counts
+            .entry(block.group_id.clone())
+            .and_modify(|c| *c += block.block_size_loci)
+            .or_insert(block.block_size_loci);
+        self.latest_group_id = Some(block.group_id.clone());
+        self.blocks.push(block);
+        self.distinct_group_count = self.counts.len();
+    }
+
+    pub fn add_locus_to_block(&mut self, group_id: &str, locus: BuscoFeature) {
+        if let Some(block) = self.blocks.iter_mut().find(|b| b.group_id == group_id) {
+            block.add_locus(locus);
+            // Update counts for the block set
+            self.total_loci += 1;
+            self.counts
+                .entry(group_id.to_string())
+                .and_modify(|c| *c += 1)
+                .or_insert(1);
+        } else {
+            let mut new_block = SyntenyBlock::new(
+                format!("{}_block_{}", group_id, self.blocks.len() + 1),
+                group_id.to_string(),
+            );
+            new_block.add_locus(locus);
+            self.add_block(new_block);
+        }
+    }
+}
+
 pub fn parse_busco_files(
     busco_config: &MultiBuscoConfig,
     sequence_features: &HashMap<String, FeatureDocument>,
@@ -308,9 +447,12 @@ pub fn parse_busco_files(
             .filter(|alg| alg.lineage == busco_file.lineage)
             .collect();
 
+        // set up a counter to keep track of how many shared
+
         let mut busco_docs = Vec::new();
         let mut attribute_docs = Vec::new();
         let mut seen_attributes = std::collections::HashSet::new();
+        let mut block_sets: HashMap<String, SyntenyBlockSet> = HashMap::new();
 
         for parsed_line in parse_full_table(full_table_reader) {
             match parsed_line {
@@ -327,6 +469,9 @@ pub fn parse_busco_files(
                                 continue;
                             }
                         };
+                        let mut block_set = block_sets
+                            .entry(busco_file.lineage.clone())
+                            .or_insert_with(|| SyntenyBlockSet::new(busco_file.lineage.clone()));
                         let sequence_length = sequence_feature.sequence_length;
                         let (start, end) = match f.start <= f.end {
                             true => (f.start, f.end),
@@ -432,6 +577,7 @@ pub fn parse_busco_files(
                         }
 
                         // Apply ALG mappings
+                        let mut first_alg = true;
                         for alg in matching_algs.iter() {
                             if let Some(mapping) = &alg.mapping {
                                 if let Some(mapped_id) = mapping.get(&f.id) {
@@ -446,8 +592,12 @@ pub fn parse_busco_files(
                                             ..Default::default()
                                         });
                                     }
+                                    if first_alg {
+                                        block_set.add_locus_to_block(mapped_id, f.clone());
+                                    }
                                 }
                             }
+                            first_alg = false;
                         }
 
                         // Create AttributeDocuments for each attribute type (once per file)
@@ -549,6 +699,8 @@ pub fn parse_busco_files(
                 }
             }
         }
+
+        dbg!(block_sets.clone());
 
         // Index BUSCO feature documents after each file completes
         if !busco_docs.is_empty() {

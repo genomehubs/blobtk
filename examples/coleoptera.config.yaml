@@ -1,0 +1,49 @@
+es:
+  host: "http://localhost"
+  port: 9200
+  hub:
+    name: goat
+    release: 2021.10.15
+    taxonomy: ncbi
+assembly:
+  accession: &ACCESSION GCA_933228885.1
+  taxon_id: &TAXON 878056
+sequence_report:
+  accession: *ACCESSION
+  taxon_id: *TAXON
+bed:
+  accession: *ACCESSION
+  taxon_id: *TAXON
+  lines_per_unit: 1000
+  windows:
+    - type: size
+      size: 1000000
+    - type: proportion
+      proportion: 0.1
+  files:
+    - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/sequencecomposition-v1.1.0-20260702/k1/{ACCESSION}.GC.1k.bedGraph.gz"
+      value_columns:
+        - label: gc
+          index: 3
+          type: float
+          summary_functions: &SUMMARY_FUNCTIONS
+            - name: mean
+            - name: subwindow_variance
+              value:
+                size: 100
+    - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/sequencecomposition-v1.1.0-20260702/base_content/k1/{ACCESSION}.N.1k.bedGraph.gz"
+      value_columns:
+        - label: n
+          index: 3
+          type: float
+          summary_functions: *SUMMARY_FUNCTIONS
+busco:
+  accession: *ACCESSION
+  taxon_id: *TAXON
+  tables:
+    - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/busco-v0.3.0-20260625/{LINEAGE}/{ACCESSION}.{LINEAGE}.full_table.tsv.gz"
+      lineages:
+        # - anopheles_odb12
+        # - arthropoda_odb10
+        # - arthropoda_odb12
+        - coleoptera_odb12
