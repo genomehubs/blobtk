@@ -197,6 +197,18 @@ pub fn build_fast_lookup(
                 rank: node.rank(),
                 anc_ids: anc_ids.clone(),
             };
+            let key = CString::new(clean_name(&tax_id)).unwrap();
+            match id_map.entry(key) {
+                blart::map::Entry::Vacant(e) => {
+                    e.insert(vec![taxon_info.clone()]);
+                }
+                blart::map::Entry::Occupied(mut e) => {
+                    // Only insert if this tax_id is not already present
+                    if !e.get().iter().any(|ti| ti.tax_id == taxon_info.tax_id) {
+                        e.get_mut().push(taxon_info.clone());
+                    }
+                }
+            }
             let key = CString::new(clean_name(&name)).unwrap();
             match id_map.entry(key) {
                 blart::map::Entry::Vacant(e) => {
@@ -499,6 +511,7 @@ pub fn match_taxonomy_section(
 
     // Check if taxon_id is present
     let mut taxon_id = taxonomy_section.get("taxon_id");
+    let tax_id = taxon_id.cloned().unwrap_or_else(|| "None".to_string());
     if let Some(tax_id) = taxon_id {
         if tax_id == "None" {
             taxon_id = None;
