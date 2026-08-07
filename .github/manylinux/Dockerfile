@@ -15,17 +15,22 @@ RUN yum -y update && \
     make \
     gcc \
     gcc-c++ \
-    llvm-devel \
-    clang-devel \
-    clang \
+    bzip2-devel \
+    xz-devel \
     which \
     pkgconfig \
-    curl && \
+    curl \
+    centos-release-scl && \
+    yum install -y llvm-toolset-7-clang-devel \
+    llvm-toolset-7-libclang-devel && \
     yum clean all && rm -rf /var/cache/yum
+
 
 # Install rustup/cargo into a global location and add toolchain
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
+    LIBCLANG_PATH=/opt/rh/llvm-toolset-7/root/usr/lib64 \
+    CLANG_PATH=/opt/rh/llvm-toolset-7/root/usr/bin/clang \
     PATH=/usr/local/cargo/bin:$PATH
 
 RUN mkdir -p "$CARGO_HOME" "$RUSTUP_HOME" && \
