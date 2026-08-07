@@ -15,6 +15,8 @@ RUN yum -y update && \
     make \
     gcc \
     gcc-c++ \
+    llvm-devel \
+    clang-devel \
     which \
     pkgconfig \
     curl && \
