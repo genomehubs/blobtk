@@ -7,10 +7,13 @@ RUN yum -y update && \
     openssl-devel \
     zlib-devel \
     perl \
+    perl-IPC-Cmd \
     perl-ExtUtils-MakeMaker \
     make \
     gcc \
     gcc-c++ \
+    clang \
+    libclang-devel \
     which \
     pkgconfig \
     curl && \

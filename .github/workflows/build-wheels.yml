@@ -1,70 +1,68 @@
 on:
-  workflow_call:
-    inputs:
-      rust_directory:
-        required: false
-        type: string
-        default: ./rust
-      python_versions:
-        required: false
-        type: string
-        default: '["3.11"]'
-      target:
-        required: false
-        type: string
-        default: x86_64-unknown-linux-gnu
-      platform:
-        required: false
-        type: string
-        default: linux
-      rust_toolchain:
-        required: false
-        type: string
-        default: "1.91.0"
-      manylinux:
-        required: false
-        type: string
-        default: auto
+    workflow_call:
+        inputs:
+            rust_directory:
+                required: false
+                type: string
+                default: ./rust
+            python_versions:
+                required: false
+                type: string
+                default: '["3.11"]'
+            target:
+                required: false
+                type: string
+                default: x86_64-unknown-linux-gnu
+            platform:
+                required: false
+                type: string
+                default: linux
+            rust_toolchain:
+                required: false
+                type: string
+                default: "1.91.0"
+            manylinux:
+                required: false
+                type: string
+                default: auto
 
 jobs:
-  build-wheels:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ${{ fromJson(inputs.python_versions) }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            ${{ inputs.rust_directory }}/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install system build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential pkg-config libssl-dev perl zlib1g-dev
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ inputs.target }}
-          args: --release --out dist -i python${{ matrix.python }} --target ${{ inputs.target }} -m ${{ inputs.rust_directory }}/Cargo.toml
-          sccache: "true"
-          rust-toolchain: ${{ inputs.rust_toolchain }}
-          manylinux: ${{ inputs.manylinux }}
-        env:
-          RUSTUP_TOOLCHAIN: ${{ inputs.rust_toolchain }}
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-${{ inputs.platform }}-${{ matrix.python }}
-          path: dist
+    build-wheels:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python: ${{ fromJson(inputs.python_versions) }}
+        steps:
+            - uses: actions/checkout@v3
+            - name: Build custom manylinux image
+              uses: docker/build-push-action@v4
+              with:
+                  context: ./.github/manylinux
+                  file: ./.github/manylinux/Dockerfile
+                  push: false
+                  load: true
+                  tags: genomehubs/blobtk-manylinux:latest
+            - name: Build wheels inside custom manylinux container
+              env:
+                  PY: ${{ matrix.python }}
+              run: |
+                  mkdir -p dist
+                  docker run --rm -e PY=${{ matrix.python }} -v "${{ github.workspace }}":/io -w /io genomehubs/blobtk-manylinux:latest /bin/bash -lc '
+                    set -e
+                    PYBIN=""
+                    for p in /opt/python/*/bin/python; do
+                      if "$p" -V 2>&1 | grep -q "Python $PY"; then
+                        PYBIN="$p"
+                        break
+                      fi
+                    done
+                    if [ -z "$PYBIN" ]; then echo "No Python $PY found in image"; exit 1; fi
+                    "$PYBIN" -m pip install --upgrade pip setuptools wheel
+                    "$PYBIN" -m pip install maturin
+                    "$PYBIN" -m maturin build --release --out /io/dist -i "$PYBIN" -m /io/${{ inputs.rust_directory }}/Cargo.toml --manylinux 2014
+                  '
+            - name: Upload wheels
+              uses: actions/upload-artifact@v4
+              with:
+                  name: wheels-${{ inputs.platform }}-${{ matrix.python }}
+                  path: dist

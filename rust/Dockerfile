@@ -1,7 +1,7 @@
 FROM rust:1.91 as builder
 WORKDIR /usr/src/blobtk
 COPY . .
-RUN apt-get update && apt-get install -y cmake python3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y cmake python3 pkg-config libssl-dev perl zlib1g-dev clang libclang-dev && rm -rf /var/lib/apt/lists/*
 # RUN cargo install --path .
 RUN RUSTFLAGS="-C target-feature=+crt-static" cargo install --path . --target x86_64-unknown-linux-gnu
 
