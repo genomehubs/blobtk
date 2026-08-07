@@ -35,7 +35,7 @@ RUN sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/*.repo && \
 RUN yum clean all && yum makecache
 
 # 6. Install the LLVM / Clang developer kit toolset safely
-RUN yum install -y llvm-toolset-7-clang-devel llvm-toolset-7-libclang-devel && \
+RUN yum install -y llvm-toolset-7-clang-devel && \
     yum clean all && rm -rf /var/cache/yum
 
 # 7. Map out the environment bindings for your Rust build stage
