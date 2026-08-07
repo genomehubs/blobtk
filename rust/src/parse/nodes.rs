@@ -1001,45 +1001,47 @@ impl Nodes {
                 }
             }
         }
-        // ...existing forwards.tsv logic unchanged...
-        let mut forwards_file = ott_path.clone();
-        forwards_file.push("forwards.tsv");
-        if forwards_file.exists() {
-            let file = File::open(&forwards_file).map_err(crate::error::Error::from)?;
-            let reader = BufReader::new(file);
-            for line in reader.lines() {
-                let line = line.map_err(crate::error::Error::from)?;
-                if line.starts_with("id\t") {
-                    continue;
-                }
-                let fields: Vec<&str> = line.split('\t').collect();
-                if fields.len() < 2 {
-                    continue;
-                }
-                let merged_id = fields[0];
-                let replacement_id = fields[1];
-                if let Some(node) = nodes.get_mut(replacement_id) {
-                    let mut found = false;
-                    if let Some(ref mut node_names) = node.names {
-                        for n in node_names.iter() {
-                            if n.name == merged_id {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if !found {
-                            node_names.push(Name {
-                                tax_id: replacement_id.to_string(),
-                                name: merged_id.to_string(),
-                                unique_name: merged_id.to_string(),
-                                class: Some("merged taxon id".to_string()),
-                                ..Default::default()
-                            });
-                        }
-                    }
-                }
-            }
-        }
+        //
+        // IMPORTANT: disable forwards as it leads to spurious synonyms being added to nodes that are not actually merged
+        //
+        // let mut forwards_file = ott_path.clone();
+        // forwards_file.push("forwards.tsv");
+        // if forwards_file.exists() {
+        //     let file = File::open(&forwards_file).map_err(crate::error::Error::from)?;
+        //     let reader = BufReader::new(file);
+        //     for line in reader.lines() {
+        //         let line = line.map_err(crate::error::Error::from)?;
+        //         if line.starts_with("id\t") {
+        //             continue;
+        //         }
+        //         let fields: Vec<&str> = line.split('\t').collect();
+        //         if fields.len() < 2 {
+        //             continue;
+        //         }
+        //         let merged_id = fields[0];
+        //         let replacement_id = fields[1];
+        //         if let Some(node) = nodes.get_mut(replacement_id) {
+        //             let mut found = false;
+        //             if let Some(ref mut node_names) = node.names {
+        //                 for n in node_names.iter() {
+        //                     if n.name == merged_id {
+        //                         found = true;
+        //                         break;
+        //                     }
+        //                 }
+        //                 if !found {
+        //                     node_names.push(Name {
+        //                         tax_id: replacement_id.to_string(),
+        //                         name: merged_id.to_string(),
+        //                         unique_name: merged_id.to_string(),
+        //                         class: Some("merged taxon id".to_string()),
+        //                         ..Default::default()
+        //                     });
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
         Ok(Nodes { nodes, children })
     }
 

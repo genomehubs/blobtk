@@ -1,6 +1,6 @@
 [package]
 name = "blobtk"
-version = "0.8.1"
+version = "0.8.3"
 edition = "2021"
 authors = ["Rich Challis <rc28@sanger.ac.uk>"]
 license = "MIT"
@@ -61,7 +61,7 @@ reqwest = { version = "0.11", features = [
     "rustls-tls",
 ], default-features = false }
 resvg = "0.31.0"
-rust-htslib = "0.40.2"
+rust-htslib = "1.0.1"
 rust_decimal = "1.29.1"
 schemars = "0.8.16"
 serde = { version = "1.0.152", features = ["derive"] }

@@ -1,4 +1,4 @@
-# BlobTk (v0.8.1)
+# BlobTk (v0.8.3)
 
 ## About
 
