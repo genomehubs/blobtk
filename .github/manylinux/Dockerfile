@@ -1,6 +1,9 @@
 
 FROM quay.io/pypa/manylinux2014_x86_64
 
+# Installs a statically built LLVM toolchain (defaults to latest available stable version)
+RUN manylinux-install-clang
+
 # Install system build deps and tooling
 RUN yum -y update && \
     yum -y install --setopt=tsflags=nodocs \
@@ -12,8 +15,6 @@ RUN yum -y update && \
     make \
     gcc \
     gcc-c++ \
-    clang \
-    libclang-devel \
     which \
     pkgconfig \
     curl && \
