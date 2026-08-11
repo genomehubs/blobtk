@@ -41,6 +41,7 @@ pub struct AlgConfig {
     pub name: String,
     pub lineage: String,
     pub path: String,
+    pub alg_count: Option<usize>,
     pub mapping: Option<HashMap<String, String>>,
 }
 
@@ -145,10 +146,12 @@ pub fn parse_alg_files(
             true,
         )?;
         let mut mapping = HashMap::new();
+        let mut unique_values = std::collections::HashSet::new();
         for result in alg_reader.into_records() {
             let record = result?;
             let key = record.get(0).unwrap().to_string();
             let value = record.get(1).unwrap().to_string();
+            unique_values.insert(value.clone());
             mapping.insert(key, value);
         }
         alg_map.insert(
@@ -157,6 +160,7 @@ pub fn parse_alg_files(
                 name: alg.name.clone(),
                 path: alg.path.clone(),
                 lineage: alg.lineage.clone(),
+                alg_count: Some(unique_values.len()),
                 mapping: Some(mapping),
             },
         );
@@ -283,68 +287,69 @@ impl BuscoIdTracker {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct SyntenyTracker {
+pub struct SyntenyLocus {
+    pub id: String,
+    pub status: String,
+    pub score: f64,
+    pub sequence_id: String,
+    pub start: usize,
+    pub end: usize,
+    pub strand: i8,
+    pub length: usize,
+
     // Identifier for the group set or clade-specific grouping scheme that this attribute belongs to.
+    // For example, "diptera_odb12_alg".
     group_set_id: String,
     // Identifier for the specific group assignment of the locus within the selected group set.
+    // For example, "diptera_odb12_alg:group_1".
     group_id: String,
     // True when this nested record describes the primary group set used for block summaries.
     is_primary: bool,
     // Identifier for the contiguous block of loci assigned to the same primary group.
+    // For example, "diptera_odb12_alg:group_1:block_1".
     block_id: String,
-    //Number of BUSCO loci in the contiguous same-group block.
+    // Number of BUSCO loci in the contiguous same-group block.
     block_size_loci: usize,
+    // Relative size of the contiguous block compared to the total number of loci in the chosen window or block context.
+    block_size_proportion: f64,
+    // Block size rank within the chosen window or block context, for example 1 for the largest block, 2 for the second largest, etc.
+    block_size_rank: usize,
     // One-based rank of the locus within its contiguous block.
     rank_within_block: usize,
     // Normalized position of the locus within its block, for example rank divided by block size.
-    rank_fraction: f64,
+    rank_proportion: f64,
     // Distance in loci from the locus to the nearest block edge.
     distance_to_edge: usize,
-    // Rank of the first locus in the contiguous block.
-    block_start_rank: usize,
-    // Rank of the last locus in the contiguous block.
-    block_end_rank: usize,
+    // // Rank of the first locus in the contiguous block.
+    // block_start_rank: usize,
+    // // Rank of the last locus in the contiguous block.
+    // block_end_rank: usize,
     // Count of immediately adjacent upstream or downstream loci in the same group before the first interruption.
-    same_group_continuous: bool,
+    same_group_continuous: usize,
     // Count of immediately adjacent upstream or downstream loci in different groups before returning to the primary group or hitting a boundary.
-    different_group_continuous: bool,
+    different_group_continuous: usize,
     // Total number of same-group loci in the chosen window or block context.
     same_group_total: usize,
     // Total number of different-group loci in the chosen window or block context.
     different_group_total: usize,
+    // Relative count of same group loci compared to different group loci, for example same_group_total / different_group_total.
+    same_to_different_ratio: f64,
     // Number of distinct non-primary groups represented among the interruptions or neighboring loci.
     distinct_different_group_count: usize,
-    // True when the number of interruptions passes a configured threshold, such as more than three.
-    interruption_threshold_flag: bool,
-    // True when the block may be truncated by a contig end, scaffold edge, or sparse BUSCO sampling.
-    is_edge_truncated: bool,
+    // Group Ids of the adjacent blocks or loci that interrupt the primary group block, for example ["group_2", "group_3"].
+    adjacent_group_ids: Vec<String>,
+    // // True when the number of interruptions passes a configured threshold, such as more than three.
+    // interruption_threshold_flag: bool,
+    // // True when the block may be truncated by a contig end, scaffold edge, or sparse BUSCO sampling.
+    // is_edge_truncated: bool,
 }
 
-impl SyntenyTracker {
+impl SyntenyLocus {
     pub fn new(group_set_id: String, group_id: String) -> Self {
-        SyntenyTracker {
+        SyntenyLocus {
             group_set_id,
             group_id,
             ..Default::default()
-        }
-    }
-
-    pub fn add_locus(&mut self, rank_within_block: usize, is_same_group: bool) {
-        if is_same_group {
-            self.same_group_total += 1;
-            self.same_group_continuous = true;
-            self.different_group_continuous = false;
-        } else {
-            self.different_group_total += 1;
-            self.same_group_continuous = false;
-            self.different_group_continuous = true;
-        }
-
-        if rank_within_block < self.block_start_rank {
-            self.block_start_rank = rank_within_block;
-        }
-        if rank_within_block > self.block_end_rank {
-            self.block_end_rank = rank_within_block;
         }
     }
 }
@@ -355,6 +360,10 @@ pub struct SyntenyBlock {
     pub block_size_loci: usize,
     pub group_id: String,
     pub loci: Vec<BuscoFeature>,
+    pub sequence_id: String,
+    pub start: Option<usize>,
+    pub end: Option<usize>,
+    pub length: usize,
 }
 
 impl SyntenyBlock {
@@ -367,19 +376,58 @@ impl SyntenyBlock {
     }
 
     pub fn add_locus(&mut self, locus: BuscoFeature) {
+        // Update start, end and length based on the new locus
+        let _start = if let Some(start) = self.start {
+            Some(start.min(locus.start))
+        } else {
+            Some(locus.start)
+        };
+        let _end = if let Some(end) = self.end {
+            Some(end.max(locus.end))
+        } else {
+            Some(locus.end)
+        };
+        if _end > _start {
+            self.start = _start;
+            self.end = _end;
+        } else {
+            self.start = _end;
+            self.end = _start;
+        }
+        self.length = self.end.unwrap_or(0) - self.start.unwrap_or(0);
         self.loci.push(locus);
         self.block_size_loci += 1;
     }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BlockSetMetrics {
+    pub total_loci: usize,
+    pub distinct_group_count: usize,
+    pub longest_block_size: usize,
+    pub block_count: usize,
+    pub majority_group_count: usize,
+    pub normalised_gini_score: f64,
+    pub normalised_minority_gini_score: f64,
+    pub normalised_transition_count_ratio: f64,
+    pub normalised_block_size: f64,
+    pub normalised_distinct_group_count: f64,
+    pub normalised_block_count: f64,
+    pub normalised_interminority_transition_ratio: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SyntenyBlockSet {
     pub group_set_id: String,
-    pub total_loci: usize,
     pub blocks: Vec<SyntenyBlock>,
-    pub latest_group_id: Option<String>,
     pub counts: HashMap<String, usize>, // group_id -> count of loci
+    pub total_loci: usize,
     pub distinct_group_count: usize,
+    pub longest_block_size: usize,
+    pub latest_group_id: Option<String>,
+    pub loci: Vec<SyntenyLocus>,
+    pub metrics: Option<BlockSetMetrics>,
+    pub transitions: Option<Vec<(String, usize)>>, // (from_group_id, to_group_id)
 }
 
 impl SyntenyBlockSet {
@@ -397,27 +445,383 @@ impl SyntenyBlockSet {
             .and_modify(|c| *c += block.block_size_loci)
             .or_insert(block.block_size_loci);
         self.latest_group_id = Some(block.group_id.clone());
+        self.longest_block_size = self.longest_block_size.max(block.block_size_loci);
         self.blocks.push(block);
         self.distinct_group_count = self.counts.len();
     }
 
     pub fn add_locus_to_block(&mut self, group_id: &str, locus: BuscoFeature) {
-        if let Some(block) = self.blocks.iter_mut().find(|b| b.group_id == group_id) {
-            block.add_locus(locus);
-            // Update counts for the block set
-            self.total_loci += 1;
-            self.counts
-                .entry(group_id.to_string())
-                .and_modify(|c| *c += 1)
-                .or_insert(1);
-        } else {
+        if group_id != self.latest_group_id.as_deref().unwrap_or("") {
+            // New group, create a new block
             let mut new_block = SyntenyBlock::new(
                 format!("{}_block_{}", group_id, self.blocks.len() + 1),
                 group_id.to_string(),
             );
             new_block.add_locus(locus);
             self.add_block(new_block);
+        } else {
+            // Add to the latest block
+            if let Some(latest_block) = self.blocks.last_mut() {
+                latest_block.add_locus(locus);
+                self.longest_block_size = self.longest_block_size.max(latest_block.block_size_loci)
+            }
         }
+        self.total_loci += 1;
+        self.counts
+            .entry(group_id.to_string())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
+    }
+
+    pub fn normalised_gini_score(&self, group_count: usize) -> f64 {
+        let n = self.total_loci as f64;
+        if n == 0.0 {
+            return 0.0;
+        }
+
+        let mut sum_of_squares = 0.0;
+        for count in self.counts.values() {
+            let p_i = *count as f64 / n;
+            sum_of_squares += p_i * p_i;
+        }
+
+        let gini = 1.0 - sum_of_squares;
+        let max_gini = 1.0 - (1.0 / group_count as f64);
+        if max_gini == 0.0 {
+            0.0
+        } else {
+            gini / max_gini
+        }
+    }
+
+    pub fn majority_group_names(&self) -> Vec<String> {
+        let max_count = self.counts.values().cloned().max().unwrap_or(0);
+        self.counts
+            .iter()
+            .filter(|&(_, &count)| count == max_count)
+            .map(|(group_id, _)| group_id.clone())
+            .collect()
+    }
+
+    pub fn minority_group_names(&self) -> Vec<String> {
+        let max_count = self.counts.values().cloned().max().unwrap_or(0);
+        self.counts
+            .iter()
+            .filter(|&(_, &count)| count < max_count)
+            .map(|(group_id, _)| group_id.clone())
+            .collect()
+    }
+
+    pub fn normalised_minority_gini_score(&self, group_count: usize) -> f64 {
+        let n = self.total_loci as f64;
+
+        if n == 0.0 {
+            return 0.0;
+        }
+
+        // filter out groups with the maximum count to focus on minority groups
+        let max_count = self.counts.values().cloned().max().unwrap_or(0);
+        let minority_groups = self.minority_group_names();
+        let minority_counts = self
+            .counts
+            .iter()
+            .filter(|(group_id, _)| minority_groups.contains(group_id))
+            .map(|(_, &count)| count)
+            .collect::<Vec<usize>>();
+
+        if minority_counts.len() < 2 {
+            return 0.0; // Not enough minority groups to calculate Gini
+        }
+
+        let n = minority_counts.iter().sum::<usize>() as f64;
+        if n == 0.0 {
+            return 0.0;
+        }
+
+        let mut sum_of_squares = 0.0;
+        for count in minority_counts.iter() {
+            let p_i = *count as f64 / n;
+            sum_of_squares += p_i * p_i;
+        }
+
+        let gini = 1.0 - sum_of_squares;
+
+        let minority_group_count = group_count - (self.counts.len() - minority_counts.len());
+
+        // Calculate the maximum possible Gini score for the given number of groups
+        let max_gini = if minority_group_count > 1 {
+            1.0 - (1.0 / minority_group_count as f64)
+        } else {
+            0.0
+        };
+
+        if max_gini == 0.0 {
+            0.0
+        } else {
+            gini / max_gini
+        }
+    }
+
+    pub fn normalised_transition_count_ratio(&self) -> f64 {
+        if self.blocks.len() <= 1 {
+            return 0.0;
+        }
+        let transitions = self.blocks.len() - 1;
+        let ratio = transitions as f64 / (self.total_loci as f64 - 1.0);
+        ratio
+    }
+
+    pub fn normalised_block_size(&self) -> f64 {
+        if self.blocks.is_empty() {
+            return 0.0;
+        }
+        let average_block_size = self.total_loci as f64 / self.blocks.len() as f64;
+        let max_block_size = self.longest_block_size as f64;
+        if max_block_size == 0.0 {
+            0.0
+        } else {
+            average_block_size / max_block_size
+        }
+    }
+
+    pub fn normalised_distinct_group_count(&self, group_count: usize) -> f64 {
+        if group_count == 0 {
+            return 0.0;
+        }
+        self.distinct_group_count as f64 / group_count as f64
+    }
+
+    pub fn normalised_block_count(&self, group_count: usize) -> f64 {
+        if group_count == 0 {
+            return 0.0;
+        }
+        self.blocks.len() as f64 / group_count as f64
+    }
+
+    pub fn normalised_interminority_transition_ratio(&self) -> f64 {
+        if self.blocks.len() <= 1 {
+            return 0.0;
+        }
+
+        let mut interminority_transitions = 0;
+        let minority_groups = self.minority_group_names();
+        let mut minority_block_count = 0;
+        for i in 1..self.blocks.len() {
+            let prev_group = &self.blocks[i - 1].group_id;
+            let curr_group = &self.blocks[i].group_id;
+
+            if prev_group != curr_group
+                && minority_groups.contains(prev_group)
+                && minority_groups.contains(curr_group)
+            {
+                interminority_transitions += 1;
+            }
+
+            if curr_group != prev_group && minority_groups.contains(curr_group) {
+                minority_block_count += 1;
+            }
+        }
+        let ratio = interminority_transitions as f64 / (minority_block_count as f64 - 1.0);
+        ratio
+    }
+
+    // pub fn calculate_synteny_metrics(&self, group_count: usize) -> HashMap<String, f64> {
+    //     let mut metrics = HashMap::new();
+    //     metrics.insert("total_loci".to_string(), self.total_loci as f64);
+    //     metrics.insert(
+    //         "distinct_group_count".to_string(),
+    //         self.distinct_group_count as f64,
+    //     );
+    //     metrics.insert(
+    //         "longest_block_size".to_string(),
+    //         self.longest_block_size as f64,
+    //     );
+    //     metrics.insert("block_count".to_string(), self.blocks.len() as f64);
+    //     metrics.insert(
+    //         "majority_group_count".to_string(),
+    //         self.counts.values().cloned().max().unwrap_or(0) as f64,
+    //     );
+    //     metrics.insert(
+    //         "normalised_gini_score".to_string(),
+    //         self.normalised_gini_score(group_count),
+    //     );
+    //     metrics.insert(
+    //         "normalised_minority_gini_score".to_string(),
+    //         self.normalised_minority_gini_score(group_count),
+    //     );
+    //     metrics.insert(
+    //         "normalised_transition_count_ratio".to_string(),
+    //         self.normalised_transition_count_ratio(),
+    //     );
+    //     metrics.insert(
+    //         "normalised_block_size".to_string(),
+    //         self.normalised_block_size(),
+    //     );
+    //     metrics.insert(
+    //         "normalised_distinct_group_count".to_string(),
+    //         self.normalised_distinct_group_count(group_count),
+    //     );
+    //     metrics.insert(
+    //         "normalised_block_count".to_string(),
+    //         self.normalised_block_count(group_count),
+    //     );
+    //     metrics.insert(
+    //         "normalised_interminority_transition_ratio".to_string(),
+    //         self.normalised_interminority_transition_ratio(),
+    //     );
+    //     metrics
+    // }
+
+    pub fn set_metrics(&mut self, group_count: usize) -> () {
+        let metrics = BlockSetMetrics {
+            total_loci: self.total_loci,
+            distinct_group_count: self.distinct_group_count,
+            longest_block_size: self.longest_block_size,
+            block_count: self.blocks.len(),
+            majority_group_count: self.counts.values().cloned().max().unwrap_or(0),
+            normalised_gini_score: self.normalised_gini_score(group_count),
+            normalised_minority_gini_score: self.normalised_minority_gini_score(group_count),
+            normalised_transition_count_ratio: self.normalised_transition_count_ratio(),
+            normalised_block_size: self.normalised_block_size(),
+            normalised_distinct_group_count: self.normalised_distinct_group_count(group_count),
+            normalised_block_count: self.normalised_block_count(group_count),
+            normalised_interminority_transition_ratio: self
+                .normalised_interminority_transition_ratio(),
+        };
+        self.metrics = Some(metrics);
+    }
+
+    pub fn get_metrics(&self) -> Option<&BlockSetMetrics> {
+        self.metrics.as_ref()
+    }
+
+    pub fn set_synteny_loci(&mut self) -> () {
+        // keep track of transitions between different group ids
+        let mut transitions = HashMap::new();
+        // Make a rank ordered list of all block sizes, and create a hashmap assigning each block id to a rank
+        let mut block_sizes: Vec<(String, usize)> = self
+            .blocks
+            .iter()
+            .map(|block| (block.block_id.clone(), block.block_size_loci))
+            .collect();
+        block_sizes.sort_by(|a, b| b.1.cmp(&a.1));
+        let block_ranks: HashMap<String, usize> = block_sizes
+            .iter()
+            .enumerate()
+            .map(|(rank, (block_id, _))| (block_id.clone(), rank + 1))
+            .collect();
+
+        // loop through all block sets and their blocks, and for each locus, create a SyntenyLocus struct with the appropriate metrics
+        let mut loci = Vec::new();
+        // get basic stats on first pass, update loci with SyntenyLocus on second pass
+        let mut block_index = 0;
+        let transition_threshold = 3; // configurable threshold for counting transitions
+        for block in &self.blocks {
+            let block_size = block.block_size_loci;
+            if block_size > transition_threshold && block_index > 0 {
+                let prev_block = &self.blocks[block_index - 1];
+                if prev_block.block_size_loci > transition_threshold
+                    && prev_block.group_id != block.group_id
+                {
+                    // sort group_ids alphabetically to avoid duplicate entries for the same transition in reverse order
+                    let transition_string = if prev_block.group_id < block.group_id {
+                        format!(
+                            "{}->{}",
+                            prev_block.group_id.clone(),
+                            block.group_id.clone()
+                        )
+                    } else {
+                        format!(
+                            "{}->{}",
+                            block.group_id.clone(),
+                            prev_block.group_id.clone()
+                        )
+                    };
+                    *transitions.entry(transition_string).or_insert(0) += 1;
+                }
+            }
+            for (i, locus) in block.loci.iter().enumerate() {
+                let rank_within_block = i + 1;
+                let rank_proportion = if block_size > 0 {
+                    (rank_within_block - 1) as f64 / (block_size - 1) as f64
+                } else {
+                    0.0
+                };
+                let distance_to_edge =
+                    std::cmp::min(rank_within_block - 1, block_size - rank_within_block);
+                let same_group_continuous = block_size;
+                let mut different_group_continuous = 0;
+                if rank_within_block == 1 && block_index > 0 {
+                    // loop through previous blocks until we find a same group
+                    let mut prev_index = block_index - 1;
+                    while self.blocks[prev_index].group_id != block.group_id {
+                        different_group_continuous += self.blocks[prev_index].block_size_loci;
+                        if prev_index == 0 {
+                            break;
+                        }
+                        prev_index -= 1;
+                    }
+                }
+                if rank_within_block == block_size && block_index < self.blocks.len() - 1 {
+                    // loop through next blocks until we find a same group
+                    let mut next_index = block_index + 1;
+                    while next_index < self.blocks.len()
+                        && self.blocks[next_index].group_id != block.group_id
+                    {
+                        different_group_continuous += self.blocks[next_index].block_size_loci;
+                        next_index += 1;
+                    }
+                }
+                let same_group_total = block_size;
+                let different_group_total =
+                    self.total_loci - self.counts.get(&block.group_id).unwrap_or(&0);
+                let same_to_different_ratio = if different_group_total > 0 {
+                    same_group_total as f64 / different_group_total as f64
+                } else {
+                    0.0
+                };
+                let distinct_different_group_count = self.counts.len() - 1;
+                let mut adjacent_group_ids = Vec::new();
+                if block_index > 0 {
+                    adjacent_group_ids.push(self.blocks[block_index - 1].group_id.clone());
+                }
+                if block_index < self.blocks.len() - 1 {
+                    adjacent_group_ids.push(self.blocks[block_index + 1].group_id.clone());
+                }
+
+                loci.push(SyntenyLocus {
+                    id: locus.id.clone(),
+                    status: locus.status.clone(),
+                    score: locus.score,
+                    sequence_id: locus.sequence.clone(),
+                    start: locus.start,
+                    end: locus.end,
+                    strand: locus.strand,
+                    length: locus.length,
+                    group_set_id: self.group_set_id.clone(),
+                    group_id: block.group_id.clone(),
+                    is_primary: true,
+                    block_id: block.block_id.clone(),
+                    block_size_loci: block_size,
+                    block_size_proportion: block_size as f64 / self.total_loci as f64,
+                    block_size_rank: *block_ranks.get(&block.block_id).unwrap_or(&1),
+                    rank_within_block,
+                    rank_proportion,
+                    distance_to_edge,
+                    same_group_continuous,
+                    different_group_continuous,
+                    same_group_total,
+                    different_group_total,
+                    same_to_different_ratio,
+                    distinct_different_group_count,
+                    adjacent_group_ids,
+                });
+            }
+            block_index += 1;
+        }
+        self.transitions = Some(transitions.into_iter().collect());
+        self.loci = loci;
+        dbg!(&self.loci);
     }
 }
 
@@ -469,8 +873,8 @@ pub fn parse_busco_files(
                                 continue;
                             }
                         };
-                        let mut block_set = block_sets
-                            .entry(busco_file.lineage.clone())
+                        let block_set = block_sets
+                            .entry(sequence_id.clone())
                             .or_insert_with(|| SyntenyBlockSet::new(busco_file.lineage.clone()));
                         let sequence_length = sequence_feature.sequence_length;
                         let (start, end) = match f.start <= f.end {
@@ -700,7 +1104,25 @@ pub fn parse_busco_files(
             }
         }
 
-        dbg!(block_sets.clone());
+        // let metrics = block_sets
+        //     .iter()
+        //     .map(|(seq_id, block_set)| {
+        //         let group_count = block_set.counts.len();
+        //         block_set.set_metrics(group_count);
+        //         let synteny_metrics = block_set.get_metrics();
+        //         (seq_id.clone(), synteny_metrics)
+        //     })
+        //     .collect::<HashMap<String, HashMap<String, f64>>>();
+        // dbg!(&metrics);
+
+        let synteny_loci = block_sets
+            .iter_mut()
+            .map(|(seq_id, block_set)| {
+                block_set.set_synteny_loci();
+                (seq_id.clone(), block_set.loci.clone())
+            })
+            .collect::<HashMap<String, Vec<SyntenyLocus>>>();
+        // dbg!(&synteny_loci);
 
         // Index BUSCO feature documents after each file completes
         if !busco_docs.is_empty() {
