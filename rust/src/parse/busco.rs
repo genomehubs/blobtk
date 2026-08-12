@@ -7,19 +7,25 @@ use std::path::PathBuf;
 use anyhow;
 use serde::{Deserialize, Serialize};
 
+pub mod attributes;
+
 use crate::error;
 use crate::import::state::ImportState;
 use crate::import::sync_attribute_documents;
 use crate::import::EsConfig;
 use crate::import::ImportOptions;
 use crate::index::es::client::ElasticsearchClient;
-use crate::index::es::models::attribute_builder::{
-    build_attribute_document, AttributeDocOverrides,
-};
+
 use crate::index::es::models::documents::FeatureDocument;
 use crate::index::es::models::nested_documents::NestedAttribute;
 use crate::io::get_csv_reader;
 use crate::parse::bed::WindowSpec;
+
+use crate::parse::busco::attributes::{
+    busco_alg_attribute, busco_core_attributes, synteny_block_attributes,
+    synteny_block_feature_document, synteny_locus_attributes, synteny_locus_feature_document,
+    AttributeCollector, SyntenyIndexArtifacts, SyntenyIndexMode,
+};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BuscoTableConfig {
@@ -72,6 +78,15 @@ pub struct BuscoFeature {
 pub struct ParsedBuscoLine {
     pub id: String,
     pub feature: Option<BuscoFeature>, // None if incomplete/missing
+}
+
+fn feature_doc_key(feature_id: &str, sequence_id: &str) -> String {
+    let key = format!("{}::{}", sequence_id, feature_id);
+    key
+}
+
+fn ensure_feature_attributes(feature_document: &mut FeatureDocument) -> &mut Vec<NestedAttribute> {
+    feature_document.attributes.get_or_insert_with(Vec::new)
 }
 
 fn parse_full_table(
@@ -281,7 +296,8 @@ impl BuscoIdTracker {
 
             categories
         } else {
-            vec![format!("{}_unknown", lineage)]
+            let categories = vec![format!("{}_unknown", lineage)];
+            categories
         }
     }
 }
@@ -292,6 +308,8 @@ pub struct SyntenyLocus {
     pub status: String,
     pub score: f64,
     pub sequence_id: String,
+    pub assembly_id: String,
+    pub taxon_id: String,
     pub start: usize,
     pub end: usize,
     pub strand: i8,
@@ -361,16 +379,27 @@ pub struct SyntenyBlock {
     pub group_id: String,
     pub loci: Vec<BuscoFeature>,
     pub sequence_id: String,
+    pub assembly_id: String,
+    pub taxon_id: String,
     pub start: Option<usize>,
     pub end: Option<usize>,
     pub length: usize,
 }
 
 impl SyntenyBlock {
-    pub fn new(block_id: String, group_id: String) -> Self {
+    pub fn new(
+        block_id: String,
+        group_id: String,
+        sequence_id: String,
+        assembly_id: String,
+        taxon_id: String,
+    ) -> Self {
         SyntenyBlock {
             block_id,
             group_id,
+            sequence_id,
+            assembly_id,
+            taxon_id,
             ..Default::default()
         }
     }
@@ -416,9 +445,69 @@ pub struct BlockSetMetrics {
     pub normalised_interminority_transition_ratio: f64,
 }
 
+impl BlockSetMetrics {
+    pub fn to_nested_attribute_docs(&self) -> Vec<NestedAttribute> {
+        let mut attrs = Vec::new();
+        attrs.push(NestedAttribute {
+            key: "total_loci".to_string(),
+            integer_value: Some(self.total_loci as i32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "distinct_group_count".to_string(),
+            integer_value: Some(self.distinct_group_count as i32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "longest_block_size".to_string(),
+            integer_value: Some(self.longest_block_size as i32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "block_count".to_string(),
+            integer_value: Some(self.block_count as i32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "majority_group_count".to_string(),
+            integer_value: Some(self.majority_group_count as i32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "normalised_gini_score".to_string(),
+            float_value: Some(self.normalised_gini_score as f32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "normalised_minority_gini_score".to_string(),
+            float_value: Some(self.normalised_minority_gini_score as f32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "normalised_transition_count_ratio".to_string(),
+            float_value: Some(self.normalised_transition_count_ratio as f32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "normalised_block_size".to_string(),
+            float_value: Some(self.normalised_block_size as f32),
+            ..Default::default()
+        });
+        attrs.push(NestedAttribute {
+            key: "normalised_distinct_group_count".to_string(),
+            float_value: Some(self.normalised_distinct_group_count as f32),
+            ..Default::default()
+        });
+        attrs
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SyntenyBlockSet {
     pub group_set_id: String,
+    pub sequence_id: String,
+    pub assembly_id: String,
+    pub taxon_id: String,
     pub blocks: Vec<SyntenyBlock>,
     pub counts: HashMap<String, usize>, // group_id -> count of loci
     pub total_loci: usize,
@@ -431,9 +520,17 @@ pub struct SyntenyBlockSet {
 }
 
 impl SyntenyBlockSet {
-    pub fn new(group_set_id: String) -> Self {
+    pub fn new(
+        group_set_id: String,
+        sequence_id: String,
+        assembly_id: String,
+        taxon_id: String,
+    ) -> Self {
         SyntenyBlockSet {
             group_set_id,
+            sequence_id,
+            assembly_id,
+            taxon_id,
             ..Default::default()
         }
     }
@@ -456,21 +553,27 @@ impl SyntenyBlockSet {
             let mut new_block = SyntenyBlock::new(
                 format!("{}_block_{}", group_id, self.blocks.len() + 1),
                 group_id.to_string(),
+                self.sequence_id.clone(),
+                self.assembly_id.clone(),
+                self.taxon_id.clone(),
             );
             new_block.add_locus(locus);
             self.add_block(new_block);
         } else {
             // Add to the latest block
             if let Some(latest_block) = self.blocks.last_mut() {
+                if latest_block.sequence_id.is_empty() {
+                    latest_block.sequence_id = locus.sequence.clone();
+                }
                 latest_block.add_locus(locus);
-                self.longest_block_size = self.longest_block_size.max(latest_block.block_size_loci)
+                self.longest_block_size = self.longest_block_size.max(latest_block.block_size_loci);
+                self.total_loci += 1;
+                self.counts
+                    .entry(group_id.to_string())
+                    .and_modify(|c| *c += 1)
+                    .or_insert(1);
             }
         }
-        self.total_loci += 1;
-        self.counts
-            .entry(group_id.to_string())
-            .and_modify(|c| *c += 1)
-            .or_insert(1);
     }
 
     pub fn normalised_gini_score(&self, group_count: usize) -> f64 {
@@ -520,7 +623,6 @@ impl SyntenyBlockSet {
         }
 
         // filter out groups with the maximum count to focus on minority groups
-        let max_count = self.counts.values().cloned().max().unwrap_or(0);
         let minority_groups = self.minority_group_names();
         let minority_counts = self
             .counts
@@ -793,7 +895,9 @@ impl SyntenyBlockSet {
                     id: locus.id.clone(),
                     status: locus.status.clone(),
                     score: locus.score,
-                    sequence_id: locus.sequence.clone(),
+                    sequence_id: self.sequence_id.clone(),
+                    assembly_id: self.assembly_id.clone(),
+                    taxon_id: self.taxon_id.clone(),
                     start: locus.start,
                     end: locus.end,
                     strand: locus.strand,
@@ -821,8 +925,88 @@ impl SyntenyBlockSet {
         }
         self.transitions = Some(transitions.into_iter().collect());
         self.loci = loci;
-        dbg!(&self.loci);
     }
+}
+
+fn finalize_synteny_outputs(
+    busco_file: &BuscoFileConfig,
+    sequence_features: &HashMap<String, FeatureDocument>,
+    busco_docs: &mut HashMap<String, FeatureDocument>,
+    block_sets: &mut HashMap<String, SyntenyBlockSet>,
+    attribute_collector: &mut AttributeCollector,
+    mode: &SyntenyIndexMode,
+) -> SyntenyIndexArtifacts {
+    let mut artifacts = SyntenyIndexArtifacts::default();
+
+    if !mode.enrich_busco_features && !mode.index_synteny_loci && !mode.index_synteny_blocks {
+        artifacts.busco_docs = busco_docs.drain().map(|(_, doc)| doc).collect();
+        artifacts.attribute_docs = attribute_collector.take_docs();
+        return artifacts;
+    }
+
+    let mut synteny_loci_by_doc_key: HashMap<String, Vec<SyntenyLocus>> = HashMap::new();
+    for block_set in block_sets.values_mut() {
+        block_set.set_synteny_loci();
+        for locus in &block_set.loci {
+            synteny_loci_by_doc_key
+                .entry(feature_doc_key(&locus.id, &locus.sequence_id))
+                .or_insert_with(Vec::new)
+                .push(locus.clone());
+        }
+    }
+
+    if mode.enrich_busco_features {
+        for (doc_key, feature_doc) in busco_docs.iter_mut() {
+            if let Some(synteny_loci) = synteny_loci_by_doc_key.get(doc_key) {
+                let feature_attributes = ensure_feature_attributes(feature_doc);
+                for locus in synteny_loci {
+                    for (attr, overrides) in synteny_locus_attributes(locus) {
+                        attribute_collector.add(feature_attributes, attr, overrides);
+                    }
+                }
+            }
+        }
+    }
+
+    if mode.index_synteny_loci {
+        for loci in synteny_loci_by_doc_key.values() {
+            for locus in loci {
+                let sequence_length = sequence_features
+                    .get(&locus.sequence_id)
+                    .map(|sequence| sequence.sequence_length)
+                    .unwrap_or(locus.length);
+                let mut feature_document =
+                    synteny_locus_feature_document(locus, busco_file, sequence_length);
+                let feature_attributes = ensure_feature_attributes(&mut feature_document);
+                for (attr, overrides) in synteny_locus_attributes(locus) {
+                    attribute_collector.add(feature_attributes, attr, overrides);
+                }
+                artifacts.synteny_locus_docs.push(feature_document);
+            }
+        }
+    }
+
+    if mode.index_synteny_blocks {
+        for block_set in block_sets.values() {
+            for block in &block_set.blocks {
+                let sequence_length = sequence_features
+                    .get(&block.sequence_id)
+                    .map(|sequence| sequence.sequence_length)
+                    .unwrap_or(block.length.max(1));
+                let mut feature_document =
+                    synteny_block_feature_document(block, busco_file, sequence_length);
+                let feature_attributes = ensure_feature_attributes(&mut feature_document);
+                for (attr, overrides) in synteny_block_attributes(block) {
+                    attribute_collector.add(feature_attributes, attr, overrides);
+                }
+                artifacts.synteny_block_docs.push(feature_document);
+            }
+        }
+    }
+
+    artifacts.busco_docs = busco_docs.drain().map(|(_, doc)| doc).collect();
+    artifacts.attribute_docs = attribute_collector.take_docs();
+    artifacts
 }
 
 pub fn parse_busco_files(
@@ -833,9 +1017,12 @@ pub fn parse_busco_files(
     state: &mut ImportState,
     es_cfg: &EsConfig,
     import_opts: &Option<ImportOptions>,
+    synteny_index_mode: Option<&SyntenyIndexMode>,
 ) -> Result<(), error::Error> {
     let client = ElasticsearchClient::try_from(es_cfg)?;
-
+    let synteny_index_mode = synteny_index_mode.cloned().unwrap_or_default();
+    let assembly_id = busco_config.accession.clone();
+    let taxon_id = busco_config.taxon_id.clone();
     let alg_map = if let Some(algs) = &busco_config.algs {
         parse_alg_files(algs.clone())?
     } else {
@@ -853,9 +1040,8 @@ pub fn parse_busco_files(
 
         // set up a counter to keep track of how many shared
 
-        let mut busco_docs = Vec::new();
-        let mut attribute_docs = Vec::new();
-        let mut seen_attributes = std::collections::HashSet::new();
+        let mut busco_docs: HashMap<String, FeatureDocument> = HashMap::new();
+        let mut attribute_collector = AttributeCollector::new();
         let mut block_sets: HashMap<String, SyntenyBlockSet> = HashMap::new();
 
         for parsed_line in parse_full_table(full_table_reader) {
@@ -873,9 +1059,15 @@ pub fn parse_busco_files(
                                 continue;
                             }
                         };
-                        let block_set = block_sets
-                            .entry(sequence_id.clone())
-                            .or_insert_with(|| SyntenyBlockSet::new(busco_file.lineage.clone()));
+                        let block_set =
+                            block_sets.entry(sequence_id.clone()).or_insert_with(|| {
+                                SyntenyBlockSet::new(
+                                    busco_file.lineage.clone(),
+                                    sequence_id.clone(),
+                                    assembly_id.clone(),
+                                    taxon_id.clone(),
+                                )
+                            });
                         let sequence_length = sequence_feature.sequence_length;
                         let (start, end) = match f.start <= f.end {
                             true => (f.start, f.end),
@@ -926,58 +1118,11 @@ pub fn parse_busco_files(
                             Some("busco".to_string()),
                         );
 
-                        // Initialize attributes if not present, but should always be present since we just created the FeatureDocument
-                        if feature_document.attributes.is_none() {
-                            feature_document.attributes = Some(Vec::new());
-                        }
-
-                        // add score and status as attributes
-                        if let Some(attributes) = &mut feature_document.attributes {
-                            attributes.push(NestedAttribute {
-                                key: "busco_name".to_string(),
-                                keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                                    f.id.clone(),
-                                )),
-                                ..Default::default()
-                            });
-
-                            attributes.push(NestedAttribute {
-                                key: "busco_score".to_string(),
-                                float_value: Some(f.score as f32),
-                                ..Default::default()
-                            });
-
-                            attributes.push(NestedAttribute {
-                                key: "busco_status".to_string(),
-                                keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                                    f.status.to_lowercase(),
-                                )),
-                                ..Default::default()
-                            });
-
-                            attributes.push(NestedAttribute {
-                                key: "assembly_id".to_string(),
-                                keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                                    busco_config.accession.clone(),
-                                )),
-                                ..Default::default()
-                            });
-
-                            attributes.push(NestedAttribute {
-                                key: "taxon_id".to_string(),
-                                keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                                    busco_config.taxon_id.clone(),
-                                )),
-                                ..Default::default()
-                            });
-
-                            attributes.push(NestedAttribute {
-                                key: "sequence_id".to_string(),
-                                keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                                    sequence_id,
-                                )),
-                                ..Default::default()
-                            });
+                        let feature_attributes = ensure_feature_attributes(&mut feature_document);
+                        for (attr, overrides) in
+                            busco_core_attributes(&f, busco_config, &sequence_id)
+                        {
+                            attribute_collector.add(feature_attributes, attr, overrides);
                         }
 
                         // Apply ALG mappings
@@ -985,17 +1130,9 @@ pub fn parse_busco_files(
                         for alg in matching_algs.iter() {
                             if let Some(mapping) = &alg.mapping {
                                 if let Some(mapped_id) = mapping.get(&f.id) {
-                                    if let Some(attributes) = &mut feature_document.attributes {
-                                        attributes.push(NestedAttribute {
-                                            key: alg.name.clone(),
-                                            keyword_value: Some(
-                                                super::genomehubs::StringOrVec::Single(
-                                                    mapped_id.clone(),
-                                                ),
-                                            ),
-                                            ..Default::default()
-                                        });
-                                    }
+                                    let (attr, overrides) =
+                                        busco_alg_attribute(&alg.name, mapped_id);
+                                    attribute_collector.add(feature_attributes, attr, overrides);
                                     if first_alg {
                                         block_set.add_locus_to_block(mapped_id, f.clone());
                                     }
@@ -1004,88 +1141,7 @@ pub fn parse_busco_files(
                             first_alg = false;
                         }
 
-                        // Create AttributeDocuments for each attribute type (once per file)
-                        let attr_key_name = format!("busco_name");
-                        if !seen_attributes.contains(&attr_key_name) {
-                            attribute_docs.push(build_attribute_document(
-                                &NestedAttribute {
-                                    key: "busco_name".to_string(),
-                                    keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                                        f.id.clone(),
-                                    )),
-                                    ..Default::default()
-                                },
-                                Some(&AttributeDocOverrides {
-                                    display_name: Some("BUSCO Name".to_string()),
-                                    description: Some("BUSCO locus name".to_string()),
-                                    ..Default::default()
-                                }),
-                            ));
-                            seen_attributes.insert(attr_key_name);
-                        }
-
-                        let attr_key_score = format!("busco_score");
-                        if !seen_attributes.contains(&attr_key_score) {
-                            attribute_docs.push(build_attribute_document(
-                                &NestedAttribute {
-                                    key: "busco_score".to_string(),
-                                    float_value: Some(f.score as f32),
-                                    ..Default::default()
-                                },
-                                Some(&AttributeDocOverrides {
-                                    display_name: Some("BUSCO Score".to_string()),
-                                    description: Some("BUSCO prediction score".to_string()),
-                                    ..Default::default()
-                                }),
-                            ));
-                            seen_attributes.insert(attr_key_score);
-                        }
-
-                        let attr_key_status = format!("busco_status");
-                        if !seen_attributes.contains(&attr_key_status) {
-                            attribute_docs.push(build_attribute_document(
-                                &NestedAttribute {
-                                    key: "busco_status".to_string(),
-                                    keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                                        f.status.to_lowercase(),
-                                    )),
-                                    ..Default::default()
-                                },
-                                Some(&AttributeDocOverrides {
-                                    display_name: Some("BUSCO Status".to_string()),
-                                    description: Some("BUSCO gene prediction status".to_string()),
-                                    ..Default::default()
-                                }),
-                            ));
-                            seen_attributes.insert(attr_key_status);
-                        }
-
-                        // Create AttributeDocuments for ALG mappings
-                        for alg in matching_algs.iter() {
-                            let attr_key_alg = alg.name.clone();
-                            if !seen_attributes.contains(&attr_key_alg) {
-                                attribute_docs.push(build_attribute_document(
-                                    &NestedAttribute {
-                                        key: alg.name.clone(),
-                                        keyword_value: Some(
-                                            super::genomehubs::StringOrVec::Single(
-                                                alg.name.clone(),
-                                            ),
-                                        ),
-                                        ..Default::default()
-                                    },
-                                    Some(&AttributeDocOverrides {
-                                        display_name: Some(format!("BUSCO {}", alg.name)),
-                                        description: Some(format!("ALG mapping for {}", alg.name)),
-                                        ..Default::default()
-                                    }),
-                                ));
-                                seen_attributes.insert(attr_key_alg);
-                            }
-                        }
-
-                        busco_docs.push(feature_document.clone());
-                        // feature_map.insert(f.id.clone(), feature_document);
+                        busco_docs.insert(feature_doc_key(&f.id, &sequence_id), feature_document);
                     } else {
                         // Incomplete line - BUSCO is missing from assembly
                         state.busco_counts.add_missing();
@@ -1104,30 +1160,66 @@ pub fn parse_busco_files(
             }
         }
 
-        // let metrics = block_sets
-        //     .iter()
-        //     .map(|(seq_id, block_set)| {
-        //         let group_count = block_set.counts.len();
-        //         block_set.set_metrics(group_count);
-        //         let synteny_metrics = block_set.get_metrics();
-        //         (seq_id.clone(), synteny_metrics)
-        //     })
-        //     .collect::<HashMap<String, HashMap<String, f64>>>();
-        // dbg!(&metrics);
+        // collect a hashmap of blockset metrics to add to state
+        let mut blockset_metrics: HashMap<String, BlockSetMetrics> = HashMap::new();
+        let group_count = matching_algs.first().and_then(|alg| alg.alg_count);
+        if let Some(count) = group_count {
+            for (seq_id, block_set) in &mut block_sets {
+                block_set.set_metrics(count);
+                if let Some(metrics) = block_set.get_metrics() {
+                    blockset_metrics.insert(seq_id.clone(), metrics.clone());
+                }
+            }
+            state.synteny_metrics_by_seq = blockset_metrics;
+        }
 
-        let synteny_loci = block_sets
-            .iter_mut()
-            .map(|(seq_id, block_set)| {
-                block_set.set_synteny_loci();
-                (seq_id.clone(), block_set.loci.clone())
-            })
-            .collect::<HashMap<String, Vec<SyntenyLocus>>>();
-        // dbg!(&synteny_loci);
+        // Finalize synteny outputs and index documents
+        let SyntenyIndexArtifacts {
+            busco_docs,
+            synteny_locus_docs,
+            synteny_block_docs,
+            attribute_docs,
+        } = finalize_synteny_outputs(
+            busco_file,
+            sequence_features,
+            &mut busco_docs,
+            &mut block_sets,
+            &mut attribute_collector,
+            &synteny_index_mode,
+        );
+
+        if synteny_index_mode.index_synteny_loci && !synteny_locus_docs.is_empty() {
+            eprintln!(
+                "    Prepared {} synteny locus docs",
+                synteny_locus_docs.len()
+            );
+        }
+
+        if synteny_index_mode.index_synteny_blocks && !synteny_block_docs.is_empty() {
+            eprintln!(
+                "    Prepared {} synteny block docs",
+                synteny_block_docs.len()
+            );
+        }
 
         // Index BUSCO feature documents after each file completes
         if !busco_docs.is_empty() {
             eprintln!("    Indexing {} BUSCO features", busco_docs.len());
             let wrapped_docs = client.wrap_for_bulk_index(busco_docs)?;
+            client.index_documents("feature", wrapped_docs)?;
+            client.refresh("feature")?;
+        }
+
+        if synteny_index_mode.index_synteny_loci && !synteny_locus_docs.is_empty() {
+            eprintln!("    Indexing {} synteny loci", synteny_locus_docs.len());
+            let wrapped_docs = client.wrap_for_bulk_index(synteny_locus_docs)?;
+            client.index_documents("feature", wrapped_docs)?;
+            client.refresh("feature")?;
+        }
+
+        if synteny_index_mode.index_synteny_blocks && !synteny_block_docs.is_empty() {
+            eprintln!("    Indexing {} synteny blocks", synteny_block_docs.len());
+            let wrapped_docs = client.wrap_for_bulk_index(synteny_block_docs)?;
             client.index_documents("feature", wrapped_docs)?;
             client.refresh("feature")?;
         }

@@ -16,7 +16,8 @@ impl Serialize for PropertyMeta {
         S: serde::Serializer,
     {
         let truncated_description = if self.description.len() > 50 {
-            format!("{}...", &self.description[..47])
+            let truncated = format!("{}...", &self.description[..47]);
+            truncated
         } else {
             self.description.clone()
         };

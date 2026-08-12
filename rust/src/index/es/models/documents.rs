@@ -5,12 +5,9 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    index::es::{
-        builders::feature,
-        models::{
-            nested_documents::{NestedAttribute, NestedIdentifier},
-            BuildDocument, EsError, IndexDocument, IndexGroup,
-        },
+    index::es::models::{
+        nested_documents::{NestedAttribute, NestedIdentifier},
+        BuildDocument, EsError, IndexDocument, IndexGroup,
     },
     parse::genomehubs::{
         StringOrVec, SummaryFunction, SummaryFunctionOrVec, TraverseDirection, ValueMetadataConfig,
@@ -22,13 +19,29 @@ fn expand_feature_types(primary_type: &str) -> Vec<String> {
     let mut feature_types = vec![primary_type.to_string()];
     if primary_type.starts_with("win") {
         feature_types.push("window".to_string());
+    } else if primary_type.contains("synteny-locus") {
+        feature_types.push("synteny-locus".to_string());
+        feature_types.push("locus".to_string());
+    } else if primary_type.contains("synteny-block") {
+        feature_types.push("synteny-block".to_string());
+        feature_types.push("block".to_string());
     } else if primary_type.contains("_odb") {
         feature_types.push("busco-gene".to_string());
         feature_types.push("gene".to_string());
     } else if primary_type == "chromosome" || primary_type == "scaffold" || primary_type == "contig"
     {
         feature_types.push("sequence".to_string());
+        feature_types.push("nuclear-sequence".to_string());
         feature_types.push("toplevel".to_string());
+    } else if primary_type == "mitochondrion"
+        || primary_type == "chloroplast"
+        || primary_type == "apicoplast"
+        || primary_type == "plastid"
+    {
+        feature_types.push("sequence".to_string());
+        feature_types.push("organelle-sequence".to_string());
+    } else {
+        dbg!(&primary_type); // --- IGNORE ---
     }
     feature_types
 }
@@ -86,6 +99,11 @@ impl FeatureDocument {
         // attributes: Option<Vec<NestedAttribute>>,
         // identifiers: Option<Vec<NestedIdentifier>>,
     ) -> Self {
+        let (start, end) = if end > start {
+            (start, end)
+        } else {
+            (end, start)
+        };
         let length = end - start;
         let seq_proportion = if sequence_length > 0 {
             (length as f64 / sequence_length as f64) as f32
@@ -146,7 +164,8 @@ impl FeatureDocument {
         let feature_id = if feature_id.starts_with(&sequence_id) {
             feature_id.clone()
         } else {
-            format!("{}:{}-{}:{}", sequence_id, start, end, feature_id)
+            let feature_id = format!("{}:{}-{}:{}", sequence_id, start, end, feature_id);
+            feature_id
         };
         FeatureDocument {
             feature_id,
@@ -235,6 +254,9 @@ pub struct AttributeDocument {
     // Field type
     #[serde(rename = "type", default = "default_field_type")]
     pub field_type: FieldType,
+    // Display group is used to group attributes in the UI, and must be a string. Attributes with the same display group will be displayed together in the UI.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub synonyms: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

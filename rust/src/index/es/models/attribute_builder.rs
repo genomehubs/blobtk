@@ -9,6 +9,8 @@ use crate::validation::spec::FieldType;
 #[derive(Clone, Debug, Default)]
 pub struct AttributeDocOverrides {
     pub display_name: Option<String>,
+    pub display_group: Option<String>,
+    pub display_level: Option<u8>,
     pub description: Option<String>,
     pub constraint: Option<Value>,
     pub field_type: Option<FieldType>,
@@ -32,6 +34,12 @@ pub fn build_attribute_document(
         if let Some(display_name) = &overrides.display_name {
             doc.display_name = Some(display_name.clone());
         }
+        if let Some(display_group) = &overrides.display_group {
+            doc.display_group = Some(display_group.clone());
+        }
+        if let Some(display_level) = &overrides.display_level {
+            doc.display_level = Some(*display_level);
+        }
         if let Some(description) = &overrides.description {
             doc.description = Some(description.clone());
         }
@@ -52,6 +60,12 @@ pub fn merge_attribute_documents(
 
     if merged.display_name.is_none() {
         merged.display_name = candidate.display_name.clone();
+    }
+    if merged.display_group.is_none() {
+        merged.display_group = candidate.display_group.clone();
+    }
+    if merged.display_level.is_none() {
+        merged.display_level = candidate.display_level.clone();
     }
     if merged.description.is_none() {
         merged.description = candidate.description.clone();

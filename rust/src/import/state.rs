@@ -1,6 +1,6 @@
 use crate::index::es::models::attribute_builder::merge_attribute_documents;
 use crate::index::es::models::documents::{AttributeDocument, FeatureDocument};
-use crate::parse::busco::BuscoIdTracker;
+use crate::parse::busco::{BlockSetMetrics, BuscoIdTracker};
 use std::collections::HashMap;
 
 /// Tallies busco status counts per sequence and per window
@@ -102,6 +102,7 @@ impl AttributeDocumentCache {
 pub struct ImportState {
     pub sequences: HashMap<String, FeatureDocument>,
     pub busco_counts: BuscoCountAggregator,
+    pub synteny_metrics_by_seq: HashMap<String, BlockSetMetrics>,
     pub busco_id_tracker: BuscoIdTracker,
     pub attribute_doc_cache: AttributeDocumentCache,
     pub assembly_id: String,
@@ -116,6 +117,7 @@ impl ImportState {
             busco_id_tracker: BuscoIdTracker::new(),
             attribute_doc_cache: AttributeDocumentCache::new(),
             assembly_id,
+            synteny_metrics_by_seq: HashMap::new(),
             taxon_id,
         }
     }
