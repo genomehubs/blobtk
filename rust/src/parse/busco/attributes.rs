@@ -223,6 +223,19 @@ pub fn synteny_locus_attributes(
                 ..default_overrides.clone()
             }),
         ),
+        // locus_name
+        (
+            NestedAttribute {
+                key: "locus_name".to_string(),
+                keyword_value: Some(StringOrVec::Single(locus.id.clone())),
+                ..Default::default()
+            },
+            Some(AttributeDocOverrides {
+                display_name: Some("Locus Name".to_string()),
+                description: Some("BUSCO locus name".to_string()),
+                ..default_overrides.clone()
+            }),
+        ),
         (
             NestedAttribute {
                 key: "group_set_id".to_string(),

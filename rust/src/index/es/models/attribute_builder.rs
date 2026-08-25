@@ -14,6 +14,61 @@ pub struct AttributeDocOverrides {
     pub description: Option<String>,
     pub constraint: Option<Value>,
     pub field_type: Option<FieldType>,
+    pub deprecated: Option<bool>,
+    pub deprecated_reason: Option<String>,
+}
+
+pub fn feature_attribute_overrides(attr: &NestedAttribute) -> AttributeDocOverrides {
+    let core_keys: &[&str] = &[
+        "feature_id",
+        "assembly_id",
+        "taxon_id",
+        "sequence_id",
+        "start",
+        "end",
+        "strand",
+        "length",
+        "feature_name",
+        "feature_type",
+    ];
+    let extended_keys: &[&str] = &[
+        "seq_proportion",
+        "midpoint",
+        "midpoint_proportion",
+        "chromosome_name",
+    ];
+
+    let display_group = if core_keys.contains(&attr.key.as_str()) {
+        Some("core".to_string())
+    } else if extended_keys.contains(&attr.key.as_str()) {
+        Some("core".to_string())
+    } else if attr.key.contains("_odb") {
+        Some("busco".to_string())
+    } else if attr.key.ends_with("_count") {
+        Some("counts".to_string())
+    } else if attr.key.contains("group_id")
+        || attr.key.contains("group_set")
+        || attr.key.contains("block_id")
+        || attr.key.contains("locus")
+        || attr.key.contains("synteny")
+    {
+        Some("synteny".to_string())
+    } else {
+        Some("stats".to_string())
+    };
+
+    let display_level =
+        if core_keys.contains(&attr.key.as_str()) || extended_keys.contains(&attr.key.as_str()) {
+            Some(1)
+        } else {
+            None
+        };
+
+    AttributeDocOverrides {
+        display_group,
+        display_level,
+        ..Default::default()
+    }
 }
 
 pub fn build_attribute_document(
@@ -46,6 +101,12 @@ pub fn build_attribute_document(
         if let Some(field_type) = &overrides.field_type {
             doc.field_type = field_type.clone();
         }
+        if let Some(deprecated) = overrides.deprecated {
+            doc.deprecated = Some(deprecated);
+        }
+        if let Some(deprecated_reason) = &overrides.deprecated_reason {
+            doc.deprecated_reason = Some(deprecated_reason.clone());
+        }
         doc.constraint = merge_constraints(doc.constraint.clone(), overrides.constraint.clone());
     }
 
@@ -69,6 +130,12 @@ pub fn merge_attribute_documents(
     }
     if merged.description.is_none() {
         merged.description = candidate.description.clone();
+    }
+    if merged.deprecated.is_none() {
+        merged.deprecated = candidate.deprecated;
+    }
+    if merged.deprecated_reason.is_none() {
+        merged.deprecated_reason = candidate.deprecated_reason.clone();
     }
     if merged.units.is_none() {
         merged.units = candidate.units.clone();

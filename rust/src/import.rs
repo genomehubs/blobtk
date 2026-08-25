@@ -4,14 +4,11 @@
 
 // use crate::index::es::config;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::error;
 use crate::index::es::client::ElasticsearchClient;
-use crate::index::es::models::attribute_builder::{
-    build_attribute_document, AttributeDocOverrides,
-};
+use crate::index::es::models::attribute_builder::build_attribute_document;
 use crate::index::es::models::documents::{AttributeDocument, FeatureDocument};
 use crate::index::es::models::nested_documents::NestedAttribute;
 use crate::parse::bed::{parse_bed_files, MultiBedConfig};
@@ -425,54 +422,11 @@ fn create_attribute_docs_from_features(
 ) -> Result<(), error::Error> {
     let mut attribute_docs = Vec::new();
 
-    let core_attributes = HashSet::from([
-        "feature_id".to_string(),
-        "assembly_id".to_string(),
-        "taxon_id".to_string(),
-        "start".to_string(),
-        "end".to_string(),
-        "strand".to_string(),
-        "length".to_string(),
-        "feature_name".to_string(),
-        "feature_type".to_string(),
-    ]);
-    let extended_attributes = HashSet::from([
-        "seq_proportion".to_string(),
-        "midpoint".to_string(),
-        "midpoint_proportion".to_string(),
-        "chromosome_name".to_string(),
-    ]);
     for feature in features {
         if let Some(attrs) = &feature.attributes {
             for attr in attrs {
-                let overrides = if core_attributes.contains(&attr.key) {
-                    Some(&AttributeDocOverrides {
-                        display_group: Some("core".to_string()),
-                        display_level: Some(1),
-                        ..Default::default()
-                    })
-                } else if extended_attributes.contains(&attr.key) {
-                    Some(&AttributeDocOverrides {
-                        display_group: Some("core".to_string()),
-                        ..Default::default()
-                    })
-                } else if attr.key.contains("_odb") {
-                    Some(&AttributeDocOverrides {
-                        display_group: Some("busco".to_string()),
-                        ..Default::default()
-                    })
-                } else if attr.key.ends_with("_count") {
-                    Some(&AttributeDocOverrides {
-                        display_group: Some("counts".to_string()),
-                        ..Default::default()
-                    })
-                } else {
-                    Some(&AttributeDocOverrides {
-                        display_group: Some("stats".to_string()),
-                        ..Default::default()
-                    })
-                };
-                attribute_docs.push(build_attribute_document(attr, overrides));
+                let overrides = crate::index::es::models::attribute_builder::feature_attribute_overrides(attr);
+                attribute_docs.push(build_attribute_document(attr, Some(&overrides)));
             }
         }
     }

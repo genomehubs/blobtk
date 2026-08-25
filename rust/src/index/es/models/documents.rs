@@ -268,6 +268,10 @@ pub struct AttributeDocument {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deprecated_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_level: Option<u8>,
     // Column index of value in original file
     #[serde(skip_serializing_if = "Option::is_none")]

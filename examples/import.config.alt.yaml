@@ -64,3 +64,7 @@ import:
   busco_tallies:
     lineages: *LINEAGES
     assembly_counts_output: "./busco_assembly_counts.tsv"
+  synteny_index:
+    enrich_busco_features: true
+    index_synteny_loci: true
+    index_synteny_blocks: true

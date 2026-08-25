@@ -20,30 +20,43 @@ bed:
       size: 1000000
     - type: proportion
       proportion: 0.1
-  files:
-    - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/sequencecomposition-v1.1.0-20260702/k1/{ACCESSION}.GC.1k.bedGraph.gz"
-      value_columns:
-        - label: gc
-          index: 3
-          type: float
-          summary_functions: &SUMMARY_FUNCTIONS
-            - name: mean
-            - name: subwindow_variance
-              value:
-                size: 100
-    - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/sequencecomposition-v1.1.0-20260702/base_content/k1/{ACCESSION}.N.1k.bedGraph.gz"
-      value_columns:
-        - label: n
-          index: 3
-          type: float
-          summary_functions: *SUMMARY_FUNCTIONS
+  files: []
+#     - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/sequencecomposition-v1.1.0-20260702/k1/{ACCESSION}.GC.1k.bedGraph.gz"
+#       value_columns:
+#         - label: gc
+#           index: 3
+#           type: float
+#           summary_functions: &SUMMARY_FUNCTIONS
+#             - name: mean
+#             - name: subwindow_variance
+#               value:
+#                 size: 100
+#     - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/sequencecomposition-v1.1.0-20260702/base_content/k1/{ACCESSION}.N.1k.bedGraph.gz"
+#       value_columns:
+#         - label: n
+#           index: 3
+#           type: float
+#           summary_functions: *SUMMARY_FUNCTIONS
 busco:
   accession: *ACCESSION
   taxon_id: *TAXON
   tables:
     - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/busco-v0.3.0-20260625/{LINEAGE}/{ACCESSION}.{LINEAGE}.full_table.tsv.gz"
-      lineages:
+      lineages: &LINEAGES
         # - anopheles_odb12
         # - arthropoda_odb10
         # - arthropoda_odb12
         - coleoptera_odb12
+import:
+  entity_types:
+    - sequence
+    - window
+    - busco
+    - attribute
+  busco_tallies:
+    lineages: *LINEAGES
+    assembly_counts_output: "./busco_assembly_counts.tsv"
+  synteny_index:
+    enrich_busco_features: true
+    index_synteny_loci: true
+    index_synteny_blocks: true
