@@ -436,12 +436,24 @@ pub struct BlockSetMetrics {
     pub longest_block_size: usize,
     pub block_count: usize,
     pub majority_group_count: usize,
-    pub normalised_gini_score: f64,
-    pub normalised_minority_gini_score: f64,
+    pub majority_group_id: Option<String>,
+    pub majority_group_fraction: Option<f64>,
+    pub majority_group_threshold_flag: bool,
+    pub filtered_transition_count_ratio: Option<f64>,
+    pub filtered_gini_score: Option<f64>,
+    #[deprecated(note = "Use filtered_transition_count_ratio instead")]
     pub normalised_transition_count_ratio: f64,
+    #[deprecated(note = "Use filtered_gini_score instead")]
+    pub normalised_gini_score: f64,
+    #[deprecated(note = "This metric is no longer kept in the compact synteny summary")]
+    pub normalised_minority_gini_score: f64,
+    #[deprecated(note = "This metric is no longer kept in the compact synteny summary")]
     pub normalised_block_size: f64,
+    #[deprecated(note = "This metric is no longer kept in the compact synteny summary")]
     pub normalised_distinct_group_count: f64,
+    #[deprecated(note = "This metric is no longer kept in the compact synteny summary")]
     pub normalised_block_count: f64,
+    #[deprecated(note = "This metric is no longer kept in the compact synteny summary")]
     pub normalised_interminority_transition_ratio: f64,
 }
 
@@ -473,31 +485,89 @@ impl BlockSetMetrics {
             integer_value: Some(self.majority_group_count as i32),
             ..Default::default()
         });
+        if let Some(group_id) = &self.majority_group_id {
+            attrs.push(NestedAttribute {
+                key: "majority_group_id".to_string(),
+                keyword_value: Some(crate::parse::genomehubs::StringOrVec::Single(
+                    group_id.clone(),
+                )),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.majority_group_fraction {
+            attrs.push(NestedAttribute {
+                key: "majority_group_fraction".to_string(),
+                float_value: Some(value as f32),
+                ..Default::default()
+            });
+        }
         attrs.push(NestedAttribute {
-            key: "normalised_gini_score".to_string(),
-            float_value: Some(self.normalised_gini_score as f32),
+            key: "majority_group_threshold_flag".to_string(),
+            bool_value: Some(self.majority_group_threshold_flag),
             ..Default::default()
         });
-        attrs.push(NestedAttribute {
-            key: "normalised_minority_gini_score".to_string(),
-            float_value: Some(self.normalised_minority_gini_score as f32),
-            ..Default::default()
-        });
-        attrs.push(NestedAttribute {
-            key: "normalised_transition_count_ratio".to_string(),
-            float_value: Some(self.normalised_transition_count_ratio as f32),
-            ..Default::default()
-        });
-        attrs.push(NestedAttribute {
-            key: "normalised_block_size".to_string(),
-            float_value: Some(self.normalised_block_size as f32),
-            ..Default::default()
-        });
-        attrs.push(NestedAttribute {
-            key: "normalised_distinct_group_count".to_string(),
-            float_value: Some(self.normalised_distinct_group_count as f32),
-            ..Default::default()
-        });
+        if let Some(value) = self.filtered_transition_count_ratio {
+            attrs.push(NestedAttribute {
+                key: "filtered_transition_count_ratio".to_string(),
+                float_value: Some(value as f32),
+                ..Default::default()
+            });
+        }
+        if let Some(value) = self.filtered_gini_score {
+            attrs.push(NestedAttribute {
+                key: "filtered_gini_score".to_string(),
+                float_value: Some(value as f32),
+                ..Default::default()
+            });
+        }
+
+        #[allow(deprecated)]
+        for (key, value, reason) in [
+            (
+                "normalised_gini_score".to_string(),
+                self.normalised_gini_score,
+                "Use filtered_gini_score instead",
+            ),
+            (
+                "normalised_transition_count_ratio".to_string(),
+                self.normalised_transition_count_ratio,
+                "Use filtered_transition_count_ratio instead",
+            ),
+            (
+                "normalised_minority_gini_score".to_string(),
+                self.normalised_minority_gini_score,
+                "This metric is no longer kept in the compact synteny summary",
+            ),
+            (
+                "normalised_block_size".to_string(),
+                self.normalised_block_size,
+                "This metric is no longer kept in the compact synteny summary",
+            ),
+            (
+                "normalised_distinct_group_count".to_string(),
+                self.normalised_distinct_group_count,
+                "This metric is no longer kept in the compact synteny summary",
+            ),
+            (
+                "normalised_block_count".to_string(),
+                self.normalised_block_count,
+                "This metric is no longer kept in the compact synteny summary",
+            ),
+            (
+                "normalised_interminority_transition_ratio".to_string(),
+                self.normalised_interminority_transition_ratio,
+                "This metric is no longer kept in the compact synteny summary",
+            ),
+        ] {
+            attrs.push(NestedAttribute {
+                key,
+                float_value: Some(value as f32),
+                deprecated: Some(true),
+                deprecated_reason: Some(reason.to_string()),
+                ..Default::default()
+            });
+        }
+
         attrs
     }
 }
@@ -664,6 +734,28 @@ impl SyntenyBlockSet {
         }
     }
 
+    pub fn filtered_transition_count_ratio(&self) -> Option<f64> {
+        let persistent_blocks: Vec<&SyntenyBlock> = self
+            .blocks
+            .iter()
+            .filter(|block| block.block_size_loci > 1)
+            .collect();
+        if persistent_blocks.len() <= 1 {
+            return None;
+        }
+
+        let persistent_loci: usize = persistent_blocks
+            .iter()
+            .map(|block| block.block_size_loci)
+            .sum();
+        if persistent_loci <= 1 {
+            return None;
+        }
+
+        let transitions = persistent_blocks.len() - 1;
+        Some(transitions as f64 / (persistent_loci as f64 - 1.0))
+    }
+
     pub fn normalised_transition_count_ratio(&self) -> f64 {
         if self.blocks.len() <= 1 {
             return 0.0;
@@ -671,6 +763,27 @@ impl SyntenyBlockSet {
         let transitions = self.blocks.len() - 1;
         let ratio = transitions as f64 / (self.total_loci as f64 - 1.0);
         ratio
+    }
+
+    pub fn filtered_gini_score(&self) -> Option<f64> {
+        let filtered_counts: Vec<usize> = self
+            .counts
+            .values()
+            .copied()
+            .filter(|count| *count > 1)
+            .collect();
+        let total = filtered_counts.iter().sum::<usize>();
+        if filtered_counts.is_empty() || total == 0 {
+            return None;
+        }
+
+        let mut sum_of_squares = 0.0;
+        for count in &filtered_counts {
+            let p_i = *count as f64 / total as f64;
+            sum_of_squares += p_i * p_i;
+        }
+
+        Some(1.0 - sum_of_squares)
     }
 
     pub fn normalised_block_size(&self) -> f64 {
@@ -775,15 +888,32 @@ impl SyntenyBlockSet {
     // }
 
     pub fn set_metrics(&mut self, group_count: usize) -> () {
+        let majority_group = self.counts.iter().max_by(|(_, a), (_, b)| a.cmp(b));
+        let majority_group_count = majority_group.map(|(_, count)| *count).unwrap_or(0);
+        let majority_group_id = majority_group.map(|(group_id, _)| group_id.clone());
+        let majority_group_fraction = if self.total_loci == 0 {
+            None
+        } else {
+            Some(majority_group_count as f64 / self.total_loci as f64)
+        };
+        let majority_group_threshold_flag =
+            majority_group_fraction.map_or(false, |value| value > (1.0 / 3.0));
+
+        #[allow(deprecated)]
         let metrics = BlockSetMetrics {
             total_loci: self.total_loci,
             distinct_group_count: self.distinct_group_count,
             longest_block_size: self.longest_block_size,
             block_count: self.blocks.len(),
-            majority_group_count: self.counts.values().cloned().max().unwrap_or(0),
+            majority_group_count,
+            majority_group_id,
+            majority_group_fraction,
+            majority_group_threshold_flag,
+            filtered_transition_count_ratio: self.filtered_transition_count_ratio(),
+            filtered_gini_score: self.filtered_gini_score(),
+            normalised_transition_count_ratio: self.normalised_transition_count_ratio(),
             normalised_gini_score: self.normalised_gini_score(group_count),
             normalised_minority_gini_score: self.normalised_minority_gini_score(group_count),
-            normalised_transition_count_ratio: self.normalised_transition_count_ratio(),
             normalised_block_size: self.normalised_block_size(),
             normalised_distinct_group_count: self.normalised_distinct_group_count(group_count),
             normalised_block_count: self.normalised_block_count(group_count),
