@@ -416,22 +416,11 @@ pub fn parse_bed_line(line: &str, value_columns: &[ValueColumn]) -> Result<Featu
 pub fn parse_bed_files(
     config: &MultiBedConfig,
 ) -> Result<HashMap<String, FeatureDocument>, error::Error> {
-    let mut features: Vec<Feature> = Vec::new();
     let mut feature_docs: HashMap<String, FeatureDocument> = HashMap::new();
-    // let lines_per_unit = config.lines_per_unit;
-
-    let windows = &config.window_specs;
-    let windowed_features: Vec<Vec<Feature>> = windows.iter().map(|_| Vec::new()).collect();
 
     for bed_config in &config.bed_configs {
         let mut bed_file = io::file_reader(bed_config.path.clone())?;
-        // read the BED file line by line and parse each line into a Feature struct
         let bed_reader = &mut *bed_file;
-        let mut accumulators: Vec<Accumulator> = Vec::new();
-        for _window_spec in &config.window_specs {
-            let value_columns = &bed_config.value_columns;
-            accumulators.push(Accumulator::new(value_columns));
-        }
         let mut per_seq_buffers: HashMap<String, Vec<Feature>> = HashMap::new();
         for line in bed_reader.lines() {
             let line = line.map_err(|e| {
@@ -441,7 +430,6 @@ pub fn parse_bed_files(
                     e
                 ))
             })?;
-            // warn on bed parsing errors but continue processing
             let feature = match parse_bed_line(&line, &bed_config.value_columns) {
                 Ok(f) => f,
                 Err(e) => {
@@ -458,6 +446,7 @@ pub fn parse_bed_files(
                 .or_insert_with(Vec::new)
                 .push(feature.clone());
         }
+
         for (seq_id, buffer) in per_seq_buffers {
             let sequence_length = buffer.last().map_or(0, |f| f.end);
             for window_spec in config.window_specs.iter() {
@@ -469,8 +458,9 @@ pub fn parse_bed_files(
                     }
                 };
                 let mut acc = Accumulator::new(&bed_config.value_columns);
-                let last_index = buffer.len() - 1;
-                for (fi, feature) in &mut buffer.iter().enumerate() {
+                let last_index = buffer.len().saturating_sub(1);
+
+                for (fi, feature) in buffer.iter().enumerate() {
                     if acc.start.is_none() {
                         acc.start = Some(feature.start);
                     }
@@ -478,8 +468,9 @@ pub fn parse_bed_files(
                     for (i, &value) in feature.values.iter().enumerate() {
                         acc.columns[i].add(value);
                     }
-                    // if window is full or this is the last line
-                    if acc.columns[0].count >= lines_per_window || fi == last_index {
+
+                    let should_flush = acc.columns[0].count >= lines_per_window || fi == last_index;
+                    if should_flush {
                         let window_name = set_window_name(
                             &seq_id,
                             acc.start.unwrap_or(0),
@@ -493,23 +484,23 @@ pub fn parse_bed_files(
                                 window_spec.to_string(),
                                 acc.start.unwrap_or(0),
                                 acc.end.unwrap_or(0),
-                                None, // strand
-                                None, // container_ids
+                                None,
+                                None,
                                 seq_id.clone(),
                                 sequence_length,
                                 config.accession.clone(),
                                 config.taxon_id.clone(),
-                                None, // ancestors
-                                None, // file_id
-                                None, // analysis_id
+                                None,
+                                None,
+                                None,
                             );
                             feature_docs.insert(window_name.clone(), doc);
                         }
+
                         let doc = feature_docs.get_mut(&window_name).unwrap();
                         for (index, col) in acc.columns.iter_mut().enumerate() {
                             let summary = col.finish();
-                            for (fi, sf) in &mut col.summary_functions.iter().enumerate() {
-                                // use the config value column name
+                            for (fi, sf) in col.summary_functions.iter().enumerate() {
                                 let name = bed_config.value_columns[index].name(fi);
                                 let attribute = NestedAttribute {
                                     key: name.clone(),
@@ -523,12 +514,6 @@ pub fn parse_bed_files(
                                 }
                                 doc.attributes.as_mut().unwrap().push(attribute);
                             }
-                            // let values: Vec<f64> = col
-                            //     .summary_functions
-                            //     .iter()
-                            //     .map(|sf| summary.get(sf).copied().unwrap_or(f64::NAN))
-                            //     .collect();
-                            // summarised_values.push(values);
                         }
 
                         let attributes = doc.attributes.as_mut().unwrap();
@@ -539,7 +524,6 @@ pub fn parse_bed_files(
                             )),
                             ..Default::default()
                         });
-
                         attributes.push(NestedAttribute {
                             key: "taxon_id".to_string(),
                             keyword_value: Some(super::genomehubs::StringOrVec::Single(
@@ -547,7 +531,6 @@ pub fn parse_bed_files(
                             )),
                             ..Default::default()
                         });
-                        // add sequence_id attribute to the document
                         attributes.push(NestedAttribute {
                             key: "sequence_id".to_string(),
                             keyword_value: Some(super::genomehubs::StringOrVec::Single(
@@ -558,6 +541,75 @@ pub fn parse_bed_files(
 
                         acc.reset();
                     }
+                }
+
+                if acc.columns.iter().any(|col| col.count > 0) {
+                    let window_name = set_window_name(
+                        &seq_id,
+                        acc.start.unwrap_or(0),
+                        acc.end.unwrap_or(0),
+                        window_spec,
+                    );
+                    if !feature_docs.contains_key(&window_name) {
+                        let doc = FeatureDocument::new(
+                            window_name.clone(),
+                            Some(seq_id.clone()),
+                            window_spec.to_string(),
+                            acc.start.unwrap_or(0),
+                            acc.end.unwrap_or(0),
+                            None,
+                            None,
+                            seq_id.clone(),
+                            sequence_length,
+                            config.accession.clone(),
+                            config.taxon_id.clone(),
+                            None,
+                            None,
+                            None,
+                        );
+                        feature_docs.insert(window_name.clone(), doc);
+                    }
+                    let doc = feature_docs.get_mut(&window_name).unwrap();
+                    for (index, col) in acc.columns.iter_mut().enumerate() {
+                        let summary = col.finish();
+                        for (fi, sf) in col.summary_functions.iter().enumerate() {
+                            let name = bed_config.value_columns[index].name(fi);
+                            let attribute = NestedAttribute {
+                                key: name.clone(),
+                                half_float_value: Some(
+                                    summary.get(sf).copied().unwrap_or(f64::NAN) as f32,
+                                ),
+                                ..Default::default()
+                            };
+                            if doc.attributes.is_none() {
+                                doc.attributes = Some(vec![]);
+                            }
+                            doc.attributes.as_mut().unwrap().push(attribute);
+                        }
+                    }
+                    let attributes = doc.attributes.as_mut().unwrap();
+                    attributes.push(NestedAttribute {
+                        key: "assembly_id".to_string(),
+                        keyword_value: Some(super::genomehubs::StringOrVec::Single(
+                            config.accession.clone(),
+                        )),
+                        ..Default::default()
+                    });
+                    attributes.push(NestedAttribute {
+                        key: "taxon_id".to_string(),
+                        keyword_value: Some(super::genomehubs::StringOrVec::Single(
+                            config.taxon_id.clone(),
+                        )),
+                        ..Default::default()
+                    });
+                    attributes.push(NestedAttribute {
+                        key: "sequence_id".to_string(),
+                        keyword_value: Some(super::genomehubs::StringOrVec::Single(
+                            seq_id.clone(),
+                        )),
+                        ..Default::default()
+                    });
+                    acc.reset();
                 }
             }
         }
@@ -595,6 +647,85 @@ mod tests {
     }
 
     // temporary test for parse_bed_files function
+    #[test]
+    fn test_parse_bed_files_creates_final_partial_window() {
+        let tmp = std::env::temp_dir().join("blobtk_bed_window_regression.bed");
+        std::fs::write(
+            &tmp,
+            "chr1\t0\t1000\t0.1\nchr1\t1000\t2000\t0.2\nchr1\t2000\t3000\t0.3\n",
+        )
+        .unwrap();
+
+        let cfg = MultiBedConfig {
+            accession: "GCA_test".to_string(),
+            taxon_id: "123".to_string(),
+            lines_per_unit: 1000,
+            bed_configs: vec![BedConfig {
+                path: tmp,
+                value_columns: vec![ValueColumn {
+                    label: "gc".to_string(),
+                    index: 3,
+                    value_type: "float".to_string(),
+                    summary_functions: vec![SummaryFunction::Mean],
+                }],
+            }],
+            window_specs: vec![WindowSpec::Size { size: 2000 }],
+        };
+
+        let docs = parse_bed_files(&cfg).unwrap();
+        assert!(!docs.is_empty());
+        assert!(docs.keys().any(|id| id.contains("chr1:0-2000:win-2k")));
+        assert!(docs.keys().any(|id| id.contains("chr1:2000-3000:win-2k")));
+    }
+
+    #[test]
+    fn test_parse_bed_files_creates_windows_with_window_feature_type() {
+        let tmp = std::env::temp_dir().join("blobtk_bed_window_feature_type.bed");
+        std::fs::write(
+            &tmp,
+            "chr1\t0\t1000\t0.1\nchr1\t1000\t2000\t0.2\nchr1\t2000\t3000\t0.3\n",
+        )
+        .unwrap();
+
+        let cfg = MultiBedConfig {
+            accession: "GCA_test".to_string(),
+            taxon_id: "123".to_string(),
+            lines_per_unit: 1000,
+            bed_configs: vec![BedConfig {
+                path: tmp,
+                value_columns: vec![ValueColumn {
+                    label: "gc".to_string(),
+                    index: 3,
+                    value_type: "float".to_string(),
+                    summary_functions: vec![SummaryFunction::Mean],
+                }],
+            }],
+            window_specs: vec![WindowSpec::Size { size: 2000 }, WindowSpec::Proportion { proportion: 0.1 }],
+        };
+
+        let docs = parse_bed_files(&cfg).unwrap();
+        let win_doc = docs
+            .values()
+            .find(|doc| doc.primary_type.starts_with("win"))
+            .expect("window docs should be created from BED input");
+
+        assert!(win_doc.primary_type.starts_with("win"));
+        let has_window_feature_type = win_doc
+            .attributes
+            .as_ref()
+            .unwrap()
+            .iter()
+            .any(|attr| {
+                attr.key == "feature_type"
+                    && matches!(
+                        attr.keyword_value.as_ref(),
+                        Some(crate::parse::genomehubs::StringOrVec::Multiple(values))
+                            if values.iter().any(|v| v == "window")
+                    )
+            });
+        assert!(has_window_feature_type, "window primary type must also appear in feature_type metadata");
+    }
+
     #[test]
     fn test_parse_bed_files() {
         let bed_config_gc = BedConfig {

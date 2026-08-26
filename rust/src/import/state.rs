@@ -103,6 +103,7 @@ pub struct ImportState {
     pub sequences: HashMap<String, FeatureDocument>,
     pub busco_counts: BuscoCountAggregator,
     pub synteny_metrics_by_seq: HashMap<String, BlockSetMetrics>,
+    pub synteny_metrics_by_window: HashMap<String, BlockSetMetrics>,
     pub busco_id_tracker: BuscoIdTracker,
     pub attribute_doc_cache: AttributeDocumentCache,
     pub assembly_id: String,
@@ -118,6 +119,7 @@ impl ImportState {
             attribute_doc_cache: AttributeDocumentCache::new(),
             assembly_id,
             synteny_metrics_by_seq: HashMap::new(),
+            synteny_metrics_by_window: HashMap::new(),
             taxon_id,
         }
     }

@@ -458,6 +458,14 @@ pub struct BlockSetMetrics {
 }
 
 impl BlockSetMetrics {
+    pub fn to_active_attribute_docs(&self) -> Vec<NestedAttribute> {
+        self.to_nested_attribute_docs()
+            .into_iter()
+            .filter(|attr| !attr.deprecated.unwrap_or(false))
+            .filter(|attr| !attr.key.starts_with("normalised_"))
+            .collect()
+    }
+
     pub fn to_nested_attribute_docs(&self) -> Vec<NestedAttribute> {
         let mut attrs = Vec::new();
         attrs.push(NestedAttribute {
@@ -513,12 +521,15 @@ impl BlockSetMetrics {
                 ..Default::default()
             });
         }
-        if let Some(value) = self.filtered_gini_score {
-            attrs.push(NestedAttribute {
-                key: "filtered_gini_score".to_string(),
-                float_value: Some(value as f32),
-                ..Default::default()
-            });
+        let has_meaningful_gini_input = self.total_loci > 1 && self.distinct_group_count > 1;
+        if has_meaningful_gini_input {
+            if let Some(value) = self.filtered_gini_score {
+                attrs.push(NestedAttribute {
+                    key: "filtered_gini_score".to_string(),
+                    float_value: Some(value as f32),
+                    ..Default::default()
+                });
+            }
         }
 
         #[allow(deprecated)]
@@ -559,6 +570,9 @@ impl BlockSetMetrics {
                 "This metric is no longer kept in the compact synteny summary",
             ),
         ] {
+            if key == "normalised_gini_score" && !has_meaningful_gini_input {
+                continue;
+            }
             attrs.push(NestedAttribute {
                 key,
                 float_value: Some(value as f32),
@@ -766,6 +780,10 @@ impl SyntenyBlockSet {
     }
 
     pub fn filtered_gini_score(&self) -> Option<f64> {
+        if self.total_loci <= 1 || self.distinct_group_count <= 1 {
+            return None;
+        }
+
         let filtered_counts: Vec<usize> = self
             .counts
             .values()
@@ -1173,6 +1191,7 @@ pub fn parse_busco_files(
         let mut busco_docs: HashMap<String, FeatureDocument> = HashMap::new();
         let mut attribute_collector = AttributeCollector::new();
         let mut block_sets: HashMap<String, SyntenyBlockSet> = HashMap::new();
+        let mut window_block_sets: HashMap<String, SyntenyBlockSet> = HashMap::new();
 
         for parsed_line in parse_full_table(full_table_reader) {
             match parsed_line {
@@ -1238,7 +1257,7 @@ pub fn parse_busco_files(
                             start,
                             end,
                             Some(f.strand),
-                            Some(container_ids),
+                            Some(container_ids.clone()),
                             sequence_id.clone(),
                             sequence_length,
                             busco_file.accession.clone(),
@@ -1265,6 +1284,20 @@ pub fn parse_busco_files(
                                     attribute_collector.add(feature_attributes, attr, overrides);
                                     if first_alg {
                                         block_set.add_locus_to_block(mapped_id, f.clone());
+                                        for window_id in &container_ids {
+                                            let window_block_set = window_block_sets
+                                                .entry(window_id.clone())
+                                                .or_insert_with(|| {
+                                                    SyntenyBlockSet::new(
+                                                        busco_file.lineage.clone(),
+                                                        sequence_id.clone(),
+                                                        assembly_id.clone(),
+                                                        taxon_id.clone(),
+                                                    )
+                                                });
+                                            window_block_set
+                                                .add_locus_to_block(mapped_id, f.clone());
+                                        }
                                     }
                                 }
                             }
@@ -1292,6 +1325,7 @@ pub fn parse_busco_files(
 
         // collect a hashmap of blockset metrics to add to state
         let mut blockset_metrics: HashMap<String, BlockSetMetrics> = HashMap::new();
+        let mut window_metrics: HashMap<String, BlockSetMetrics> = HashMap::new();
         let group_count = matching_algs.first().and_then(|alg| alg.alg_count);
         if let Some(count) = group_count {
             for (seq_id, block_set) in &mut block_sets {
@@ -1301,6 +1335,14 @@ pub fn parse_busco_files(
                 }
             }
             state.synteny_metrics_by_seq = blockset_metrics;
+
+            for (window_id, block_set) in &mut window_block_sets {
+                block_set.set_metrics(count);
+                if let Some(metrics) = block_set.get_metrics() {
+                    window_metrics.insert(window_id.clone(), metrics.clone());
+                }
+            }
+            state.synteny_metrics_by_window = window_metrics;
         }
 
         // Finalize synteny outputs and index documents
