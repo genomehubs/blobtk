@@ -274,7 +274,7 @@ fn attach_synteny_metrics_to_attributes(
     synteny_metrics_by_seq: &HashMap<String, BlockSetMetrics>,
 ) {
     if let Some(metrics) = synteny_metrics_by_seq.get(sequence_id) {
-        let block_set_attrs = metrics.to_nested_attribute_docs();
+        let block_set_attrs = metrics.to_active_attribute_docs();
         attrs.extend(block_set_attrs);
     }
 }
@@ -287,6 +287,28 @@ fn attach_active_window_synteny_metrics_to_attributes(
     if let Some(metrics) = synteny_metrics_by_window.get(window_id) {
         let block_set_attrs = metrics.to_active_attribute_docs();
         attrs.extend(block_set_attrs);
+    }
+}
+
+fn attach_rich_group_and_transition_metrics_to_attributes(
+    attrs: &mut Vec<NestedAttribute>,
+    sequence_id: &str,
+    synteny_metrics_by_seq: &HashMap<String, BlockSetMetrics>,
+) {
+    if let Some(metrics) = synteny_metrics_by_seq.get(sequence_id) {
+        let rich_attrs = metrics.to_rich_attribute_docs();
+        attrs.extend(rich_attrs);
+    }
+}
+
+fn attach_rich_window_group_and_transition_metrics_to_attributes(
+    attrs: &mut Vec<NestedAttribute>,
+    window_id: &str,
+    synteny_metrics_by_window: &HashMap<String, BlockSetMetrics>,
+) {
+    if let Some(metrics) = synteny_metrics_by_window.get(window_id) {
+        let rich_attrs = metrics.to_rich_attribute_docs();
+        attrs.extend(rich_attrs);
     }
 }
 
@@ -312,6 +334,11 @@ fn attach_counts_and_index_sequences(
                 }
             }
             attach_synteny_metrics_to_attributes(&mut attrs, seq_id, &state.synteny_metrics_by_seq);
+            attach_rich_group_and_transition_metrics_to_attributes(
+                &mut attrs,
+                seq_id,
+                &state.synteny_metrics_by_seq,
+            );
 
             seq_doc.attributes = Some(attrs);
         }
@@ -365,6 +392,11 @@ fn parse_bed_and_index(
         }
 
         attach_active_window_synteny_metrics_to_attributes(
+            &mut attrs,
+            window_id,
+            &state.synteny_metrics_by_window,
+        );
+        attach_rich_window_group_and_transition_metrics_to_attributes(
             &mut attrs,
             window_id,
             &state.synteny_metrics_by_window,
@@ -521,6 +553,7 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::index::es::models::nested_documents::NestedAttribute;
@@ -553,6 +586,8 @@ mod tests {
                 normalised_distinct_group_count: 0.0,
                 normalised_block_count: 0.0,
                 normalised_interminority_transition_ratio: 0.0,
+                group_counts: vec![("group-A".to_string(), 12), ("group-B".to_string(), 8)],
+                top_transitions: vec![("group-A->group-B".to_string(), 3)],
             },
         );
 
@@ -611,6 +646,8 @@ mod tests {
             normalised_distinct_group_count: 0.0,
             normalised_block_count: 0.0,
             normalised_interminority_transition_ratio: 0.0,
+            group_counts: vec![("group-A".to_string(), 1)],
+            top_transitions: vec![],
         };
 
         let docs = metrics.to_nested_attribute_docs();
@@ -641,6 +678,8 @@ mod tests {
                 normalised_distinct_group_count: 0.0,
                 normalised_block_count: 0.0,
                 normalised_interminority_transition_ratio: 0.0,
+                group_counts: vec![("group-B".to_string(), 2), ("group-A".to_string(), 1)],
+                top_transitions: vec![("group-A->group-B".to_string(), 1)],
             },
         );
         state.synteny_metrics_by_seq.insert(
@@ -663,6 +702,8 @@ mod tests {
                 normalised_distinct_group_count: 0.0,
                 normalised_block_count: 0.0,
                 normalised_interminority_transition_ratio: 0.0,
+                group_counts: vec![("group-A".to_string(), 12), ("group-B".to_string(), 8)],
+                top_transitions: vec![("group-A->group-B".to_string(), 2)],
             },
         );
 
@@ -716,6 +757,8 @@ mod tests {
                 normalised_distinct_group_count: 0.0,
                 normalised_block_count: 0.0,
                 normalised_interminority_transition_ratio: 0.0,
+                group_counts: vec![("group-A".to_string(), 12), ("group-B".to_string(), 8)],
+                top_transitions: vec![("group-A->group-B".to_string(), 3)],
             },
         )]);
 
@@ -725,5 +768,181 @@ mod tests {
         assert!(attrs.iter().any(|attr| attr.key == "majority_group_id"));
         assert!(attrs.iter().any(|attr| attr.key == "filtered_gini_score"));
         assert!(attrs.iter().all(|attr| attr.key != "normalised_gini_score"));
+    }
+
+    #[test]
+    fn rich_group_and_transition_metrics_are_attached_separately() {
+        let mut attrs = vec![NestedAttribute {
+            key: "lineage_status_count".to_string(),
+            integer_value: Some(7),
+            ..Default::default()
+        }];
+        let metrics_by_seq = std::collections::HashMap::from([(
+            "seq-1".to_string(),
+            BlockSetMetrics {
+                total_loci: 20,
+                distinct_group_count: 2,
+                longest_block_size: 10,
+                block_count: 2,
+                majority_group_count: 12,
+                majority_group_id: Some("group-A".to_string()),
+                majority_group_fraction: Some(0.6),
+                majority_group_threshold_flag: true,
+                filtered_transition_count_ratio: Some(0.4),
+                filtered_gini_score: Some(0.25),
+                normalised_transition_count_ratio: 0.0,
+                normalised_gini_score: 0.0,
+                normalised_minority_gini_score: 0.0,
+                normalised_block_size: 0.0,
+                normalised_distinct_group_count: 0.0,
+                normalised_block_count: 0.0,
+                normalised_interminority_transition_ratio: 0.0,
+                group_counts: vec![("group-A".to_string(), 12), ("group-B".to_string(), 8)],
+                top_transitions: vec![
+                    ("group-A->group-B".to_string(), 3),
+                    ("group-B->group-A".to_string(), 2),
+                ],
+            },
+        )]);
+
+        attach_rich_group_and_transition_metrics_to_attributes(
+            &mut attrs,
+            "seq-1",
+            &metrics_by_seq,
+        );
+
+        let group_counts_attr = attrs
+            .iter()
+            .find(|attr| attr.key == "group_counts")
+            .unwrap();
+        let top_transitions_attr = attrs
+            .iter()
+            .find(|attr| attr.key == "top_transitions")
+            .unwrap();
+
+        assert!(group_counts_attr
+            .flattened_value
+            .as_ref()
+            .is_some_and(|value| value.is_object()));
+        assert!(group_counts_attr
+            .flattened_value
+            .as_ref()
+            .and_then(|value| value.get("values"))
+            .is_some());
+        assert!(top_transitions_attr
+            .flattened_value
+            .as_ref()
+            .is_some_and(|value| value.is_object()));
+        assert!(top_transitions_attr
+            .flattened_value
+            .as_ref()
+            .and_then(|value| value.get("values"))
+            .is_some());
+        assert!(attrs.iter().any(|attr| attr.key == "group_counts"));
+        assert!(attrs.iter().any(|attr| attr.key == "top_transitions"));
+        assert!(attrs.iter().all(|attr| attr.key != "normalised_gini_score"));
+        assert!(attrs.iter().any(|attr| attr.key == "majority_group_id"));
+    }
+
+    #[test]
+    fn set_synteny_loci_populates_top_transitions_before_metrics_are_derived() {
+        let mut block_set = crate::parse::busco::SyntenyBlockSet::new(
+            "lineage".to_string(),
+            "seq-1".to_string(),
+            "asm".to_string(),
+            "tax".to_string(),
+        );
+
+        for idx in 1..=4 {
+            block_set.add_locus_to_block(
+                "group-A",
+                crate::parse::busco::BuscoFeature {
+                    id: format!("busco-a-{idx}"),
+                    status: "Complete".to_string(),
+                    score: 1.0,
+                    sequence: "seq-1".to_string(),
+                    start: ((idx - 1) * 10) + 1,
+                    end: idx * 10,
+                    strand: 1,
+                    length: 10,
+                },
+            );
+        }
+        for idx in 1..=4 {
+            block_set.add_locus_to_block(
+                "group-B",
+                crate::parse::busco::BuscoFeature {
+                    id: format!("busco-b-{idx}"),
+                    status: "Complete".to_string(),
+                    score: 1.0,
+                    sequence: "seq-1".to_string(),
+                    start: 41 + ((idx - 1) * 10),
+                    end: 50 + ((idx - 1) * 10),
+                    strand: 1,
+                    length: 10,
+                },
+            );
+        }
+
+        block_set.set_synteny_loci();
+        assert!(block_set.transitions.is_some());
+        let transitions = block_set.transitions.clone().unwrap();
+        assert!(!transitions.is_empty());
+        assert!(transitions
+            .iter()
+            .any(|(key, count)| key == "group-A->group-B" && *count == 1));
+
+        block_set.set_metrics(block_set.group_model_count());
+        let metrics = block_set
+            .get_metrics()
+            .expect("metrics should be available");
+        assert!(!metrics.top_transitions.is_empty());
+    }
+
+    #[test]
+    fn group_model_triggers_synteny_metrics_without_alg_count() {
+        let mut block_set = crate::parse::busco::SyntenyBlockSet::new(
+            "lineage".to_string(),
+            "seq-1".to_string(),
+            "asm".to_string(),
+            "tax".to_string(),
+        );
+
+        block_set.add_locus_to_block(
+            "group-A",
+            crate::parse::busco::BuscoFeature {
+                id: "busco-1".to_string(),
+                status: "Complete".to_string(),
+                score: 1.0,
+                sequence: "seq-1".to_string(),
+                start: 1,
+                end: 10,
+                strand: 1,
+                length: 10,
+            },
+        );
+        block_set.add_locus_to_block(
+            "group-B",
+            crate::parse::busco::BuscoFeature {
+                id: "busco-2".to_string(),
+                status: "Complete".to_string(),
+                score: 1.0,
+                sequence: "seq-1".to_string(),
+                start: 11,
+                end: 20,
+                strand: 1,
+                length: 10,
+            },
+        );
+
+        assert!(block_set.has_group_model());
+        assert_eq!(block_set.group_model_count(), 2);
+
+        block_set.set_metrics(block_set.group_model_count());
+        let metrics = block_set
+            .get_metrics()
+            .expect("group metrics should be set");
+        assert_eq!(metrics.distinct_group_count, 2);
+        assert!(!metrics.group_counts.is_empty());
     }
 }

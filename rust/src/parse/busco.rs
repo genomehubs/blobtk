@@ -455,15 +455,84 @@ pub struct BlockSetMetrics {
     pub normalised_block_count: f64,
     #[deprecated(note = "This metric is no longer kept in the compact synteny summary")]
     pub normalised_interminority_transition_ratio: f64,
+    /// Detailed per-group counts retained outside the compact summary for downstream analysis.
+    pub group_counts: Vec<(String, usize)>,
+    /// Ranked transitions retained outside the compact summary for downstream analysis.
+    pub top_transitions: Vec<(String, usize)>,
 }
 
 impl BlockSetMetrics {
+    fn transition_key_parts(transition: &str) -> (String, String) {
+        match transition.split_once("->") {
+            Some((from_group, to_group)) => (from_group.to_string(), to_group.to_string()),
+            None => (transition.to_string(), String::new()),
+        }
+    }
+
     pub fn to_active_attribute_docs(&self) -> Vec<NestedAttribute> {
         self.to_nested_attribute_docs()
             .into_iter()
             .filter(|attr| !attr.deprecated.unwrap_or(false))
             .filter(|attr| !attr.key.starts_with("normalised_"))
             .collect()
+    }
+
+    pub fn to_rich_attribute_docs(&self) -> Vec<NestedAttribute> {
+        let mut attrs = Vec::new();
+
+        if !self.group_counts.is_empty() {
+            let group_counts_json: Vec<serde_json::Value> = self
+                .group_counts
+                .iter()
+                .enumerate()
+                .map(|(rank, (group_id, count))| {
+                    serde_json::json!({
+                        "group_id": group_id,
+                        "count": count,
+                        "rank": rank + 1
+                    })
+                })
+                .collect();
+            attrs.push(NestedAttribute {
+                key: "group_counts".to_string(),
+                flattened_value: Some(serde_json::json!({ "values": group_counts_json })),
+                ..Default::default()
+            });
+        }
+
+        if !self.top_transitions.is_empty() {
+            let transitions_json: Vec<serde_json::Value> = self
+                .top_transitions
+                .iter()
+                .enumerate()
+                .map(|(rank, (transition, count))| {
+                    let (from_group, to_group) = Self::transition_key_parts(transition);
+                    serde_json::json!({
+                        "from_group": from_group,
+                        "to_group": to_group,
+                        "count": count,
+                        "rank": rank + 1
+                    })
+                })
+                .collect();
+            attrs.push(NestedAttribute {
+                key: "top_transitions".to_string(),
+                flattened_value: Some(serde_json::json!({ "values": transitions_json })),
+                ..Default::default()
+            });
+        }
+
+        if let Some(group_id) = &self.majority_group_id {
+            attrs.push(NestedAttribute {
+                key: "majority_group_id".to_string(),
+                keyword_value: Some(crate::parse::genomehubs::StringOrVec::Single(
+                    group_id.clone(),
+                )),
+                ..Default::default()
+            });
+        }
+
+        attrs
     }
 
     pub fn to_nested_attribute_docs(&self) -> Vec<NestedAttribute> {
@@ -617,6 +686,14 @@ impl SyntenyBlockSet {
             taxon_id,
             ..Default::default()
         }
+    }
+
+    pub fn has_group_model(&self) -> bool {
+        !self.counts.is_empty() || self.total_loci > 0 || !self.blocks.is_empty()
+    }
+
+    pub fn group_model_count(&self) -> usize {
+        self.distinct_group_count.max(1)
     }
 
     pub fn add_block(&mut self, block: SyntenyBlock) {
@@ -916,6 +993,16 @@ impl SyntenyBlockSet {
         };
         let majority_group_threshold_flag =
             majority_group_fraction.map_or(false, |value| value > (1.0 / 3.0));
+        let mut group_counts: Vec<(String, usize)> = self
+            .counts
+            .iter()
+            .map(|(group_id, count)| (group_id.clone(), *count))
+            .collect();
+        group_counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+        let mut top_transitions = self.transitions.clone().unwrap_or_default();
+        top_transitions.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        top_transitions.truncate(10);
 
         #[allow(deprecated)]
         let metrics = BlockSetMetrics {
@@ -937,6 +1024,8 @@ impl SyntenyBlockSet {
             normalised_block_count: self.normalised_block_count(group_count),
             normalised_interminority_transition_ratio: self
                 .normalised_interminority_transition_ratio(),
+            group_counts,
+            top_transitions,
         };
         self.metrics = Some(metrics);
     }
@@ -1326,18 +1415,30 @@ pub fn parse_busco_files(
         // collect a hashmap of blockset metrics to add to state
         let mut blockset_metrics: HashMap<String, BlockSetMetrics> = HashMap::new();
         let mut window_metrics: HashMap<String, BlockSetMetrics> = HashMap::new();
-        let group_count = matching_algs.first().and_then(|alg| alg.alg_count);
-        if let Some(count) = group_count {
+        let has_group_model = block_sets.values().any(SyntenyBlockSet::has_group_model)
+            || window_block_sets
+                .values()
+                .any(SyntenyBlockSet::has_group_model);
+
+        if has_group_model {
+            for block_set in block_sets.values_mut() {
+                block_set.set_synteny_loci();
+            }
             for (seq_id, block_set) in &mut block_sets {
-                block_set.set_metrics(count);
+                let group_count = block_set.group_model_count();
+                block_set.set_metrics(group_count);
                 if let Some(metrics) = block_set.get_metrics() {
                     blockset_metrics.insert(seq_id.clone(), metrics.clone());
                 }
             }
             state.synteny_metrics_by_seq = blockset_metrics;
 
+            for block_set in window_block_sets.values_mut() {
+                block_set.set_synteny_loci();
+            }
             for (window_id, block_set) in &mut window_block_sets {
-                block_set.set_metrics(count);
+                let group_count = block_set.group_model_count();
+                block_set.set_metrics(group_count);
                 if let Some(metrics) = block_set.get_metrics() {
                     window_metrics.insert(window_id.clone(), metrics.clone());
                 }
