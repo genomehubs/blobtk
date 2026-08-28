@@ -133,6 +133,66 @@ fn expand_placeholders(cfg: &mut ImportConfig) {
     }
 }
 
+fn ensure_index_exists(
+    es_cfg: &EsConfig,
+    index_prefix: &str,
+    mappings: crate::index::es::mappings::common::Mappings,
+) -> Result<(), error::Error> {
+    let client = ElasticsearchClient::try_from(es_cfg)?;
+    let index_name = client.resolve_index_name(index_prefix)?;
+
+    match client.get_index_info(&index_name) {
+        Ok(_) => return Ok(()),
+        Err(err) => {
+            let err_str = err.to_string();
+            if !err_str.contains("not_found") && !err_str.contains("index_not_found_exception") {
+                return Err(err.into());
+            }
+        }
+    }
+
+    let config = crate::index::es::config::IndexConfig {
+        settings: Default::default(),
+        mappings: Some(mappings),
+    };
+    match client.create_index(&index_name, config) {
+        Ok(_) => {
+            eprintln!(
+                "  Created index {} and waiting for it to become ready",
+                index_name
+            );
+            client.wait_for_index_ready(&index_name, "yellow")?;
+            Ok(())
+        }
+        Err(err) => {
+            let err_str = err.to_string();
+            if err_str.contains("already exists")
+                || err_str.contains("resource_already_exists_exception")
+            {
+                eprintln!("  Index {} already exists; checking readiness", index_name);
+                client.wait_for_index_ready(&index_name, "yellow")?;
+                Ok(())
+            } else {
+                Err(err.into())
+            }
+        }
+    }
+}
+
+fn ensure_import_indices(es_cfg: &EsConfig) -> Result<(), error::Error> {
+    ensure_index_exists(
+        es_cfg,
+        "feature",
+        crate::index::es::mappings::feature_index_mappings(),
+    )?;
+    ensure_index_exists(
+        es_cfg,
+        "attributes",
+        crate::index::es::mappings::attribute_index_mappings(),
+    )?;
+    Ok(())
+}
+
 fn attach_busco_category_counts(state: &mut ImportState) -> Result<(), anyhow::Error> {
     // For each unique BUSCO ID (not occurrence)
     for busco_id in state.busco_id_tracker.occurrences.keys() {
@@ -505,6 +565,7 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
     let assembly_id = cfg.assembly.accession.clone();
     let taxon_id = cfg.assembly.taxon_id.clone();
     let mut import_state = ImportState::new(assembly_id, taxon_id);
+    ensure_import_indices(&cfg.es)?;
     restore_attribute_cache(&mut import_state, &cfg.es)?;
 
     eprintln!("Step 1: Parsing sequence report...");

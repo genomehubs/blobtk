@@ -479,7 +479,6 @@ impl BlockSetMetrics {
 
     pub fn to_rich_attribute_docs(&self) -> Vec<NestedAttribute> {
         let mut attrs = Vec::new();
-
         if !self.group_counts.is_empty() {
             let group_counts_json: Vec<serde_json::Value> = self
                 .group_counts

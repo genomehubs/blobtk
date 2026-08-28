@@ -184,6 +184,73 @@ impl ElasticsearchClient {
         }
     }
 
+    pub fn wait_for_index_ready(
+        &self,
+        index_name: &str,
+        minimum_status: &str,
+    ) -> Result<(), EsError> {
+        let minimum = minimum_status.to_ascii_lowercase();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        let client = reqwest::blocking::Client::new();
+
+        loop {
+            let response = client
+                .get(&format!(
+                    "{}/_cluster/health/{}",
+                    self.cluster_url, index_name
+                ))
+                .send()
+                .map_err(|e| EsError::ApiError(e.to_string()))?;
+
+            if response.status().is_success() {
+                let json: serde_json::Value = response
+                    .json()
+                    .map_err(|e| EsError::SerializationError(e.to_string()))?;
+                let status = json
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+                eprintln!("  ES status for {}: {}", index_name, status);
+
+                if matches!(status.to_ascii_lowercase().as_str(), "green" | "yellow")
+                    && matches!(minimum.as_str(), "green" | "yellow")
+                {
+                    let rank = match status.to_ascii_lowercase().as_str() {
+                        "green" => 2,
+                        "yellow" => 1,
+                        _ => 0,
+                    };
+                    let min_rank = match minimum.as_str() {
+                        "green" => 2,
+                        "yellow" => 1,
+                        _ => 0,
+                    };
+                    if rank >= min_rank {
+                        eprintln!("  Index {} ready with status {}", index_name, status);
+                        return Ok(());
+                    }
+                }
+            } else {
+                eprintln!(
+                    "  Index {} not ready yet (health request failed): {}",
+                    index_name,
+                    response
+                        .text()
+                        .unwrap_or_else(|_| "unknown error".to_string())
+                );
+            }
+
+            if std::time::Instant::now() >= deadline {
+                return Err(EsError::ApiError(format!(
+                    "Timed out waiting for index {} to reach status {}",
+                    index_name, minimum_status
+                )));
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    }
+
     pub fn add_mapping(&self, index_name: &str, mapping: Mappings) -> Result<(), EsError> {
         // generate the API request to add the mapping to the specified index
         let request_url = format!("{}/{}/_mapping", self.cluster_url, index_name);
@@ -290,13 +357,60 @@ impl ElasticsearchClient {
             .collect()
     }
 
+    pub fn ensure_index_exists_for_prefix(&self, index_prefix: &str) -> Result<(), EsError> {
+        let index_name = self.resolve_index_name(index_prefix)?;
+
+        if self.get_index_info(&index_name).is_ok() {
+            return Ok(());
+        }
+
+        let mappings = match index_prefix {
+            "feature" => crate::index::es::mappings::feature_index_mappings(),
+            "attributes" => crate::index::es::mappings::attribute_index_mappings(),
+            _ => Mappings::default(),
+        };
+
+        let cfg = IndexConfig {
+            settings: Default::default(),
+            mappings: Some(mappings),
+        };
+
+        match self.create_index(&index_name, cfg) {
+            Ok(()) => {
+                eprintln!(
+                    "  Created index {} and waiting for it to become ready",
+                    index_name
+                );
+                self.wait_for_index_ready(&index_name, "yellow")?;
+                Ok(())
+            }
+            Err(err)
+                if err.to_string().contains("already exists")
+                    || err
+                        .to_string()
+                        .contains("resource_already_exists_exception") =>
+            {
+                eprintln!("  Index {} already exists; checking readiness", index_name);
+                self.wait_for_index_ready(&index_name, "yellow")?;
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+
     pub fn index_documents(
         &self,
         index_prefix: &str,
         documents: Vec<Document>,
     ) -> Result<(), EsError> {
+        if documents.is_empty() {
+            return Ok(());
+        }
+
+        self.ensure_index_exists_for_prefix(index_prefix)?;
+
         // generate the API request to perform bulk indexing of the documents into the specified index
-        // index at most 1000 documents at a time to avoid exceeding the maximum request size
+        // keep batches modest to avoid request timeouts on busy clusters
         let batch_size = 1000;
         for chunk in documents.chunks(batch_size) {
             self.index_documents_chunk(index_prefix, chunk.to_vec())?;

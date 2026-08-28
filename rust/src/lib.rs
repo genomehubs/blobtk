@@ -4,6 +4,8 @@
 /// Functions for processing BAM files.
 pub mod bam;
 
+pub mod attribute_registry;
+
 /// Functions for processing a BlobDir.
 pub mod blobdir;
 

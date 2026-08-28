@@ -1,0 +1,356 @@
+attributes:
+  feature_id:
+    display_name: Feature ID
+    display_group: coordinates
+    display_level: 1
+    description: Unique feature identifier
+    type: keyword
+    status: active
+  sequence_id:
+    display_name: Sequence ID
+    display_group: coordinates
+    display_level: 1
+    description: Sequence or scaffold identifier containing the feature
+    type: keyword
+    status: active
+  assembly_id:
+    display_name: Assembly ID
+    display_group: coordinates
+    display_level: 1
+    description: Assembly accession for the feature
+    type: keyword
+    status: active
+  taxon_id:
+    display_name: Taxon ID
+    display_group: coordinates
+    display_level: 1
+    description: Taxon identifier for the feature
+    type: keyword
+    status: active
+  chromosome_name:
+    display_name: Chromosome name
+    display_group: coordinates
+    display_level: 1
+    description: Chromosome or assembled molecule name for the feature
+    type: keyword
+    status: active
+  feature_type:
+    display_name: Feature type
+    display_group: coordinates
+    display_level: 1
+    description: Feature classification used for indexing and filtering
+    type: keyword
+    status: active
+  start:
+    display_name: Start
+    display_group: coordinates
+    display_level: 1
+    description: Feature start position (1-indexed)
+    type: long
+    status: active
+  end:
+    display_name: End
+    display_group: coordinates
+    display_level: 1
+    description: Feature end position (1-indexed)
+    type: long
+    status: active
+  strand:
+    display_name: Strand
+    display_group: coordinates
+    display_level: 1
+    description: Strand orientation of the feature
+    type: byte
+    status: active
+  length:
+    display_name: Feature length
+    display_group: summary
+    display_level: 1
+    description: Feature length in base pairs
+    type: long
+    units: bp
+    status: active
+  feature_name:
+    display_name: Feature name
+    display_group: feature
+    display_level: 1
+    description: Human-readable feature or sequence name
+    type: keyword
+    status: active
+    aliases:
+      - name
+  busco_name:
+    display_name: BUSCO Name
+    display_group: busco
+    display_level: 2
+    description: BUSCO locus name
+    type: keyword
+    status: active
+  busco_score:
+    display_name: BUSCO Score
+    display_group: busco
+    display_level: 2
+    description: BUSCO score
+    type: half_float
+    status: active
+  busco_status:
+    display_name: BUSCO Status
+    display_group: busco
+    display_level: 2
+    description: BUSCO outcome status
+    type: keyword
+    status: active
+  busco_status_count:
+    display_name: BUSCO status count
+    display_group: counts
+    display_level: 2
+    description: Count of BUSCO loci by status for the assembly or sequence context
+    type: long
+    status: active
+  lineage_status_count:
+    display_name: Lineage status count
+    display_group: counts
+    display_level: 2
+    description: Count of BUSCO loci in the lineage summary by status
+    type: long
+    status: active
+  group_set_id:
+    display_name: Group Set ID
+    display_group: synteny
+    display_level: 2
+    description: Group set used for synteny classification
+    type: keyword
+    status: active
+  group_id:
+    display_name: Group ID
+    display_group: synteny
+    display_level: 2
+    description: Group assignment for the synteny locus
+    type: keyword
+    status: active
+  is_primary:
+    display_name: Primary Group
+    display_group: synteny
+    display_level: 2
+    description: Whether the locus belongs to the primary group set
+    type: boolean
+    status: active
+  locus_name:
+    display_name: Locus Name
+    display_group: synteny
+    display_level: 2
+    description: Synteny locus name
+    type: keyword
+    status: active
+  block_id:
+    display_name: Block ID
+    display_group: synteny
+    display_level: 2
+    description: Contiguous synteny block identifier
+    type: keyword
+    status: active
+  block_size_loci:
+    display_name: Block Size Loci
+    display_group: synteny
+    display_level: 2
+    description: Number of BUSCO loci in the block
+    type: long
+    status: active
+  block_size_rank:
+    display_name: Block size rank
+    display_group: synteny
+    display_level: 2
+    description: Rank of the synteny block by size within the context
+    type: long
+    status: active
+  block_size_proportion:
+    display_name: Block Size Proportion
+    display_group: synteny
+    display_level: 2
+    description: Block size relative to the selected context
+    type: double
+    status: active
+  rank_within_block:
+    display_name: Rank within block
+    display_group: synteny
+    display_level: 2
+    description: One-based rank of the locus within its contiguous block
+    type: long
+    status: active
+  rank_proportion:
+    display_name: Rank proportion
+    display_group: synteny
+    display_level: 2
+    description: Normalized locus position within its block
+    type: float
+    status: active
+  distance_to_edge:
+    display_name: Distance to edge
+    display_group: synteny
+    display_level: 2
+    description: Distance in loci from the block edge
+    type: long
+    units: loci
+    status: active
+  same_group_continuous:
+    display_name: Same-group continuous
+    display_group: synteny
+    display_level: 2
+    description: Count of continuous same-group loci before interruption
+    type: long
+    status: active
+  different_group_continuous:
+    display_name: Different-group continuous
+    display_group: synteny
+    display_level: 2
+    description: Count of continuous different-group loci before returning to the dominant group
+    type: long
+    status: active
+  same_group_total:
+    display_name: Same Group Total
+    display_group: synteny
+    display_level: 2
+    description: Total same-group loci in the context
+    type: long
+    status: active
+  different_group_total:
+    display_name: Different Group Total
+    display_group: synteny
+    display_level: 2
+    description: Total different-group loci in the context
+    type: long
+    status: active
+  same_to_different_ratio:
+    display_name: Same To Different Ratio
+    display_group: synteny
+    display_level: 2
+    description: Ratio of same-group to different-group loci
+    type: double
+    status: active
+  distinct_different_group_count:
+    display_name: Distinct different-group count
+    display_group: synteny
+    display_level: 2
+    description: Number of distinct non-primary groups represented in the local context
+    type: long
+    status: active
+  adjacent_group_ids:
+    display_name: Adjacent Group IDs
+    display_group: synteny
+    display_level: 2
+    description: Groups adjacent to the primary block
+    type: keyword
+    status: active
+  total_loci:
+    display_name: Total loci
+    display_group: synteny
+    display_level: 2
+    description: Total number of BUSCO loci in the analyzed synteny context
+    type: long
+    status: active
+  distinct_group_count:
+    display_name: Distinct group count
+    display_group: synteny
+    display_level: 2
+    description: Number of distinct group assignments in the synteny context
+    type: long
+    status: active
+  longest_block_size:
+    display_name: Longest block size
+    display_group: synteny
+    display_level: 2
+    description: Largest contiguous block size in loci
+    type: long
+    status: active
+  block_count:
+    display_name: Block count
+    display_group: synteny
+    display_level: 2
+    description: Number of contiguous synteny blocks in the context
+    type: long
+    status: active
+  majority_group_count:
+    display_name: Majority group count
+    display_group: synteny
+    display_level: 2
+    description: Number of loci assigned to the majority group
+    type: long
+    status: active
+  majority_group_id:
+    display_name: Majority group ID
+    display_group: synteny
+    display_level: 2
+    description: Dominant group assignment within the synteny context
+    type: keyword
+    status: active
+    aliases:
+      - majority_id
+  majority_group_fraction:
+    display_name: Majority group fraction
+    display_group: synteny
+    display_level: 2
+    description: Fraction of loci assigned to the majority group
+    type: float
+    status: active
+  majority_group_threshold_flag:
+    display_name: Majority threshold flag
+    display_group: synteny
+    display_level: 2
+    description: Whether the majority group clears the configured threshold
+    type: boolean
+    status: active
+  filtered_transition_count_ratio:
+    display_name: Filtered transition count ratio
+    display_group: synteny
+    display_level: 2
+    description: Transition density after filtering for meaningful group-to-group changes
+    type: float
+    status: active
+  filtered_gini_score:
+    display_name: Filtered Gini score
+    display_group: synteny
+    display_level: 2
+    description: Concentration score calculated from filtered group counts
+    type: float
+    status: active
+  group_counts:
+    display_name: Group counts
+    display_group: synteny
+    display_level: 2
+    description: Per-group count vectors retained for richer synteny analysis
+    type: nested
+    status: active
+  top_transitions:
+    display_name: Top transitions
+    display_group: synteny
+    display_level: 2
+    description: Highest-frequency group transitions retained for richer synteny analysis
+    type: nested
+    status: active
+  midpoint:
+    display_name: Midpoint
+    display_group: summary
+    display_level: 1
+    description: Coordinate midpoint of the feature or window, derived from the feature boundaries.
+    type: long
+    units: bp
+    source: derived
+    status: active
+  midpoint_proportion:
+    display_name: Midpoint proportion
+    display_group: summary
+    display_level: 1
+    description: Midpoint coordinate expressed as a proportion of the sequence length.
+    type: float
+    source: derived
+    status: active
+  seq_proportion:
+    display_name: Sequence proportion
+    display_group: summary
+    display_level: 1
+    description: Deprecated in favour of explicit bed-configured proportion metrics; this fixed field is not the canonical source for analytic comparisons.
+    type: float
+    source: derived
+    status: deprecated
+    deprecated: true
+    deprecated_reason: Prefer configuration-driven proportion metrics such as bed summaries over a generic fixed seq_proportion field.

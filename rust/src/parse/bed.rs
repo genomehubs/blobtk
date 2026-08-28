@@ -419,7 +419,13 @@ pub fn parse_bed_files(
     let mut feature_docs: HashMap<String, FeatureDocument> = HashMap::new();
 
     for bed_config in &config.bed_configs {
-        let mut bed_file = io::file_reader(bed_config.path.clone())?;
+        let mut bed_file = io::file_reader(bed_config.path.clone()).map_err(|e| {
+            error::Error::ReaderError(format!(
+                "Failed to open BED file {}: {}",
+                bed_config.path.display(),
+                e
+            ))
+        })?;
         let bed_reader = &mut *bed_file;
         let mut per_seq_buffers: HashMap<String, Vec<Feature>> = HashMap::new();
         for line in bed_reader.lines() {
@@ -604,9 +610,7 @@ pub fn parse_bed_files(
                     });
                     attributes.push(NestedAttribute {
                         key: "sequence_id".to_string(),
-                        keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                            seq_id.clone(),
-                        )),
+                        keyword_value: Some(super::genomehubs::StringOrVec::Single(seq_id.clone())),
                         ..Default::default()
                     });
                     acc.reset();
@@ -700,7 +704,10 @@ mod tests {
                     summary_functions: vec![SummaryFunction::Mean],
                 }],
             }],
-            window_specs: vec![WindowSpec::Size { size: 2000 }, WindowSpec::Proportion { proportion: 0.1 }],
+            window_specs: vec![
+                WindowSpec::Size { size: 2000 },
+                WindowSpec::Proportion { proportion: 0.1 },
+            ],
         };
 
         let docs = parse_bed_files(&cfg).unwrap();
@@ -710,20 +717,18 @@ mod tests {
             .expect("window docs should be created from BED input");
 
         assert!(win_doc.primary_type.starts_with("win"));
-        let has_window_feature_type = win_doc
-            .attributes
-            .as_ref()
-            .unwrap()
-            .iter()
-            .any(|attr| {
-                attr.key == "feature_type"
-                    && matches!(
-                        attr.keyword_value.as_ref(),
-                        Some(crate::parse::genomehubs::StringOrVec::Multiple(values))
-                            if values.iter().any(|v| v == "window")
-                    )
-            });
-        assert!(has_window_feature_type, "window primary type must also appear in feature_type metadata");
+        let has_window_feature_type = win_doc.attributes.as_ref().unwrap().iter().any(|attr| {
+            attr.key == "feature_type"
+                && matches!(
+                    attr.keyword_value.as_ref(),
+                    Some(crate::parse::genomehubs::StringOrVec::Multiple(values))
+                        if values.iter().any(|v| v == "window")
+                )
+        });
+        assert!(
+            has_window_feature_type,
+            "window primary type must also appear in feature_type metadata"
+        );
     }
 
     #[test]

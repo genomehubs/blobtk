@@ -1,5 +1,6 @@
 use serde_json::{Map, Value};
 
+use crate::attribute_registry::AttributeRegistry;
 use crate::index::es::models::{
     documents::AttributeDocument, nested_documents::NestedAttribute, IndexGroup,
 };
@@ -71,6 +72,46 @@ pub fn feature_attribute_overrides(attr: &NestedAttribute) -> AttributeDocOverri
     }
 }
 
+fn apply_registry_metadata(doc: &mut AttributeDocument, key: &str) {
+    let Ok(registry) = AttributeRegistry::load_default() else {
+        return;
+    };
+    let Some(entry) = registry.lookup(key) else {
+        return;
+    };
+
+    if doc.display_name.is_none() || doc.display_name == Some(key.to_string()) {
+        doc.display_name = entry.display_name.clone().or_else(|| Some(key.to_string()));
+    }
+    if doc.display_group.is_none() {
+        doc.display_group = entry.display_group.clone();
+    }
+    if doc.display_level.is_none() {
+        doc.display_level = entry.display_level;
+    }
+    if doc.description.is_none() {
+        doc.description = entry.description.clone();
+    }
+    if doc.field_type == FieldType::Keyword && entry.r#type.is_some() {
+        match entry.r#type.as_deref() {
+            Some("long") => doc.field_type = FieldType::Long,
+            Some("integer") => doc.field_type = FieldType::Integer,
+            Some("float") => doc.field_type = FieldType::Float,
+            Some("double") => doc.field_type = FieldType::Double,
+            Some("byte") => doc.field_type = FieldType::Byte,
+            Some("short") => doc.field_type = FieldType::Short,
+            Some("date") => doc.field_type = FieldType::Date,
+            Some("boolean") => doc.field_type = FieldType::Boolean,
+            Some("half_float") => doc.field_type = FieldType::HalfFloat,
+            Some("1dp") => doc.field_type = FieldType::OneDP,
+            Some("2dp") => doc.field_type = FieldType::TwoDP,
+            Some("3dp") => doc.field_type = FieldType::ThreeDP,
+            Some("4dp") => doc.field_type = FieldType::FourDP,
+            _ => {}
+        }
+    }
+}
+
 pub fn build_attribute_document(
     attr: &NestedAttribute,
     overrides: Option<&AttributeDocOverrides>,
@@ -84,6 +125,8 @@ pub fn build_attribute_document(
         constraint: infer_constraint(attr),
         ..Default::default()
     };
+
+    apply_registry_metadata(&mut doc, &attr.key);
 
     if let Some(overrides) = overrides {
         if let Some(display_name) = &overrides.display_name {
