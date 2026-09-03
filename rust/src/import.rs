@@ -683,6 +683,161 @@ mod tests {
     }
 
     #[test]
+    fn create_attribute_docs_from_features_accepts_sequence_and_window_feature_type_aliases() {
+        let mut state = ImportState::new("asm-1".to_string(), "tax-1".to_string());
+        let es_cfg = EsConfig {
+            host: "http://localhost:9200".to_string(),
+            port: 9200,
+            username: None,
+            password: None,
+            hub: HubConfig {
+                name: "test".to_string(),
+                release: "test".to_string(),
+                taxonomy: "test".to_string(),
+            },
+        };
+        let import_opts = Some(ImportOptions {
+            entity_types: Some(vec![]),
+            busco_tallies: None,
+            synteny_index: None,
+        });
+
+        let sequence_doc = FeatureDocument::new(
+            "CM000001.1".to_string(),
+            None,
+            "chromosome".to_string(),
+            1,
+            1_000_000,
+            Some(1),
+            None,
+            "CM000001.1".to_string(),
+            1_000_000,
+            "asm-1".to_string(),
+            "tax-1".to_string(),
+            None,
+            None,
+            None,
+        );
+        let window_doc = FeatureDocument::new(
+            "CM000001.1:0-2000:win-2k".to_string(),
+            Some("CM000001.1".to_string()),
+            "win-2k".to_string(),
+            0,
+            2000,
+            None,
+            None,
+            "CM000001.1".to_string(),
+            1_000_000,
+            "asm-1".to_string(),
+            "tax-1".to_string(),
+            None,
+            None,
+            None,
+        );
+
+        create_attribute_docs_from_features(
+            &[sequence_doc, window_doc],
+            &mut state,
+            &es_cfg,
+            &import_opts,
+        )
+        .unwrap();
+
+        assert!(!state.attribute_doc_cache.documents.is_empty());
+    }
+
+    #[test]
+    fn sequence_and_window_import_contract_stays_single_index_via_config_flow() {
+        use crate::parse::bed::{
+            parse_bed_files, BedConfig, MultiBedConfig, RemnantPolicy, SummaryFunction,
+            ValueColumn, WindowSpec,
+        };
+        use crate::parse::sequence_report::parse_sequence_report;
+
+        let tmp_dir = std::env::temp_dir().join("blobtk_phase1_single_index_regression");
+        let _ = std::fs::create_dir_all(&tmp_dir);
+
+        let seq_report_path = tmp_dir.join("sequence_report.jsonl");
+        let bed_path = tmp_dir.join("values.bed");
+
+        std::fs::write(
+            &seq_report_path,
+            "{\"assembly_accession\":\"GCA_test\",\"assigned_molecule_location_type\":\"chromosome\",\"chr_name\":\"chr1\",\"gc_percent\":42.5,\"genbank_accession\":\"chr1\",\"length\":5000,\"role\":\"assembled-molecule\",\"sequence_name\":\"chr1\"}\n",
+        )
+        .unwrap();
+
+        std::fs::write(
+            &bed_path,
+            "chr1\t0\t1000\t0.10\nchr1\t1000\t2000\t0.20\nchr1\t2000\t3000\t0.30\nchr1\t3000\t4000\t0.40\nchr1\t4000\t5000\t0.50\n",
+        )
+        .unwrap();
+
+        let seq_features = parse_sequence_report(SequenceReportImportConfig {
+            accession: "GCA_test".to_string(),
+            taxon_id: "123".to_string(),
+            local_path: Some(seq_report_path.clone()),
+        })
+        .unwrap();
+
+        let bed_config = MultiBedConfig {
+            accession: "GCA_test".to_string(),
+            taxon_id: "123".to_string(),
+            lines_per_unit: 1000,
+            bed_configs: vec![BedConfig {
+                path: bed_path.clone(),
+                local_path: Some(bed_path.clone()),
+                value_columns: vec![ValueColumn {
+                    label: "gc".to_string(),
+                    index: 3,
+                    value_type: "float".to_string(),
+                    summary_functions: vec![SummaryFunction::Mean],
+                }],
+            }],
+            window_specs: vec![WindowSpec::Size {
+                size: 2000,
+                remnant_policy: RemnantPolicy::Centered,
+            }],
+        };
+
+        let window_docs = parse_bed_files(&bed_config).unwrap();
+        let sequence_doc = seq_features.values().next().unwrap().clone();
+        let window_doc = window_docs.values().next().unwrap().clone();
+
+        let mut state = ImportState::new("GCA_test".to_string(), "123".to_string());
+        let es_cfg = EsConfig {
+            host: "http://localhost:9200".to_string(),
+            port: 9200,
+            username: None,
+            password: None,
+            hub: HubConfig {
+                name: "test".to_string(),
+                release: "test".to_string(),
+                taxonomy: "test".to_string(),
+            },
+        };
+        let import_opts = Some(ImportOptions {
+            entity_types: Some(vec!["sequence".to_string(), "window".to_string()]),
+            busco_tallies: None,
+            synteny_index: None,
+        });
+
+        create_attribute_docs_from_features(
+            &[sequence_doc, window_doc],
+            &mut state,
+            &es_cfg,
+            &import_opts,
+        )
+        .unwrap();
+
+        assert!(!state.attribute_doc_cache.documents.is_empty());
+        assert!(state
+            .attribute_doc_cache
+            .documents
+            .values()
+            .any(|doc| doc.name == "feature_type"));
+    }
+
+    #[test]
     fn attach_synteny_metrics_to_window_attrs_includes_active_compact_summary_fields() {
         let mut attrs = vec![NestedAttribute {
             key: "busco_status_count".to_string(),

@@ -1,7 +1,16 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AttributeDestination {
+    TopLevel,
+    Nested,
+    Both,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AttributeRegistryEntry {
@@ -22,9 +31,13 @@ pub struct AttributeRegistryEntry {
     #[serde(default)]
     pub source: Option<String>,
     #[serde(default)]
+    pub destination: Option<AttributeDestination>,
+    #[serde(default)]
     pub deprecated: Option<bool>,
     #[serde(default)]
     pub deprecated_reason: Option<String>,
+    #[serde(default)]
+    pub pattern: Option<String>,
     #[serde(default)]
     pub aliases: Vec<String>,
 }
@@ -92,13 +105,27 @@ impl AttributeRegistry {
     }
 
     pub fn require_registered(&self, key: &str) -> Result<(), String> {
-        if self.lookup(key).is_some() || self.lookup_alias(key).is_some() {
+        if self.lookup(key).is_some()
+            || self.lookup_alias(key).is_some()
+            || self.matches_pattern(key)
+        {
             Ok(())
         } else {
             Err(format!(
                 "attribute '{key}' is not registered in the attribute registry"
             ))
         }
+    }
+
+    pub fn matches_pattern(&self, key: &str) -> bool {
+        self.attributes
+            .values()
+            .filter_map(|entry| entry.pattern.as_deref())
+            .any(|pattern| {
+                Regex::new(pattern)
+                    .map(|re| re.is_match(key))
+                    .unwrap_or(false)
+            })
     }
 
     pub fn find_unmapped_keys<I, S>(&self, keys: I) -> Vec<String>
@@ -109,7 +136,11 @@ impl AttributeRegistry {
         let mut missing = keys
             .into_iter()
             .map(|key| key.into())
-            .filter(|key| self.lookup(key).is_none() && self.lookup_alias(key).is_none())
+            .filter(|key| {
+                self.lookup(key).is_none()
+                    && self.lookup_alias(key).is_none()
+                    && !self.matches_pattern(key)
+            })
             .collect::<Vec<_>>();
         missing.sort();
         missing.dedup();
@@ -128,6 +159,60 @@ impl AttributeRegistry {
             Err(format!("unregistered attributes: {}", missing.join(", ")))
         }
     }
+
+    pub fn destination_for_key(&self, key: &str) -> Option<AttributeDestination> {
+        if let Some(entry) = self.lookup_alias(key) {
+            return entry.destination;
+        }
+
+        for entry in self.attributes.values() {
+            if let Some(pattern) = &entry.pattern {
+                let re = Regex::new(pattern).ok()?;
+                if re.is_match(key) {
+                    return entry.destination;
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn is_nested_attribute(&self, key: &str) -> bool {
+        matches!(
+            self.destination_for_key(key),
+            Some(AttributeDestination::Nested) | Some(AttributeDestination::Both)
+        )
+    }
+
+    pub fn is_top_level_attribute(&self, key: &str) -> bool {
+        matches!(
+            self.destination_for_key(key),
+            Some(AttributeDestination::TopLevel) | Some(AttributeDestination::Both)
+        )
+    }
+
+    pub fn require_all_attributes_have_destination(&self) -> Result<(), String> {
+        let missing = self
+            .attributes
+            .iter()
+            .filter_map(|(key, entry)| {
+                if entry.destination.is_none() {
+                    Some(key.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "attributes missing destination metadata: {}",
+                missing.join(", ")
+            ))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -140,10 +225,27 @@ mod tests {
         let feature_id = registry.lookup("feature_id").unwrap();
         assert_eq!(feature_id.display_group.as_deref(), Some("coordinates"));
         assert_eq!(feature_id.display_name.as_deref(), Some("Feature ID"));
+        assert_eq!(feature_id.destination, Some(AttributeDestination::Both));
 
         let busco_score = registry.lookup("busco_score").unwrap();
         assert_eq!(busco_score.display_group.as_deref(), Some("busco"));
         assert_eq!(busco_score.status.as_deref(), Some("active"));
+        assert_eq!(busco_score.destination, Some(AttributeDestination::Nested));
+    }
+
+    #[test]
+    fn registry_accepts_pattern_based_lineage_attributes() {
+        let registry = AttributeRegistry::load_default().unwrap();
+
+        assert!(registry
+            .require_registered("anopheles_odb12_complete_count")
+            .is_ok());
+        assert!(registry
+            .require_registered("arthropoda_odb10_fragmented_count")
+            .is_ok());
+        assert!(registry
+            .destination_for_key("diptera_odb12_duplicated_count")
+            .is_some());
     }
 
     #[test]
@@ -167,5 +269,11 @@ mod tests {
             missing,
             vec!["another_missing_field", "totally_unknown_field"]
         );
+    }
+
+    #[test]
+    fn registry_requires_destination_metadata_for_every_field() {
+        let registry = AttributeRegistry::load_default().unwrap();
+        assert!(registry.require_all_attributes_have_destination().is_ok());
     }
 }

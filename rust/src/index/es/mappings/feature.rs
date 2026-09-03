@@ -151,7 +151,7 @@ pub fn feature_index_properties() -> HashMap<String, Property> {
 // Set of mappings for values in the feature index
 pub fn feature_index_mappings() -> Mappings {
     Mappings {
-        dynamic: Some(false),
+        dynamic: Some(true),
         properties: feature_index_properties(),
     }
 }

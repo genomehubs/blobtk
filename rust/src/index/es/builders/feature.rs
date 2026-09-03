@@ -33,6 +33,7 @@ impl DocumentBuilder<FeatureDocument> for FeatureDocumentBuilder {
             analysis_id: None,
             attributes: None,
             identifiers: None,
+            extra_fields: None,
         };
         // Implementation goes here
         unimplemented!()

@@ -9,7 +9,7 @@ use std::fs::{create_dir_all, write};
 use std::io::BufRead;
 use std::process::Command;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{self, Error};
 use crate::import::SequenceReportImportConfig;
@@ -18,7 +18,7 @@ use crate::index::es::models::nested_documents::NestedAttribute;
 use crate::io;
 use crate::parse::genomehubs::StringOrVec;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DatasetsSequenceReport {
     assembly_accession: String,
     // assembly_unit: String,
@@ -201,4 +201,40 @@ pub fn parse_sequence_report(
     // No path given -> fetch but don't cache
     let json_lines = fetch_datasets_sequence_report(&config.accession)?;
     parse_sequence_report_from_json_lines(&json_lines, config.taxon_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sequence_report_feature_includes_sequence_aliases_in_feature_type() {
+        let record = DatasetsSequenceReport {
+            assembly_accession: "GCA_test".to_string(),
+            assigned_molecule_location_type: "chromosome".to_string(),
+            chr_name: Some("chr1".to_string()),
+            gc_percent: Some(41.2),
+            genbank_accession: "CM000001.1".to_string(),
+            length: 1_000_000,
+            role: "assembled-molecule".to_string(),
+            sequence_name: Some("chr1".to_string()),
+        };
+
+        let feature = record.to_feature("1234".to_string());
+
+        assert_eq!(feature.primary_type, "chromosome");
+        assert!(feature
+            .attributes
+            .as_ref()
+            .unwrap()
+            .iter()
+            .any(|attr| attr.key == "feature_type"
+                && matches!(
+                    attr.keyword_value.as_ref(),
+                    Some(crate::parse::genomehubs::StringOrVec::Multiple(values))
+                        if values.iter().any(|v| v == "sequence")
+                            && values.iter().any(|v| v == "nuclear-sequence")
+                            && values.iter().any(|v| v == "toplevel")
+                )));
+    }
 }

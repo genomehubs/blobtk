@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    attribute_registry::{AttributeDestination, AttributeRegistry},
     index::es::models::{
         nested_documents::{NestedAttribute, NestedIdentifier},
         BuildDocument, EsError, IndexDocument, IndexGroup,
@@ -15,7 +16,7 @@ use crate::{
     validation::spec::{default_field_type, FieldType},
 };
 
-fn expand_feature_types(primary_type: &str) -> Vec<String> {
+pub fn feature_type_aliases(primary_type: &str) -> Vec<String> {
     let mut feature_types = vec![primary_type.to_string()];
     if primary_type.starts_with("win") {
         feature_types.push("window".to_string());
@@ -77,6 +78,8 @@ pub struct FeatureDocument {
     pub attributes: Option<Vec<NestedAttribute>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identifiers: Option<Vec<NestedIdentifier>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_fields: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl FeatureDocument {
@@ -116,50 +119,105 @@ impl FeatureDocument {
         } else {
             0.0
         };
-        let feature_types = expand_feature_types(&primary_type);
-        let mut attributes_list = vec![
-            NestedAttribute {
-                key: "start".to_string(),
-                long_value: Some(start as i64),
-                ..Default::default()
-            },
-            NestedAttribute {
-                key: "end".to_string(),
-                long_value: Some(end as i64),
-                ..Default::default()
-            },
-            NestedAttribute {
-                key: "length".to_string(),
-                long_value: Some(length as i64),
-                ..Default::default()
-            },
-            NestedAttribute {
-                key: "seq_proportion".to_string(),
-                float_value: Some(seq_proportion),
-                ..Default::default()
-            },
-            NestedAttribute {
-                key: "midpoint".to_string(),
-                long_value: Some(midpoint as i64),
-                ..Default::default()
-            },
-            NestedAttribute {
-                key: "midpoint_proportion".to_string(),
-                float_value: Some(midpoint_proportion),
-                ..Default::default()
-            },
-            NestedAttribute {
-                key: "feature_type".to_string(),
-                keyword_value: Some(StringOrVec::Multiple(feature_types)),
-                ..Default::default()
-            },
+        let feature_types = feature_type_aliases(&primary_type);
+        let registry = AttributeRegistry::load_default().ok();
+        let should_store_nested = |key: &str| {
+            registry
+                .as_ref()
+                .map(|registry| registry.is_nested_attribute(key))
+                .unwrap_or(true)
+        };
+        let should_store_top_level = |key: &str| {
+            registry
+                .as_ref()
+                .map(|registry| registry.is_top_level_attribute(key))
+                .unwrap_or(false)
+        };
+
+        let mut attributes_list = vec![];
+        let mut extra_fields = HashMap::new();
+        let nested_entries = [
+            (
+                "start".to_string(),
+                NestedAttribute {
+                    key: "start".to_string(),
+                    long_value: Some(start as i64),
+                    ..Default::default()
+                },
+            ),
+            (
+                "end".to_string(),
+                NestedAttribute {
+                    key: "end".to_string(),
+                    long_value: Some(end as i64),
+                    ..Default::default()
+                },
+            ),
+            (
+                "length".to_string(),
+                NestedAttribute {
+                    key: "length".to_string(),
+                    long_value: Some(length as i64),
+                    ..Default::default()
+                },
+            ),
+            (
+                "seq_proportion".to_string(),
+                NestedAttribute {
+                    key: "seq_proportion".to_string(),
+                    float_value: Some(seq_proportion),
+                    ..Default::default()
+                },
+            ),
+            (
+                "midpoint".to_string(),
+                NestedAttribute {
+                    key: "midpoint".to_string(),
+                    long_value: Some(midpoint as i64),
+                    ..Default::default()
+                },
+            ),
+            (
+                "midpoint_proportion".to_string(),
+                NestedAttribute {
+                    key: "midpoint_proportion".to_string(),
+                    float_value: Some(midpoint_proportion),
+                    ..Default::default()
+                },
+            ),
+            (
+                "feature_type".to_string(),
+                NestedAttribute {
+                    key: "feature_type".to_string(),
+                    keyword_value: Some(StringOrVec::Multiple(feature_types)),
+                    ..Default::default()
+                },
+            ),
         ];
+        for (key, attr) in nested_entries {
+            if should_store_nested(&key) {
+                attributes_list.push(attr.clone());
+            }
+            if should_store_top_level(&key) {
+                if let Some(value) = nested_attribute_as_value(&attr) {
+                    extra_fields.insert(key, value);
+                }
+            }
+        }
         if let Some(strand_value) = strand {
-            attributes_list.push(NestedAttribute {
-                key: "strand".to_string(),
-                byte_value: Some(strand_value),
-                ..Default::default()
-            });
+            if should_store_nested("strand") {
+                attributes_list.push(NestedAttribute {
+                    key: "strand".to_string(),
+                    byte_value: Some(strand_value),
+                    ..Default::default()
+                });
+            }
+            if should_store_top_level("strand") {
+                extra_fields.insert(
+                    "strand".to_string(),
+                    serde_json::Value::Number(serde_json::Number::from(strand_value)),
+                );
+            }
         }
         let feature_id = if feature_id.starts_with(&sequence_id) {
             feature_id.clone()
@@ -185,8 +243,62 @@ impl FeatureDocument {
             analysis_id,
             attributes: Some(attributes_list),
             identifiers: None,
+            extra_fields: if extra_fields.is_empty() {
+                None
+            } else {
+                Some(extra_fields)
+            },
         }
     }
+}
+
+fn nested_attribute_as_value(attr: &NestedAttribute) -> Option<serde_json::Value> {
+    if let Some(value) = attr.keyword_value.as_ref() {
+        return Some(serde_json::to_value(value).unwrap_or(serde_json::Value::Null));
+    }
+    if let Some(value) = attr.bool_value {
+        return Some(serde_json::Value::Bool(value));
+    }
+    if let Some(value) = attr.byte_value {
+        return Some(serde_json::Value::Number(serde_json::Number::from(value)));
+    }
+    if let Some(value) = attr.short_value {
+        return Some(serde_json::Value::Number(serde_json::Number::from(value)));
+    }
+    if let Some(value) = attr.integer_value {
+        return Some(serde_json::Value::Number(serde_json::Number::from(value)));
+    }
+    if let Some(value) = attr.long_value {
+        return Some(serde_json::Value::Number(serde_json::Number::from(value)));
+    }
+    if let Some(value) = attr.float_value {
+        return Some(serde_json::json!(value));
+    }
+    if let Some(value) = attr.double_value {
+        return Some(serde_json::json!(value));
+    }
+    if let Some(value) = attr.half_float_value {
+        return Some(serde_json::json!(value));
+    }
+    if let Some(value) = attr.one_dp_value {
+        return Some(serde_json::json!(value));
+    }
+    if let Some(value) = attr.two_dp_value {
+        return Some(serde_json::json!(value));
+    }
+    if let Some(value) = attr.three_dp_value {
+        return Some(serde_json::json!(value));
+    }
+    if let Some(value) = attr.four_dp_value {
+        return Some(serde_json::json!(value));
+    }
+    if let Some(value) = attr.date_value.clone() {
+        return Some(serde_json::Value::String(value));
+    }
+    if let Some(value) = attr.text_value.clone() {
+        return Some(serde_json::Value::String(value));
+    }
+    None
 }
 
 impl BuildDocument for FeatureDocument {
@@ -194,12 +306,29 @@ impl BuildDocument for FeatureDocument {
         &mut self,
         attribute: super::nested_documents::NestedAttribute,
     ) -> Result<(), EsError> {
-        {
+        let registry = AttributeRegistry::load_default().ok();
+        let key = attribute.key.clone();
+        let is_nested = registry
+            .as_ref()
+            .map(|registry| registry.is_nested_attribute(&key))
+            .unwrap_or(true);
+        let is_top_level = registry
+            .as_ref()
+            .map(|registry| registry.is_top_level_attribute(&key))
+            .unwrap_or(false);
+
+        if is_nested {
             if let Some(attrs) = &mut self.attributes {
-                attrs.push(attribute);
+                attrs.push(attribute.clone());
             } else {
-                self.attributes = Some(vec![attribute]);
+                self.attributes = Some(vec![attribute.clone()]);
             }
+        }
+        if is_top_level {
+            let value = nested_attribute_as_value(&attribute).unwrap_or(serde_json::Value::Null);
+            self.extra_fields
+                .get_or_insert_with(HashMap::new)
+                .insert(key, value);
         }
         Ok(())
     }
@@ -314,5 +443,26 @@ impl IndexDocument for AttributeDocument {
             ));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::feature_type_aliases;
+
+    #[test]
+    fn feature_type_aliases_include_sequence_flags_for_sequence_documents() {
+        let aliases = feature_type_aliases("chromosome");
+        assert!(aliases.contains(&"chromosome".to_string()));
+        assert!(aliases.contains(&"sequence".to_string()));
+        assert!(aliases.contains(&"nuclear-sequence".to_string()));
+        assert!(aliases.contains(&"toplevel".to_string()));
+    }
+
+    #[test]
+    fn feature_type_aliases_include_window_flags_for_window_documents() {
+        let aliases = feature_type_aliases("win-2k");
+        assert!(aliases.contains(&"win-2k".to_string()));
+        assert!(aliases.contains(&"window".to_string()));
     }
 }
