@@ -78,11 +78,30 @@ pub struct FeatureDocument {
     pub attributes: Option<Vec<NestedAttribute>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identifiers: Option<Vec<NestedIdentifier>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extra_fields: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl FeatureDocument {
+    fn canonical_top_level_field(key: &str) -> bool {
+        matches!(
+            key,
+            "feature_id"
+                | "parent_feature_id"
+                | "primary_type"
+                | "start"
+                | "end"
+                | "length"
+                | "strand"
+                | "container_ids"
+                | "sequence_id"
+                | "sequence_length"
+                | "assembly_id"
+                | "taxon_id"
+                | "ancestors"
+                | "file_id"
+                | "analysis_id"
+        )
+    }
+
     pub fn new(
         feature_id: String,
         parent_feature_id: Option<String>,
@@ -135,7 +154,6 @@ impl FeatureDocument {
         };
 
         let mut attributes_list = vec![];
-        let mut extra_fields = HashMap::new();
         let nested_entries = [
             (
                 "start".to_string(),
@@ -198,10 +216,10 @@ impl FeatureDocument {
             if should_store_nested(&key) {
                 attributes_list.push(attr.clone());
             }
-            if should_store_top_level(&key) {
-                if let Some(value) = nested_attribute_as_value(&attr) {
-                    extra_fields.insert(key, value);
-                }
+            if should_store_top_level(&key) && !Self::canonical_top_level_field(&key) {
+                // Only explicitly mapped top-level fields are valid. There is no fallback
+                // `extra_fields` bucket.
+                let _ = attr;
             }
         }
         if let Some(strand_value) = strand {
@@ -212,11 +230,8 @@ impl FeatureDocument {
                     ..Default::default()
                 });
             }
-            if should_store_top_level("strand") {
-                extra_fields.insert(
-                    "strand".to_string(),
-                    serde_json::Value::Number(serde_json::Number::from(strand_value)),
-                );
+            if should_store_top_level("strand") && !Self::canonical_top_level_field("strand") {
+                let _ = strand_value;
             }
         }
         let feature_id = if feature_id.starts_with(&sequence_id) {
@@ -243,11 +258,6 @@ impl FeatureDocument {
             analysis_id,
             attributes: Some(attributes_list),
             identifiers: None,
-            extra_fields: if extra_fields.is_empty() {
-                None
-            } else {
-                Some(extra_fields)
-            },
         }
     }
 }
@@ -324,11 +334,11 @@ impl BuildDocument for FeatureDocument {
                 self.attributes = Some(vec![attribute.clone()]);
             }
         }
-        if is_top_level {
-            let value = nested_attribute_as_value(&attribute).unwrap_or(serde_json::Value::Null);
-            self.extra_fields
-                .get_or_insert_with(HashMap::new)
-                .insert(key, value);
+        if is_top_level && !Self::canonical_top_level_field(&key) {
+            // Top-level destination means the attribute must be a real field in the
+            // feature schema, not a bucketed fallback. Unknown or unmapped attributes
+            // are rejected by the registry checks upstream.
+            let _ = attribute;
         }
         Ok(())
     }
@@ -448,7 +458,7 @@ impl IndexDocument for AttributeDocument {
 
 #[cfg(test)]
 mod tests {
-    use super::feature_type_aliases;
+    use super::{feature_type_aliases, FeatureDocument};
 
     #[test]
     fn feature_type_aliases_include_sequence_flags_for_sequence_documents() {
@@ -464,5 +474,32 @@ mod tests {
         let aliases = feature_type_aliases("win-2k");
         assert!(aliases.contains(&"win-2k".to_string()));
         assert!(aliases.contains(&"window".to_string()));
+    }
+
+    #[test]
+    fn canonical_feature_fields_stay_top_level_and_do_not_duplicate_in_extra_fields() {
+        let doc = FeatureDocument::new(
+            "feat1".to_string(),
+            None,
+            "gene".to_string(),
+            100,
+            500,
+            Some(1),
+            None,
+            "chr1".to_string(),
+            1000,
+            "asm1".to_string(),
+            "9606".to_string(),
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(doc.start, 100);
+        assert_eq!(doc.end, 500);
+        assert_eq!(doc.length, 400);
+        assert_eq!(doc.sequence_id, "chr1");
+        assert_eq!(doc.assembly_id, "asm1");
+        assert_eq!(doc.taxon_id, "9606");
     }
 }

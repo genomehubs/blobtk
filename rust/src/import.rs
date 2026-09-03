@@ -19,6 +19,7 @@ use crate::parse::busco::{
 };
 use crate::parse::sequence_report;
 use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 pub mod state;
 use state::ImportState;
@@ -42,14 +43,20 @@ pub struct EsConfig {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SequenceReportImportConfig {
     pub accession: String,
+    #[serde(default)]
     pub taxon_id: String,
+    #[serde(default)]
+    pub ancestors: Vec<String>,
     pub local_path: Option<std::path::PathBuf>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct AssemblyImportConfig {
     pub accession: String,
-    pub taxon_id: String,
+    #[serde(default)]
+    pub taxon_id: Option<String>,
+    #[serde(default)]
+    pub ancestors: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -75,15 +82,117 @@ pub struct ImportConfig {
     pub import: Option<ImportOptions>,
 }
 
+static ASSEMBLY_TAXON_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+static ASSEMBLY_ANCESTORS_CACHE: OnceLock<Mutex<HashMap<String, Vec<String>>>> = OnceLock::new();
+
+fn lookup_assembly_record(
+    accession: &str,
+    base_url: &str,
+) -> Result<serde_json::Value, anyhow::Error> {
+    let url =
+        format!("{base_url}/api/v2/record?recordId={accession}&result=assembly&groups=lineage");
+    let body = reqwest::blocking::get(&url)?.error_for_status()?.text()?;
+    Ok(serde_json::from_str(&body)?)
+}
+
+fn lookup_taxon_id_for_assembly(
+    accession: &str,
+    taxonomy: &str,
+    base_url: &str,
+) -> Result<String, anyhow::Error> {
+    let cache_key = format!("{}|{}|{}", base_url, taxonomy, accession);
+    {
+        let cache = ASSEMBLY_TAXON_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        if let Some(taxon_id) = cache.lock().unwrap().get(&cache_key).cloned() {
+            return Ok(taxon_id);
+        }
+    }
+
+    let response = lookup_assembly_record(accession, base_url)?;
+    let taxon_id = response["records"]
+        .as_array()
+        .and_then(|records| records.first())
+        .and_then(|record| record.get("record"))
+        .and_then(|record| record.get("taxon_id"))
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| anyhow::anyhow!("assembly taxon_id not found for assembly {}", accession))?
+        .to_string();
+
+    let cache = ASSEMBLY_TAXON_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    cache.lock().unwrap().insert(cache_key, taxon_id.clone());
+    Ok(taxon_id)
+}
+
+fn lookup_ancestor_taxon_ids_for_assembly(
+    accession: &str,
+    base_url: &str,
+) -> Result<Vec<String>, anyhow::Error> {
+    let cache_key = format!("{}|{}", base_url, accession);
+    {
+        let cache = ASSEMBLY_ANCESTORS_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        if let Some(ancestors) = cache.lock().unwrap().get(&cache_key).cloned() {
+            return Ok(ancestors);
+        }
+    }
+
+    let response = lookup_assembly_record(accession, base_url)?;
+    let ancestors = response["records"]
+        .as_array()
+        .and_then(|records| records.first())
+        .and_then(|record| record.get("record"))
+        .and_then(|record| record.get("lineage"))
+        .and_then(|lineage| lineage.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|entry| entry.get("taxon_id").and_then(|value| value.as_str()))
+                .map(|value| value.to_string())
+                .collect::<Vec<String>>()
+        })
+        .unwrap_or_default();
+
+    let cache = ASSEMBLY_ANCESTORS_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    cache.lock().unwrap().insert(cache_key, ancestors.clone());
+    Ok(ancestors)
+}
+
+fn resolve_assembly_taxon_id_with_base_url(
+    cfg: &mut ImportConfig,
+    base_url: &str,
+) -> Result<(), anyhow::Error> {
+    let taxon_id = match cfg.assembly.taxon_id.clone() {
+        Some(taxon_id) => taxon_id,
+        None => {
+            let taxonomy = cfg.es.hub.taxonomy.trim();
+            lookup_taxon_id_for_assembly(&cfg.assembly.accession, taxonomy, base_url)?
+        }
+    };
+
+    let ancestor_taxon_ids =
+        lookup_ancestor_taxon_ids_for_assembly(&cfg.assembly.accession, base_url)?;
+
+    cfg.assembly.taxon_id = Some(taxon_id.clone());
+    cfg.assembly.ancestors = ancestor_taxon_ids.clone();
+    cfg.sequence_report.taxon_id = taxon_id.clone();
+    cfg.sequence_report.ancestors = ancestor_taxon_ids.clone();
+    cfg.bed.taxon_id = taxon_id.clone();
+    cfg.bed.ancestors = ancestor_taxon_ids.clone();
+    cfg.busco.taxon_id = taxon_id.clone();
+    cfg.busco.ancestors = ancestor_taxon_ids.clone();
+    Ok(())
+}
+
+fn resolve_assembly_taxon_id(cfg: &mut ImportConfig) -> Result<(), anyhow::Error> {
+    resolve_assembly_taxon_id_with_base_url(cfg, "https://goat.genomehubs.org")
+}
+
 fn expand_busco_tables(cfg: &mut ImportConfig) {
     let accession = cfg.assembly.accession.clone();
-    let taxon = cfg.assembly.taxon_id.clone();
+    let taxon = cfg.assembly.taxon_id.clone().unwrap_or_default();
     let mut expanded: Vec<BuscoFileConfig> = Vec::new();
 
-    // iterate over original table entries (adapt field name to your struct)
     if let Some(tables) = &cfg.busco.tables {
         for table in tables.iter() {
-            // normalize path string
             let path_str = table.path.to_string_lossy().to_string();
             let local_path_str = table
                 .local_path
@@ -107,6 +216,7 @@ fn expand_busco_tables(cfg: &mut ImportConfig) {
                         lineage: lineage.clone(),
                         taxon_id: taxon.clone(),
                         accession: accession.clone(),
+                        ancestors: cfg.assembly.ancestors.clone(),
                     });
                 }
             } else {
@@ -123,6 +233,7 @@ fn expand_busco_tables(cfg: &mut ImportConfig) {
                     lineage: String::new(),
                     taxon_id: taxon.clone(),
                     accession: accession.clone(),
+                    ancestors: cfg.assembly.ancestors.clone(),
                 });
             }
         }
@@ -590,10 +701,11 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
     let config_path = &options.config;
     let yaml_text = std::fs::read_to_string(config_path)?;
     let mut cfg: ImportConfig = serde_yaml::from_str(&yaml_text)?;
+    resolve_assembly_taxon_id(&mut cfg)?;
     expand_placeholders(&mut cfg);
 
     let assembly_id = cfg.assembly.accession.clone();
-    let taxon_id = cfg.assembly.taxon_id.clone();
+    let taxon_id = cfg.assembly.taxon_id.clone().unwrap_or_default();
     let mut import_state = ImportState::new(assembly_id, taxon_id);
     ensure_import_indices(&cfg.es)?;
     restore_attribute_cache(&mut import_state, &cfg.es)?;
@@ -648,6 +760,106 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
 mod tests {
     use super::*;
     use crate::index::es::models::nested_documents::NestedAttribute;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    #[test]
+    fn resolve_assembly_taxon_id_uses_lookup_when_taxon_missing() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_url = format!("http://{addr}");
+
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = [0; 2048];
+            let _ = stream.read(&mut buf).unwrap();
+            let response = br#"{
+                "status":{"success":true},
+                "records":[{"record":{"taxon_id":"1518534"}}]
+            }"#;
+            let http = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.len(),
+                String::from_utf8_lossy(response)
+            );
+            stream.write_all(http.as_bytes()).unwrap();
+        });
+
+        let resolved =
+            lookup_taxon_id_for_assembly("GCA_016920705.1", "ncbi", &server_url).unwrap();
+        assert_eq!(resolved, "1518534");
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn resolve_assembly_taxon_id_uses_process_cache_for_repeated_calls() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_url = format!("http://{addr}");
+
+        let request_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let request_count_for_server = request_count.clone();
+
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buf = [0; 2048];
+            let _ = stream.read(&mut buf).unwrap();
+            request_count_for_server.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let response = br#"{
+                "status":{"success":true},
+                "records":[{"record":{"taxon_id":"1518534"}}]
+            }"#;
+            let http = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.len(),
+                String::from_utf8_lossy(response)
+            );
+            stream.write_all(http.as_bytes()).unwrap();
+        });
+
+        let cached_key = "GCA_CACHE_TEST_1.1";
+        let first = lookup_taxon_id_for_assembly(cached_key, "ncbi", &server_url).unwrap();
+        let second = lookup_taxon_id_for_assembly(cached_key, "ncbi", &server_url).unwrap();
+        assert_eq!(first, "1518534");
+        assert_eq!(second, "1518534");
+        assert_eq!(request_count.load(std::sync::atomic::Ordering::SeqCst), 1);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn import_config_allows_missing_taxon_id() {
+        let yaml = r#"
+es:
+  host: "http://localhost"
+  port: 9200
+  hub:
+    name: goat
+    release: 2021.10.15
+    taxonomy: ncbi
+assembly:
+  accession: GCA_016920705.1
+sequence_report:
+  accession: GCA_016920705.1
+  local_path: "~/tmp/GCA_016920705.1.sequence_report.jsonl"
+bed:
+  accession: GCA_016920705.1
+  lines_per_unit: 1000
+  windows:
+    - type: size
+      size: 1000000
+      remnant_policy: Centered
+  files: []
+busco:
+  accession: GCA_016920705.1
+  algs: []
+"#;
+
+        let cfg: ImportConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(cfg.assembly.taxon_id, None);
+        assert_eq!(cfg.sequence_report.taxon_id, "");
+        assert_eq!(cfg.bed.taxon_id, "");
+        assert_eq!(cfg.busco.taxon_id, "");
+    }
 
     #[test]
     fn attach_busco_category_counts_keeps_sequence_counts_from_parse_without_double_counting() {
@@ -775,6 +987,7 @@ mod tests {
         let seq_features = parse_sequence_report(SequenceReportImportConfig {
             accession: "GCA_test".to_string(),
             taxon_id: "123".to_string(),
+            ancestors: vec!["1".to_string(), "2".to_string()],
             local_path: Some(seq_report_path.clone()),
         })
         .unwrap();
@@ -782,6 +995,7 @@ mod tests {
         let bed_config = MultiBedConfig {
             accession: "GCA_test".to_string(),
             taxon_id: "123".to_string(),
+            ancestors: vec!["1".to_string(), "2".to_string()],
             lines_per_unit: 1000,
             bed_configs: vec![BedConfig {
                 path: bed_path.clone(),

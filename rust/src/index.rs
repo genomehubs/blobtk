@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::BufRead;
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 
 use anyhow;
 use log;
@@ -1726,12 +1727,28 @@ fn find_blobtoolkit_url(accession: &str) -> Option<PathBuf> {
     None
 }
 
-fn lookup_goat_lineages(taxon_id: String) -> Result<Vec<String>, anyhow::Error> {
-    // use curl to fetch directly from the API
-    let url = format!(
-        "https://goat.genomehubs.org/api/v2/search?query=tax_lineage%28{}%29&result=taxon&fields=odb10_lineage&includeEstimates=true&taxonomy=ncbi",
-        taxon_id
+static GOAT_LINEAGE_CACHE: OnceLock<Mutex<HashMap<String, Vec<String>>>> = OnceLock::new();
+
+fn lookup_goat_lineages(
+    record_id: String,
+    result: Option<&str>,
+) -> Result<Vec<String>, anyhow::Error> {
+    let cache_key = format!("{}|{:?}", record_id, result);
+    {
+        let cache = GOAT_LINEAGE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+        if let Some(lineages) = cache.lock().unwrap().get(&cache_key).cloned() {
+            return Ok(lineages);
+        }
+    }
+
+    let mut url = format!(
+        "https://goat.genomehubs.org/api/v2/record?recordId={}&groups=lineage",
+        record_id
     );
+    if let Some(result) = result {
+        url = format!("{}&result={}", url, result);
+    }
+
     let output = Command::new("curl").args(["-s", &url]).output()?;
     if !output.status.success() {
         return Err(anyhow::anyhow!(
@@ -1740,20 +1757,29 @@ fn lookup_goat_lineages(taxon_id: String) -> Result<Vec<String>, anyhow::Error> 
         ));
     }
 
-    let lineages = String::from_utf8(output.stdout)?;
-    let lineages: serde_json::Value = serde_json::from_str(&lineages)?;
-    let lineages = lineages["results"]
+    let record_data = String::from_utf8(output.stdout)?;
+    let record_data: serde_json::Value = serde_json::from_str(&record_data)?;
+    let lineages = record_data["records"]
         .as_array()
-        .unwrap()
-        .iter()
-        .map(|result| {
-            result["result"]["fields"]["odb10_lineage"]["value"]
-                .as_str()
-                .unwrap()
-                .to_string()
+        .and_then(|records| records.first())
+        .and_then(|record| record.get("record"))
+        .and_then(|record| record.get("lineage"))
+        .and_then(|lineage| lineage.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|entry| {
+                    entry
+                        .get("scientific_name")
+                        .and_then(|name| name.as_str())
+                        .map(str::to_string)
+                })
+                .collect::<Vec<String>>()
         })
-        .collect::<Vec<String>>();
+        .unwrap_or_default();
 
+    let cache = GOAT_LINEAGE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    cache.lock().unwrap().insert(cache_key, lineages.clone());
     Ok(lineages)
 }
 
@@ -1770,7 +1796,7 @@ fn process_busco_dirs(
         if let Some(busco_dir_name) = busco_dir.file_name() {
             let regex = regex::Regex::new(r"(\w+_odb\d+)").unwrap();
             if !regex.is_match(busco_dir_name.to_str().unwrap()) {
-                let lineages = lookup_goat_lineages(taxon_id)?;
+                let lineages = lookup_goat_lineages(taxon_id, Some("taxon"))?;
                 for lineage in lineages {
                     let lineage_dir = busco_dir.join(lineage);
                     // if lineage_dir.exists() {

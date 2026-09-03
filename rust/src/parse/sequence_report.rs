@@ -109,7 +109,7 @@ impl DatasetsSequenceReport {
             sequence_length,
             assembly_id,
             taxon_id,
-            None, // ancestors
+            Some(vec![]),
             None, // file_id
             None, // analysis_id
         );
@@ -160,6 +160,7 @@ fn fetch_datasets_sequence_report(accession: &str) -> Result<String, error::Erro
 fn parse_sequence_report_from_json_lines(
     json_lines: &str,
     taxon_id: String,
+    ancestor_taxon_ids: Vec<String>,
 ) -> Result<HashMap<String, FeatureDocument>, error::Error> {
     let mut feature_docs: HashMap<String, FeatureDocument> = HashMap::new();
     for line in json_lines.lines() {
@@ -168,7 +169,8 @@ fn parse_sequence_report_from_json_lines(
         }
         let record: DatasetsSequenceReport = serde_json::from_str(line)
             .map_err(|e| Error::Generic(format!("Failed to parse JSON line: {}", e)))?;
-        let feature_doc = record.to_feature(taxon_id.clone());
+        let mut feature_doc = record.to_feature(taxon_id.clone());
+        feature_doc.ancestors = Some(ancestor_taxon_ids.clone());
         feature_docs.insert(feature_doc.feature_id.clone(), feature_doc);
     }
     Ok(feature_docs)
@@ -189,18 +191,26 @@ pub fn parse_sequence_report(
                 .map(|line| line.unwrap_or_default())
                 .collect::<Vec<String>>()
                 .join("\n");
-            return parse_sequence_report_from_json_lines(&json_lines, config.taxon_id);
+            return parse_sequence_report_from_json_lines(
+                &json_lines,
+                config.taxon_id,
+                config.ancestors,
+            );
         }
         // path was provided but not present locally -> fetch and cache
         let json_lines = fetch_datasets_sequence_report(&config.accession)?;
         let mut writer = io::get_writer(&Some(p.clone()));
         writer.write_all(json_lines.as_bytes())?;
-        return parse_sequence_report_from_json_lines(&json_lines, config.taxon_id);
+        return parse_sequence_report_from_json_lines(
+            &json_lines,
+            config.taxon_id,
+            config.ancestors,
+        );
     }
 
     // No path given -> fetch but don't cache
     let json_lines = fetch_datasets_sequence_report(&config.accession)?;
-    parse_sequence_report_from_json_lines(&json_lines, config.taxon_id)
+    parse_sequence_report_from_json_lines(&json_lines, config.taxon_id, config.ancestors)
 }
 
 #[cfg(test)]

@@ -7,14 +7,11 @@ es:
     taxonomy: ncbi
 assembly:
   accession: &ACCESSION GCA_016920705.1
-  taxon_id: &TAXON 1518534
 sequence_report:
   accession: *ACCESSION
-  taxon_id: *TAXON
   local_path: "~/tmp/{ACCESSION}.sequence_report.jsonl"
 bed:
   accession: *ACCESSION
-  taxon_id: *TAXON
   lines_per_unit: 1000
   windows:
     - type: size
@@ -46,7 +43,6 @@ bed:
           summary_functions: *SUMMARY_FUNCTIONS
 busco:
   accession: *ACCESSION
-  taxon_id: *TAXON
   tables:
     - path: "https://gap.cog.sanger.ac.uk/{ACCESSION}/busco/{LINEAGE}/{ACCESSION}.{LINEAGE}.full_table.tsv.gz"
       local_path: "~/tmp/{ACCESSION}.{LINEAGE}.full_table.tsv.gz"

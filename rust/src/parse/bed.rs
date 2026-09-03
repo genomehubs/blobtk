@@ -499,7 +499,10 @@ pub fn window_ids_for_midpoint(
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MultiBedConfig {
     pub accession: String,
+    #[serde(default)]
     pub taxon_id: String,
+    #[serde(default)]
+    pub ancestors: Vec<String>,
     pub lines_per_unit: usize,
     #[serde(rename = "files")]
     pub bed_configs: Vec<BedConfig>,
@@ -831,7 +834,7 @@ pub fn parse_bed_files(
                                 sequence_length,
                                 config.accession.clone(),
                                 config.taxon_id.clone(),
-                                None,
+                                Some(config.ancestors.clone()),
                                 None,
                                 None,
                             );
@@ -973,6 +976,7 @@ mod tests {
         let cfg = MultiBedConfig {
             accession: "GCA_test".to_string(),
             taxon_id: "123".to_string(),
+            ancestors: vec!["1".to_string(), "2".to_string()],
             lines_per_unit: 1000,
             bed_configs: vec![BedConfig {
                 path: tmp,
@@ -1008,6 +1012,7 @@ mod tests {
         let cfg = MultiBedConfig {
             accession: "GCA_test".to_string(),
             taxon_id: "123".to_string(),
+            ancestors: vec!["1".to_string(), "2".to_string()],
             lines_per_unit: 1000,
             bed_configs: vec![BedConfig {
                 path: tmp,
@@ -1043,6 +1048,7 @@ mod tests {
         let cfg = MultiBedConfig {
             accession: "GCA_test".to_string(),
             taxon_id: "123".to_string(),
+            ancestors: vec!["1".to_string(), "2".to_string()],
             lines_per_unit: 1000,
             bed_configs: vec![BedConfig {
                 path: tmp,
@@ -1150,6 +1156,7 @@ mod tests {
         let multi_bed_config = MultiBedConfig {
             accession: "GCA_016920705.1".to_string(),
             taxon_id: "1518534".to_string(),
+            ancestors: vec!["44542".to_string(), "44537".to_string(), "7164".to_string()],
             lines_per_unit: 1000,
             bed_configs: vec![
                 bed_config_gc,

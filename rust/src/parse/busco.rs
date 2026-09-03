@@ -42,6 +42,8 @@ pub struct BuscoFileConfig {
     pub lineage: String,
     pub taxon_id: String,
     pub accession: String,
+    #[serde(default)]
+    pub ancestors: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -57,7 +59,10 @@ pub struct AlgConfig {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct MultiBuscoConfig {
     pub accession: String,
+    #[serde(default)]
     pub taxon_id: String,
+    #[serde(default)]
+    pub ancestors: Vec<String>,
     #[serde(skip_serializing)]
     pub tables: Option<Vec<BuscoTableConfig>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1377,7 +1382,7 @@ pub fn parse_busco_files(
                             sequence_length,
                             busco_file.accession.clone(),
                             busco_file.taxon_id.clone(),
-                            None,
+                            Some(busco_file.ancestors.clone()),
                             Some(busco_file.path.to_string_lossy().to_string()),
                             Some("busco".to_string()),
                         );
