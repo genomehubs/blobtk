@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::attribute_registry::AttributeRegistry;
 use crate::error;
 use crate::index::es::client::ElasticsearchClient;
 use crate::index::es::models::attribute_builder::build_attribute_document;
@@ -42,7 +43,7 @@ pub struct EsConfig {
 pub struct SequenceReportImportConfig {
     pub accession: String,
     pub taxon_id: String,
-    pub path: Option<std::path::PathBuf>,
+    pub local_path: Option<std::path::PathBuf>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -84,6 +85,10 @@ fn expand_busco_tables(cfg: &mut ImportConfig) {
         for table in tables.iter() {
             // normalize path string
             let path_str = table.path.to_string_lossy().to_string();
+            let local_path_str = table
+                .local_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().to_string());
 
             if let Some(lineages) = &table.lineages {
                 for lineage in lineages {
@@ -91,8 +96,14 @@ fn expand_busco_tables(cfg: &mut ImportConfig) {
                         .replace("{ACCESSION}", &accession)
                         .replace("{LINEAGE}", lineage)
                         .replace("{TAXON}", &taxon);
+                    let local_p = local_path_str.as_ref().map(|s| {
+                        s.replace("{ACCESSION}", &accession)
+                            .replace("{LINEAGE}", lineage)
+                            .replace("{TAXON}", &taxon)
+                    });
                     expanded.push(BuscoFileConfig {
                         path: PathBuf::from(p),
+                        local_path: local_p.as_ref().map(|s| PathBuf::from(s)),
                         lineage: lineage.clone(),
                         taxon_id: taxon.clone(),
                         accession: accession.clone(),
@@ -102,8 +113,13 @@ fn expand_busco_tables(cfg: &mut ImportConfig) {
                 let p = path_str
                     .replace("{ACCESSION}", &accession)
                     .replace("{TAXON}", &taxon);
+                let local_p = local_path_str.as_ref().map(|s| {
+                    s.replace("{ACCESSION}", &accession)
+                        .replace("{TAXON}", &taxon)
+                });
                 expanded.push(BuscoFileConfig {
                     path: PathBuf::from(p),
+                    local_path: local_p.as_ref().map(|s| PathBuf::from(s)),
                     lineage: String::new(),
                     taxon_id: taxon.clone(),
                     accession: accession.clone(),
@@ -120,16 +136,21 @@ fn expand_placeholders(cfg: &mut ImportConfig) {
         let s = bed.path.to_string_lossy().to_string();
         let s = s.replace("{ACCESSION}", &accession);
         bed.path = std::path::PathBuf::from(s);
+        if let Some(local_path) = &bed.local_path {
+            let s = local_path.to_string_lossy().to_string();
+            let s = s.replace("{ACCESSION}", &accession);
+            bed.local_path = Some(std::path::PathBuf::from(s));
+        }
     }
     expand_busco_tables(cfg);
     let s = cfg
         .sequence_report
-        .path
+        .local_path
         .as_ref()
         .map(|p| p.to_string_lossy().to_string());
     if let Some(s) = s {
         let s = s.replace("{ACCESSION}", &accession);
-        cfg.sequence_report.path = Some(std::path::PathBuf::from(s));
+        cfg.sequence_report.local_path = Some(std::path::PathBuf::from(s));
     }
 }
 
@@ -194,24 +215,20 @@ fn ensure_import_indices(es_cfg: &EsConfig) -> Result<(), error::Error> {
 }
 
 fn attach_busco_category_counts(state: &mut ImportState) -> Result<(), anyhow::Error> {
-    // For each unique BUSCO ID (not occurrence)
+    // Sequence-level BUSCO counts are recorded during parsing as raw status totals
+    // (e.g. complete / fragmented / missing). They must not be re-aggregated here,
+    // otherwise the same BUSCO loci are double-counted on the sequence feature.
     for busco_id in state.busco_id_tracker.occurrences.keys() {
         if let Some(occurrences) = state.busco_id_tracker.occurrences.get(busco_id) {
-            // Get lineage from first occurrence
             let lineage = &occurrences[0].3;
             let categories = state.busco_id_tracker.categorize(busco_id, lineage);
 
-            // Add to assembly counts ONCE per BUSCO ID
             for category in &categories {
                 state.busco_counts.add_to_assembly(lineage, category);
             }
 
-            // Add to sequence/window counts for each occurrence
-            for (seq_id, window_ids, _, _) in occurrences {
+            for (_, window_ids, _, _) in occurrences {
                 for category in &categories {
-                    state
-                        .busco_counts
-                        .add_to_sequence(seq_id, lineage, category);
                     for win_id in window_ids {
                         state.busco_counts.add_to_window(win_id, lineage, category);
                     }
@@ -541,16 +558,29 @@ fn create_attribute_docs_from_features(
     es_cfg: &EsConfig,
     import_opts: &Option<ImportOptions>,
 ) -> Result<(), error::Error> {
+    let registry = AttributeRegistry::load_default().map_err(|err| {
+        error::Error::Generic(format!("failed to load attribute registry: {err}"))
+    })?;
     let mut attribute_docs = Vec::new();
+    let mut keys = Vec::new();
 
     for feature in features {
         if let Some(attrs) = &feature.attributes {
             for attr in attrs {
+                keys.push(attr.key.clone());
                 let overrides =
                     crate::index::es::models::attribute_builder::feature_attribute_overrides(attr);
                 attribute_docs.push(build_attribute_document(attr, Some(&overrides)));
             }
         }
+    }
+
+    let missing = registry.find_unmapped_keys(keys);
+    if !missing.is_empty() {
+        return Err(error::Error::Generic(format!(
+            "attribute registry guard failed: unregistered attributes: {}",
+            missing.join(", ")
+        )));
     }
 
     sync_attribute_documents(attribute_docs, state, es_cfg, import_opts)
@@ -618,6 +648,39 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
 mod tests {
     use super::*;
     use crate::index::es::models::nested_documents::NestedAttribute;
+
+    #[test]
+    fn attach_busco_category_counts_keeps_sequence_counts_from_parse_without_double_counting() {
+        let mut state = ImportState::new("asm-1".to_string(), "tax-1".to_string());
+
+        state
+            .busco_counts
+            .add_to_sequence("seq-1", "diptera_odb12", "complete");
+        state.busco_id_tracker.record(
+            "BUSCO_00001",
+            "seq-1",
+            vec!["win-1".to_string()],
+            "Complete",
+            "diptera_odb12",
+        );
+
+        attach_busco_category_counts(&mut state).unwrap();
+
+        let seq_counts = state
+            .busco_counts
+            .seq_counts
+            .get("seq-1")
+            .and_then(|lineages| lineages.get("diptera_odb12"))
+            .unwrap();
+
+        assert_eq!(seq_counts.get("complete"), Some(&1));
+        assert_eq!(seq_counts.get("single_copy"), None);
+        assert_eq!(seq_counts.get("duplicated"), None);
+        assert_eq!(
+            state.busco_counts.window_counts["win-1"]["diptera_odb12"]["complete"],
+            1
+        );
+    }
 
     #[test]
     fn attach_synteny_metrics_to_window_attrs_includes_active_compact_summary_fields() {

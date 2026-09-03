@@ -77,6 +77,25 @@ impl<R: Read> Read for ProgressRead<R> {
     }
 }
 
+fn expand_home(path: &Path) -> PathBuf {
+    let s = path.to_string_lossy();
+
+    if s == "~" {
+        return std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+    }
+
+    if let Ok(rest) = path.strip_prefix("~/") {
+        let home = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        return home.join(rest);
+    }
+
+    path.to_path_buf()
+}
+
 fn read_stdin() -> Vec<Vec<u8>> {
     let stdin = io::stdin();
     let mut list: Vec<Vec<u8>> = vec![];
@@ -98,7 +117,8 @@ pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
 {
-    let file = File::open(filename)?;
+    let path = expand_home(filename.as_ref());
+    let file = File::open(path)?;
     Ok(io::BufReader::new(file).lines())
 }
 
@@ -126,12 +146,18 @@ pub fn get_list(file_path: &Option<PathBuf>) -> HashSet<Vec<u8>> {
 }
 
 pub fn get_file_writer(file_path: &PathBuf, append: bool) -> Box<dyn Write> {
-    if let Err(e) = create_dir_all(file_path.parent().unwrap()) {
-        panic!(
-            "couldn't create directory {}: {}",
-            file_path.parent().unwrap().display(),
-            e
-        );
+    let file_path = &expand_home(file_path);
+
+    if let Some(parent) = file_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            if let Err(e) = create_dir_all(file_path.parent().unwrap()) {
+                panic!(
+                    "couldn't create directory {}: {}",
+                    file_path.parent().unwrap().display(),
+                    e
+                );
+            }
+        }
     }
     let file = if append {
         match OpenOptions::new().append(true).open(file_path) {
@@ -160,7 +186,7 @@ pub fn get_writer(file_path: &Option<PathBuf>) -> Box<dyn Write> {
     let writer: Box<dyn Write> = match file_path {
         Some(path) if path == Path::new("-") => Box::new(BufWriter::new(io::stdout().lock())),
         Some(path) => {
-            create_dir_all(path.parent().unwrap()).unwrap();
+            // create_dir_all(path.parent().unwrap()).unwrap();
             get_file_writer(path, false)
         }
         None => Box::new(BufWriter::new(io::stdout().lock())),
@@ -172,7 +198,7 @@ pub fn get_append_writer(file_path: &Option<PathBuf>) -> Box<dyn Write> {
     let writer: Box<dyn Write> = match file_path {
         Some(path) if path == Path::new("-") => Box::new(BufWriter::new(io::stdout().lock())),
         Some(path) => {
-            create_dir_all(path.parent().unwrap()).unwrap();
+            // create_dir_all(path.parent().unwrap()).unwrap();
             get_file_writer(path, true)
         }
         None => Box::new(BufWriter::new(io::stdout().lock())),
@@ -194,6 +220,7 @@ pub fn get_csv_writer(file_path: &Option<PathBuf>, delimiter: u8) -> csv::Writer
 /// Return a BufRead object for a given file path.
 /// If the file path has a `.gz` extension, the file is decompressed on the fly.
 pub fn local_file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
+    let path = expand_home(path.as_ref());
     let file = File::open(&path)?;
 
     if path.extension() == Some(OsStr::new("gz")) {
@@ -364,6 +391,7 @@ pub fn file_reader(path: PathBuf) -> io::Result<Box<dyn BufRead>> {
         return ssh_file_reader(&path.to_string_lossy());
     }
 
+    let path = expand_home(&path);
     let file = File::open(&path);
 
     if path.extension() == Some(OsStr::new("gz")) {
@@ -408,6 +436,28 @@ pub fn get_empty_reader() -> Box<dyn BufRead> {
     Box::new(BufReader::new(io::empty()))
 }
 
+pub fn get_csv_reader_from_file_reader(
+    file_reader: Box<dyn BufRead>,
+    delimiter: u8,
+    has_headers: bool,
+    comment_char: Option<u8>,
+    skip_lines: usize,
+    flexible: bool,
+) -> io::Result<csv::Reader<Box<dyn BufRead>>> {
+    let mut file_reader = file_reader;
+    for _ in 0..skip_lines {
+        let mut line = String::new();
+        file_reader.read_line(&mut line).unwrap();
+    }
+
+    Ok(csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .has_headers(has_headers)
+        .comment(comment_char)
+        .flexible(flexible)
+        .from_reader(file_reader))
+}
+
 /// Return a csv::Reader object for a given file path.
 /// If the file path has a `.gz` extension, the file is decompressed on the fly.
 pub fn get_csv_reader(
@@ -418,20 +468,20 @@ pub fn get_csv_reader(
     skip_lines: usize,
     flexible: bool,
 ) -> io::Result<csv::Reader<Box<dyn BufRead>>> {
-    let file_reader = file_reader(file_path.as_ref().unwrap().clone())?;
-    // Skip the first `skip_lines` lines
-    let mut file_reader = Box::new(file_reader);
-    for _ in 0..skip_lines {
-        let mut line = String::new();
-        file_reader.read_line(&mut line).unwrap();
-    }
-
-    Ok(csv::ReaderBuilder::new()
-        .delimiter(delimiter)
-        .has_headers(has_headers)
-        .comment(comment_char)
-        .flexible(flexible) // Allow incomplete rows
-        .from_reader(file_reader))
+    let file_reader = if let Some(file_path) = file_path {
+        let file_path = expand_home(file_path);
+        file_reader(file_path)?
+    } else {
+        get_empty_reader()
+    };
+    get_csv_reader_from_file_reader(
+        file_reader,
+        delimiter,
+        has_headers,
+        comment_char,
+        skip_lines,
+        flexible,
+    )
 }
 
 pub fn write_list(entries: &HashSet<Vec<u8>>, file_path: &Option<PathBuf>) -> Result<()> {

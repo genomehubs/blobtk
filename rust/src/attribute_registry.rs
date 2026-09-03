@@ -90,6 +90,44 @@ impl AttributeRegistry {
             })
             .map(|(_, entry)| entry)
     }
+
+    pub fn require_registered(&self, key: &str) -> Result<(), String> {
+        if self.lookup(key).is_some() || self.lookup_alias(key).is_some() {
+            Ok(())
+        } else {
+            Err(format!(
+                "attribute '{key}' is not registered in the attribute registry"
+            ))
+        }
+    }
+
+    pub fn find_unmapped_keys<I, S>(&self, keys: I) -> Vec<String>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut missing = keys
+            .into_iter()
+            .map(|key| key.into())
+            .filter(|key| self.lookup(key).is_none() && self.lookup_alias(key).is_none())
+            .collect::<Vec<_>>();
+        missing.sort();
+        missing.dedup();
+        missing
+    }
+
+    pub fn require_registered_keys<I, S>(&self, keys: I) -> Result<(), String>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let missing = self.find_unmapped_keys(keys);
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(format!("unregistered attributes: {}", missing.join(", ")))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -106,5 +144,28 @@ mod tests {
         let busco_score = registry.lookup("busco_score").unwrap();
         assert_eq!(busco_score.display_group.as_deref(), Some("busco"));
         assert_eq!(busco_score.status.as_deref(), Some("active"));
+    }
+
+    #[test]
+    fn registry_requires_known_keys_and_reports_unmapped_fields() {
+        let registry = AttributeRegistry::load_default().unwrap();
+
+        assert!(registry.require_registered("feature_id").is_ok());
+        assert!(registry.require_registered("name").is_ok());
+        assert!(registry
+            .require_registered("totally_unknown_field")
+            .is_err());
+
+        let missing = registry.find_unmapped_keys(vec![
+            "feature_id".to_string(),
+            "name".to_string(),
+            "totally_unknown_field".to_string(),
+            "another_missing_field".to_string(),
+        ]);
+
+        assert_eq!(
+            missing,
+            vec!["another_missing_field", "totally_unknown_field"]
+        );
     }
 }

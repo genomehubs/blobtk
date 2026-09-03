@@ -74,3 +74,9 @@ impl From<EsError> for Error {
         Error::ApiError(err.to_string())
     }
 }
+
+impl From<Box<dyn std::error::Error>> for Error {
+    fn from(err: Box<dyn std::error::Error>) -> Self {
+        Error::Generic(err.to_string())
+    }
+}

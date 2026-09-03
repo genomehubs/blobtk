@@ -1,7 +1,7 @@
 //! Functions to parse a busco full table file and return an iterator of BuscoFeature structs.
 
 use std::collections::HashMap;
-use std::io::BufRead;
+use std::io::{copy, BufRead, Cursor, Read};
 use std::path::PathBuf;
 
 use anyhow;
@@ -18,7 +18,7 @@ use crate::index::es::client::ElasticsearchClient;
 
 use crate::index::es::models::documents::FeatureDocument;
 use crate::index::es::models::nested_documents::NestedAttribute;
-use crate::io::get_csv_reader;
+use crate::io::{file_reader, get_csv_reader, get_csv_reader_from_file_reader, get_file_writer};
 use crate::parse::bed::WindowSpec;
 
 use crate::parse::busco::attributes::{
@@ -30,6 +30,7 @@ use crate::parse::busco::attributes::{
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct BuscoTableConfig {
     pub path: PathBuf,
+    pub local_path: Option<PathBuf>,
     #[serde(default)]
     pub lineages: Option<Vec<String>>,
 }
@@ -37,6 +38,7 @@ pub struct BuscoTableConfig {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct BuscoFileConfig {
     pub path: PathBuf,
+    pub local_path: Option<PathBuf>,
     pub lineage: String,
     pub taxon_id: String,
     pub accession: String,
@@ -46,7 +48,8 @@ pub struct BuscoFileConfig {
 pub struct AlgConfig {
     pub name: String,
     pub lineage: String,
-    pub path: String,
+    pub path: PathBuf,
+    pub local_path: Option<PathBuf>,
     pub alg_count: Option<usize>,
     pub mapping: Option<HashMap<String, String>>,
 }
@@ -152,14 +155,33 @@ pub fn parse_alg_files(
 ) -> Result<HashMap<String, AlgConfig>, anyhow::Error> {
     let mut alg_map = HashMap::new();
     for alg in alg_configs {
-        let alg_reader = get_csv_reader(
-            &Some(PathBuf::from(alg.path.clone())),
-            b'\t',
-            false,
-            None,
-            0,
-            true,
-        )?;
+        let alg_reader = if let Some(local) = &alg.local_path {
+            match file_reader(local.clone()) {
+                Ok(reader) => {
+                    get_csv_reader_from_file_reader(Box::new(reader), b'\t', false, None, 0, true)?
+                }
+                Err(_) => {
+                    let mut remote_reader = file_reader(alg.path.clone())?;
+                    let mut bytes = Vec::new();
+                    Read::read_to_end(&mut *remote_reader, &mut bytes)?;
+
+                    let mut local_writer = get_file_writer(local, false);
+                    copy(&mut Cursor::new(bytes.clone()), &mut *local_writer)?;
+
+                    get_csv_reader_from_file_reader(
+                        Box::new(Cursor::new(bytes)),
+                        b'\t',
+                        false,
+                        None,
+                        0,
+                        true,
+                    )?
+                }
+            }
+        } else {
+            get_csv_reader(&Some(alg.path.clone()), b'\t', false, None, 0, true)?
+        };
+
         let mut mapping = HashMap::new();
         let mut unique_values = std::collections::HashSet::new();
         for result in alg_reader.into_records() {
@@ -174,6 +196,7 @@ pub fn parse_alg_files(
             AlgConfig {
                 name: alg.name.clone(),
                 path: alg.path.clone(),
+                local_path: alg.local_path.clone(),
                 lineage: alg.lineage.clone(),
                 alg_count: Some(unique_values.len()),
                 mapping: Some(mapping),
@@ -190,42 +213,20 @@ fn overlapping_window_ids(
     feat_end_1based: usize,
     window_specs: &[WindowSpec],
     lines_per_unit: usize,
+    bounds_cache: &mut std::collections::HashMap<String, Vec<(usize, usize)>>,
 ) -> Vec<String> {
-    let s = feat_start_1based.saturating_sub(1);
-    let e = feat_end_1based.max(feat_start_1based); // guard malformed input
-
     let mut ids = Vec::new();
 
     for spec in window_specs {
-        let mut window_bp = match spec {
-            WindowSpec::Size { size: bp } => *bp,
-            WindowSpec::Proportion { proportion: p } => {
-                ((sequence_length as f64) * *p).ceil() as usize
-            }
-        };
-
-        if window_bp == 0 {
-            continue;
-        }
-
-        // Optional: match BED quantization to 1kb units
-        if lines_per_unit > 1 {
-            window_bp = window_bp.div_ceil(lines_per_unit) * lines_per_unit;
-        }
-
-        let first = s / window_bp;
-        let last = e.saturating_sub(1) / window_bp;
-
-        for i in first..=last {
-            let w_start = i * window_bp;
-            let w_end = ((i + 1) * window_bp).min(sequence_length);
-            ids.push(crate::parse::bed::set_window_name(
-                sequence_id,
-                w_start,
-                w_end,
-                spec,
-            ));
-        }
+        ids.extend(crate::parse::bed::window_ids_for_midpoint(
+            sequence_id,
+            sequence_length,
+            feat_start_1based,
+            feat_end_1based,
+            spec,
+            lines_per_unit,
+            bounds_cache,
+        ));
     }
 
     ids
@@ -1266,8 +1267,32 @@ pub fn parse_busco_files(
     };
     for busco_file in busco_config.files.as_ref().unwrap_or(&Vec::new()) {
         eprintln!("  Parsing BUSCO file: {}", busco_file.path.display());
-        let full_table_reader =
-            get_csv_reader(&Some(busco_file.path.clone()), b'\t', true, None, 2, true)?;
+        let full_table_reader = if let Some(local) = &busco_file.local_path {
+            match file_reader(local.clone()) {
+                Ok(reader) => {
+                    get_csv_reader_from_file_reader(Box::new(reader), b'\t', true, None, 2, true)?
+                }
+                Err(_) => {
+                    let mut remote_reader = file_reader(busco_file.path.clone())?;
+                    let mut bytes = Vec::new();
+                    std::io::Read::read_to_end(&mut *remote_reader, &mut bytes)?;
+
+                    let mut local_writer = get_file_writer(local, false);
+                    std::io::copy(&mut std::io::Cursor::new(bytes.clone()), &mut *local_writer)?;
+
+                    get_csv_reader_from_file_reader(
+                        Box::new(Cursor::new(bytes)),
+                        b'\t',
+                        true,
+                        None,
+                        2,
+                        true,
+                    )?
+                }
+            }
+        } else {
+            get_csv_reader(&Some(busco_file.path.clone()), b'\t', true, None, 2, true)?
+        };
         // find all alg maps with matching lineage and apply them to the busco features
         let matching_algs: Vec<&AlgConfig> = alg_map
             .values()
@@ -1280,6 +1305,7 @@ pub fn parse_busco_files(
         let mut attribute_collector = AttributeCollector::new();
         let mut block_sets: HashMap<String, SyntenyBlockSet> = HashMap::new();
         let mut window_block_sets: HashMap<String, SyntenyBlockSet> = HashMap::new();
+        let mut window_bounds_cache: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
 
         for parsed_line in parse_full_table(full_table_reader) {
             match parsed_line {
@@ -1325,6 +1351,7 @@ pub fn parse_busco_files(
                             end,
                             &window_cfg,
                             lines_per_unit,
+                            &mut window_bounds_cache,
                         );
 
                         state.busco_id_tracker.record(

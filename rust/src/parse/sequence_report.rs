@@ -5,17 +5,14 @@
 //!
 
 use std::collections::HashMap;
-use std::fs::{create_dir_all, write, File};
+use std::fs::{create_dir_all, write};
 use std::io::BufRead;
-use std::path::PathBuf;
 use std::process::Command;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::error::{self, Error};
 use crate::import::SequenceReportImportConfig;
-use crate::index::es::config;
-use crate::index::es::mappings::attribute;
 use crate::index::es::models::documents::FeatureDocument;
 use crate::index::es::models::nested_documents::NestedAttribute;
 use crate::io;
@@ -183,7 +180,7 @@ pub fn parse_sequence_report(
     config: SequenceReportImportConfig,
 ) -> Result<HashMap<String, FeatureDocument>, error::Error> {
     // If a path is provided and exists, read from it.
-    if let Some(p) = config.path {
+    if let Some(p) = config.local_path {
         let maybe_sr_file = io::file_reader(p.clone());
         if let Ok(mut sr_file) = maybe_sr_file {
             let sr_reader = &mut *sr_file;
@@ -196,10 +193,8 @@ pub fn parse_sequence_report(
         }
         // path was provided but not present locally -> fetch and cache
         let json_lines = fetch_datasets_sequence_report(&config.accession)?;
-        if let Some(parent) = p.parent() {
-            create_dir_all(parent)?; // ensure parent exists
-        }
-        write(&p, &json_lines)?; // write cache
+        let mut writer = io::get_writer(&Some(p.clone()));
+        writer.write_all(json_lines.as_bytes())?;
         return parse_sequence_report_from_json_lines(&json_lines, config.taxon_id);
     }
 

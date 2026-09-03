@@ -426,11 +426,17 @@ impl ElasticsearchClient {
         let index_name = self.resolve_index_name(index_prefix)?;
         let request_url = format!("{}/{}/_bulk", self.cluster_url, index_name);
         let mut bulk_request_body = String::new();
+
         for document in documents {
+            let doc_id = if document.id.starts_with(index_prefix) {
+                document.id.clone()
+            } else {
+                format!("{}-{}", index_prefix, document.id)
+            };
             let action = serde_json::json!({
                 "index": {
                     "_index": index_name,
-                    "_id": document.id,
+                    "_id": doc_id,
                 }
             });
             let action_str = serde_json::to_string(&action)

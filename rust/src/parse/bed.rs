@@ -4,7 +4,7 @@
 //! The module uses the Feature struct to represent the attributes and metadata of each feature, and provides functions to parse the BED files and extract the relevant information into a vector of Feature structs. The module also includes error handling to ensure that any issues encountered during parsing are properly reported and handled.
 
 use std::collections::HashMap;
-use std::io::BufRead;
+use std::io::{copy, BufRead, Cursor, Read};
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -168,7 +168,8 @@ impl ValueColumn {
         if index == 0 {
             self.label.clone()
         } else {
-            format!("{}_{}", self.label, self.summary_functions[index].name())
+            let label = format!("{}_{}", self.label, self.summary_functions[index].name());
+            label
         }
     }
 }
@@ -176,35 +177,323 @@ impl ValueColumn {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BedConfig {
     pub path: PathBuf,
+    pub local_path: Option<PathBuf>,
     pub value_columns: Vec<ValueColumn>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum RemnantPolicy {
+    Trailing,    // current behavior: leftover at chromosome end
+    Centered,    // center the remnant by anchoring at both ends
+    Symmetric,   // split the remnant evenly at both ends
+    Discard,     // discard the remnant entirely
+    Distributed, // distribute the remnant across the entire sequence
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum WindowSpec {
-    Size { size: usize },
-    Proportion { proportion: f64 },
+    Size {
+        size: usize,
+        remnant_policy: RemnantPolicy,
+    },
+    Proportion {
+        proportion: f64,
+    },
 }
 
 impl WindowSpec {
     pub fn to_string(&self) -> String {
         match self {
-            WindowSpec::Size { size } => {
+            WindowSpec::Size {
+                size,
+                remnant_policy: _,
+            } => {
                 // format size with si suffix
                 let si_size = if *size >= 1_000_000_000 {
-                    format!("{}G", size / 1_000_000_000)
+                    let s = format!("{}G", size / 1_000_000_000);
+                    s
                 } else if *size >= 1_000_000 {
-                    format!("{}M", size / 1_000_000)
+                    let s = format!("{}M", size / 1_000_000);
+                    s
                 } else if *size >= 1_000 {
-                    format!("{}k", size / 1_000)
+                    let s = format!("{}k", size / 1_000);
+                    s
                 } else {
-                    format!("{}", size)
+                    let s = format!("{}", size);
+                    s
                 };
-                format!("win-{}", si_size)
+                let s = format!("win-{}", si_size);
+                s
             }
-            WindowSpec::Proportion { proportion } => format!("win-{:.2}", proportion),
+            WindowSpec::Proportion { proportion } => {
+                let s = format!("win-{:.2}", proportion);
+                s
+            }
         }
     }
+}
+
+pub fn window_spec_cache_key(window_spec: &WindowSpec) -> String {
+    match window_spec {
+        WindowSpec::Size {
+            size,
+            remnant_policy,
+        } => {
+            format!("size:{}:{:?}", size, remnant_policy)
+        }
+        WindowSpec::Proportion { proportion } => {
+            format!("proportion:{}", proportion)
+        }
+    }
+}
+
+pub fn window_bounds_for_sequence(
+    sequence_length: usize,
+    window_spec: &WindowSpec,
+    _lines_per_unit: usize,
+) -> Vec<(usize, usize)> {
+    let mut bounds = Vec::new();
+
+    match window_spec {
+        WindowSpec::Size {
+            size,
+            remnant_policy,
+        } => {
+            if *size == 0 {
+                return bounds;
+            }
+
+            let full_bins = sequence_length / *size;
+            let remnant = sequence_length % *size;
+
+            match remnant_policy {
+                RemnantPolicy::Trailing => {
+                    let mut start = 0;
+                    while start < sequence_length {
+                        let end = (start + *size).min(sequence_length);
+                        bounds.push((start, end));
+                        start = end;
+                    }
+                }
+                RemnantPolicy::Discard => {
+                    let mut start = 0;
+                    while start + *size <= sequence_length {
+                        let end = start + *size;
+                        bounds.push((start, end));
+                        start = end;
+                    }
+                }
+                RemnantPolicy::Distributed => {
+                    let num_windows = if sequence_length == 0 {
+                        0
+                    } else {
+                        (sequence_length as f64 / *size as f64).ceil() as usize
+                    };
+                    if num_windows == 0 {
+                        return bounds;
+                    }
+
+                    let mut start = 0;
+                    for i in 0..num_windows {
+                        let end = if i + 1 == num_windows {
+                            sequence_length
+                        } else {
+                            ((sequence_length * (i + 1)) + num_windows - 1) / num_windows
+                        };
+                        bounds.push((start, end));
+                        start = end;
+                    }
+                }
+                RemnantPolicy::Centered => {
+                    if sequence_length == 0 {
+                        return bounds;
+                    }
+                    if full_bins == 0 {
+                        bounds.push((0, sequence_length));
+                        return bounds;
+                    }
+                    if remnant == 0 {
+                        let mut start = 0;
+                        for _ in 0..full_bins {
+                            let end = (start + *size).min(sequence_length);
+                            bounds.push((start, end));
+                            start = end;
+                        }
+                        return bounds;
+                    }
+
+                    let mut start = 0;
+                    let central_index = full_bins / 2;
+                    for i in 0..full_bins {
+                        let fixed_end = start + *size;
+                        if i == central_index {
+                            let end = (fixed_end + remnant).min(sequence_length);
+                            bounds.push((start, end));
+                            start = end;
+                        } else {
+                            bounds.push((start, fixed_end));
+                            start = fixed_end;
+                        }
+                    }
+
+                    if start < sequence_length {
+                        bounds.push((start, sequence_length));
+                    }
+                }
+                RemnantPolicy::Symmetric => {
+                    if sequence_length == 0 {
+                        return bounds;
+                    }
+                    if full_bins == 0 {
+                        bounds.push((0, sequence_length));
+                        return bounds;
+                    }
+                    if remnant == 0 {
+                        let mut start = 0;
+                        for _ in 0..full_bins {
+                            let end = (start + *size).min(sequence_length);
+                            bounds.push((start, end));
+                            start = end;
+                        }
+                        return bounds;
+                    }
+
+                    let left_extra = remnant / 2;
+                    let right_extra = remnant - left_extra;
+                    let mut start = 0;
+
+                    if full_bins > 0 {
+                        let left_window_end = (*size + left_extra).min(sequence_length);
+                        bounds.push((0, left_window_end));
+                        start = left_window_end;
+                    }
+
+                    for _ in 1..(full_bins.saturating_sub(1)) {
+                        let end = (start + *size).min(sequence_length);
+                        bounds.push((start, end));
+                        start = end;
+                    }
+
+                    if full_bins > 1 {
+                        let right_window_start =
+                            (sequence_length - (*size + right_extra)).max(start);
+                        if right_window_start > start {
+                            bounds.push((start, right_window_start));
+                        }
+                        bounds.push((right_window_start, sequence_length));
+                    } else {
+                        bounds.push((start, sequence_length));
+                    }
+                }
+            }
+        }
+        WindowSpec::Proportion { proportion } => {
+            if *proportion <= 0.0 || sequence_length == 0 {
+                return bounds;
+            }
+            let window_size = (sequence_length as f64 * proportion).ceil() as usize;
+            let mut start = 0;
+            while start < sequence_length {
+                let end = (start + window_size).min(sequence_length);
+                bounds.push((start, end));
+                start = end;
+            }
+        }
+    }
+
+    bounds
+}
+
+pub fn window_bounds_for_sequence_cached(
+    sequence_id: &str,
+    sequence_length: usize,
+    window_spec: &WindowSpec,
+    lines_per_unit: usize,
+    cache: &mut HashMap<String, Vec<(usize, usize)>>,
+) -> Vec<(usize, usize)> {
+    let key = format!(
+        "{}:{}:{}",
+        sequence_id,
+        sequence_length,
+        window_spec_cache_key(window_spec)
+    );
+    if let Some(bounds) = cache.get(&key) {
+        return bounds.clone();
+    }
+    let bounds = window_bounds_for_sequence(sequence_length, window_spec, lines_per_unit);
+    cache.insert(key, bounds.clone());
+    bounds
+}
+
+pub fn window_index_for_position(bounds: &[(usize, usize)], position: usize) -> Option<usize> {
+    bounds
+        .iter()
+        .position(|(start, end)| position >= *start && position < *end)
+}
+
+pub fn window_ids_for_range(
+    sequence_id: &str,
+    sequence_length: usize,
+    feat_start_1based: usize,
+    feat_end_1based: usize,
+    window_spec: &WindowSpec,
+    lines_per_unit: usize,
+    bounds_cache: &mut HashMap<String, Vec<(usize, usize)>>,
+) -> Vec<String> {
+    let start_0based = feat_start_1based.saturating_sub(1);
+    let end_0based = feat_end_1based.max(feat_start_1based).saturating_sub(1);
+    let bounds = window_bounds_for_sequence_cached(
+        sequence_id,
+        sequence_length,
+        window_spec,
+        lines_per_unit,
+        bounds_cache,
+    );
+
+    let first_idx = window_index_for_position(&bounds, start_0based).unwrap_or(0);
+    let last_idx =
+        window_index_for_position(&bounds, end_0based).unwrap_or(bounds.len().saturating_sub(1));
+
+    (first_idx..=last_idx)
+        .filter_map(|idx| {
+            let (w_start, w_end) = *bounds.get(idx)?;
+            Some(set_window_name(sequence_id, w_start, w_end, window_spec))
+        })
+        .collect()
+}
+
+pub fn window_ids_for_midpoint(
+    sequence_id: &str,
+    sequence_length: usize,
+    feat_start_1based: usize,
+    feat_end_1based: usize,
+    window_spec: &WindowSpec,
+    lines_per_unit: usize,
+    bounds_cache: &mut HashMap<String, Vec<(usize, usize)>>,
+) -> Vec<String> {
+    let start_0based = feat_start_1based.saturating_sub(1);
+    let end_0based = feat_end_1based.max(feat_start_1based).saturating_sub(1);
+    let midpoint = if end_0based >= start_0based {
+        start_0based + ((end_0based - start_0based) / 2)
+    } else {
+        start_0based
+    };
+
+    let bounds = window_bounds_for_sequence_cached(
+        sequence_id,
+        sequence_length,
+        window_spec,
+        lines_per_unit,
+        bounds_cache,
+    );
+
+    window_index_for_position(&bounds, midpoint)
+        .map(|idx| {
+            let (w_start, w_end) = bounds[idx];
+            vec![set_window_name(sequence_id, w_start, w_end, window_spec)]
+        })
+        .unwrap_or_default()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -347,13 +636,14 @@ pub fn set_window_name(
     end: usize,
     window_spec: &WindowSpec,
 ) -> String {
-    format!(
+    let s = format!(
         "{}:{}-{}:{}",
         sequence_id,
         start,
         end,
         window_spec.to_string()
-    )
+    );
+    s
 }
 
 pub fn parse_bed_line(line: &str, value_columns: &[ValueColumn]) -> Result<Feature, error::Error> {
@@ -413,83 +703,128 @@ pub fn parse_bed_line(line: &str, value_columns: &[ValueColumn]) -> Result<Featu
     })
 }
 
+fn fill_per_seq_buffers(
+    bed_reader: &mut dyn std::io::BufRead,
+    bed_config: &BedConfig,
+    bed_path: &std::path::Path,
+) -> Result<HashMap<String, Vec<Feature>>, error::Error> {
+    let mut per_seq_buffers: HashMap<String, Vec<Feature>> = HashMap::new();
+    for line in bed_reader.lines() {
+        let line = line.map_err(|e| {
+            error::Error::ReaderError(format!(
+                "Error reading line from BED file {}: {}",
+                bed_path.display(),
+                e
+            ))
+        })?;
+        let feature = match parse_bed_line(&line, &bed_config.value_columns) {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(error::Error::ParseError(format!(
+                    "Failed to parse BED file: {}, line: {}: {}",
+                    bed_path.display(),
+                    line,
+                    e
+                )));
+            }
+        };
+        per_seq_buffers
+            .entry(feature.sequence_id.clone())
+            .or_insert_with(Vec::new)
+            .push(feature.clone());
+    }
+    Ok(per_seq_buffers)
+}
+
+pub fn read_bed_file(config: &BedConfig) -> Result<HashMap<String, Vec<Feature>>, error::Error> {
+    // read from local of available. If not read from remote using the provided path. If local path provided but not exists then write remote to local after reading
+    if let Some(local) = &config.local_path {
+        let maybe_bed_file = io::file_reader(local.clone());
+        if let Ok(mut bed_file) = maybe_bed_file {
+            let bed_reader = &mut *bed_file;
+            return fill_per_seq_buffers(bed_reader, config, local);
+        } else {
+            // read from remote if local file is not available
+            let remote_bed_file = io::file_reader(config.path.clone());
+            if let Ok(mut bed_file) = remote_bed_file {
+                let mut bytes = Vec::new();
+                Read::read_to_end(&mut *bed_file, &mut bytes)?;
+
+                let mut parse_reader = Cursor::new(bytes.clone());
+                let per_seq_buffers = fill_per_seq_buffers(&mut parse_reader, config, &config.path);
+
+                let mut local_file = io::get_file_writer(local, false);
+                copy(&mut Cursor::new(bytes), &mut *local_file)?;
+
+                return per_seq_buffers;
+            } else {
+                return Err(error::Error::ReaderError(format!(
+                    "Failed to open remote BED file {}: {}",
+                    config.path.display(),
+                    "File not found"
+                )));
+            }
+        }
+    } else if let Ok(mut bed_file) = io::file_reader(config.path.clone()) {
+        let bed_reader = &mut *bed_file;
+        return fill_per_seq_buffers(bed_reader, config, &config.path);
+    } else {
+        return Err(error::Error::ReaderError(format!(
+            "Failed to open BED file {}: {}",
+            config.path.display(),
+            "File not found"
+        )));
+    }
+}
+
 pub fn parse_bed_files(
     config: &MultiBedConfig,
 ) -> Result<HashMap<String, FeatureDocument>, error::Error> {
     let mut feature_docs: HashMap<String, FeatureDocument> = HashMap::new();
 
     for bed_config in &config.bed_configs {
-        let mut bed_file = io::file_reader(bed_config.path.clone()).map_err(|e| {
-            error::Error::ReaderError(format!(
-                "Failed to open BED file {}: {}",
-                bed_config.path.display(),
-                e
-            ))
-        })?;
-        let bed_reader = &mut *bed_file;
-        let mut per_seq_buffers: HashMap<String, Vec<Feature>> = HashMap::new();
-        for line in bed_reader.lines() {
-            let line = line.map_err(|e| {
-                error::Error::ReaderError(format!(
-                    "Error reading line from BED file {}: {}",
-                    bed_config.path.display(),
-                    e
-                ))
-            })?;
-            let feature = match parse_bed_line(&line, &bed_config.value_columns) {
-                Ok(f) => f,
-                Err(e) => {
-                    return Err(error::Error::ParseError(format!(
-                        "Failed to parse BED file: {}, line: {}: {}",
-                        bed_config.path.display(),
-                        line,
-                        e
-                    )));
-                }
-            };
-            per_seq_buffers
-                .entry(feature.sequence_id.clone())
-                .or_insert_with(Vec::new)
-                .push(feature.clone());
-        }
-
-        for (seq_id, buffer) in per_seq_buffers {
-            let sequence_length = buffer.last().map_or(0, |f| f.end);
-            for window_spec in config.window_specs.iter() {
-                let lines_per_window = match window_spec {
-                    WindowSpec::Size { size } => *size / config.lines_per_unit,
-                    WindowSpec::Proportion { proportion } => {
-                        let total_lines = buffer.len();
-                        ((total_lines as f64) * proportion).ceil() as usize
-                    }
-                };
-                let mut acc = Accumulator::new(&bed_config.value_columns);
-                let last_index = buffer.len().saturating_sub(1);
-
-                for (fi, feature) in buffer.iter().enumerate() {
-                    if acc.start.is_none() {
-                        acc.start = Some(feature.start);
-                    }
-                    acc.end = Some(feature.end);
-                    for (i, &value) in feature.values.iter().enumerate() {
-                        acc.columns[i].add(value);
+        if let Ok(per_seq_buffers) = read_bed_file(bed_config) {
+            for (seq_id, buffer) in per_seq_buffers {
+                let sequence_length = buffer.last().map_or(0, |f| f.end);
+                for window_spec in config.window_specs.iter() {
+                    let bounds = window_bounds_for_sequence(
+                        sequence_length,
+                        window_spec,
+                        config.lines_per_unit,
+                    );
+                    if bounds.is_empty() {
+                        continue;
                     }
 
-                    let should_flush = acc.columns[0].count >= lines_per_window || fi == last_index;
-                    if should_flush {
-                        let window_name = set_window_name(
-                            &seq_id,
-                            acc.start.unwrap_or(0),
-                            acc.end.unwrap_or(0),
-                            window_spec,
-                        );
+                    for (window_start, window_end) in bounds {
+                        let mut acc = Accumulator::new(&bed_config.value_columns);
+                        let mut saw_overlap = false;
+
+                        for feature in &buffer {
+                            if feature.start >= window_end || feature.end <= window_start {
+                                continue;
+                            }
+                            saw_overlap = true;
+                            acc.start = Some(window_start);
+                            acc.end = Some(window_end);
+                            for (index, &value) in feature.values.iter().enumerate() {
+                                acc.columns[index].add(value);
+                            }
+                        }
+
+                        if !saw_overlap {
+                            continue;
+                        }
+
+                        let window_name =
+                            set_window_name(&seq_id, window_start, window_end, window_spec);
                         if !feature_docs.contains_key(&window_name) {
                             let doc = FeatureDocument::new(
                                 window_name.clone(),
                                 Some(seq_id.clone()),
                                 window_spec.to_string(),
-                                acc.start.unwrap_or(0),
-                                acc.end.unwrap_or(0),
+                                window_start,
+                                window_end,
                                 None,
                                 None,
                                 seq_id.clone(),
@@ -544,76 +879,7 @@ pub fn parse_bed_files(
                             )),
                             ..Default::default()
                         });
-
-                        acc.reset();
                     }
-                }
-
-                if acc.columns.iter().any(|col| col.count > 0) {
-                    let window_name = set_window_name(
-                        &seq_id,
-                        acc.start.unwrap_or(0),
-                        acc.end.unwrap_or(0),
-                        window_spec,
-                    );
-                    if !feature_docs.contains_key(&window_name) {
-                        let doc = FeatureDocument::new(
-                            window_name.clone(),
-                            Some(seq_id.clone()),
-                            window_spec.to_string(),
-                            acc.start.unwrap_or(0),
-                            acc.end.unwrap_or(0),
-                            None,
-                            None,
-                            seq_id.clone(),
-                            sequence_length,
-                            config.accession.clone(),
-                            config.taxon_id.clone(),
-                            None,
-                            None,
-                            None,
-                        );
-                        feature_docs.insert(window_name.clone(), doc);
-                    }
-                    let doc = feature_docs.get_mut(&window_name).unwrap();
-                    for (index, col) in acc.columns.iter_mut().enumerate() {
-                        let summary = col.finish();
-                        for (fi, sf) in col.summary_functions.iter().enumerate() {
-                            let name = bed_config.value_columns[index].name(fi);
-                            let attribute = NestedAttribute {
-                                key: name.clone(),
-                                half_float_value: Some(
-                                    summary.get(sf).copied().unwrap_or(f64::NAN) as f32,
-                                ),
-                                ..Default::default()
-                            };
-                            if doc.attributes.is_none() {
-                                doc.attributes = Some(vec![]);
-                            }
-                            doc.attributes.as_mut().unwrap().push(attribute);
-                        }
-                    }
-                    let attributes = doc.attributes.as_mut().unwrap();
-                    attributes.push(NestedAttribute {
-                        key: "assembly_id".to_string(),
-                        keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                            config.accession.clone(),
-                        )),
-                        ..Default::default()
-                    });
-                    attributes.push(NestedAttribute {
-                        key: "taxon_id".to_string(),
-                        keyword_value: Some(super::genomehubs::StringOrVec::Single(
-                            config.taxon_id.clone(),
-                        )),
-                        ..Default::default()
-                    });
-                    attributes.push(NestedAttribute {
-                        key: "sequence_id".to_string(),
-                        keyword_value: Some(super::genomehubs::StringOrVec::Single(seq_id.clone())),
-                        ..Default::default()
-                    });
-                    acc.reset();
                 }
             }
         }
@@ -650,6 +916,50 @@ mod tests {
         assert_eq!(feature.values, vec![1.23, 4.0]);
     }
 
+    #[test]
+    fn test_window_bounds_for_sequence_symmetric_remnant() {
+        let bounds = window_bounds_for_sequence(
+            10,
+            &WindowSpec::Size {
+                size: 4,
+                remnant_policy: RemnantPolicy::Symmetric,
+            },
+            1,
+        );
+        assert_eq!(bounds, vec![(0, 5), (5, 10)]);
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_centered_remnant() {
+        let bounds = window_bounds_for_sequence(
+            14,
+            &WindowSpec::Size {
+                size: 4,
+                remnant_policy: RemnantPolicy::Centered,
+            },
+            1,
+        );
+        assert_eq!(bounds, vec![(0, 4), (4, 10), (10, 14)]);
+    }
+
+    #[test]
+    fn test_window_id_for_midpoint_uses_midpoint_not_range_overlap() {
+        let mut cache = HashMap::new();
+        let window_ids = window_ids_for_midpoint(
+            "chr1",
+            10,
+            2,
+            8,
+            &WindowSpec::Size {
+                size: 4,
+                remnant_policy: RemnantPolicy::Centered,
+            },
+            1,
+            &mut cache,
+        );
+        assert_eq!(window_ids, vec!["chr1:4-10:win-4".to_string()]);
+    }
+
     // temporary test for parse_bed_files function
     #[test]
     fn test_parse_bed_files_creates_final_partial_window() {
@@ -666,6 +976,7 @@ mod tests {
             lines_per_unit: 1000,
             bed_configs: vec![BedConfig {
                 path: tmp,
+                local_path: None,
                 value_columns: vec![ValueColumn {
                     label: "gc".to_string(),
                     index: 3,
@@ -673,13 +984,51 @@ mod tests {
                     summary_functions: vec![SummaryFunction::Mean],
                 }],
             }],
-            window_specs: vec![WindowSpec::Size { size: 2000 }],
+            window_specs: vec![WindowSpec::Size {
+                size: 2000,
+                remnant_policy: RemnantPolicy::Trailing,
+            }],
         };
 
         let docs = parse_bed_files(&cfg).unwrap();
         assert!(!docs.is_empty());
         assert!(docs.keys().any(|id| id.contains("chr1:0-2000:win-2k")));
         assert!(docs.keys().any(|id| id.contains("chr1:2000-3000:win-2k")));
+    }
+
+    #[test]
+    fn test_parse_bed_files_respects_centered_remnant_policy() {
+        let tmp = std::env::temp_dir().join("blobtk_bed_centered_window_regression.bed");
+        std::fs::write(
+            &tmp,
+            "chr1\t0\t1000\t0.1\nchr1\t1000\t2000\t0.2\nchr1\t2000\t3000\t0.3\nchr1\t3000\t4000\t0.4\nchr1\t4000\t5000\t0.5\n",
+        )
+        .unwrap();
+
+        let cfg = MultiBedConfig {
+            accession: "GCA_test".to_string(),
+            taxon_id: "123".to_string(),
+            lines_per_unit: 1000,
+            bed_configs: vec![BedConfig {
+                path: tmp,
+                local_path: None,
+                value_columns: vec![ValueColumn {
+                    label: "gc".to_string(),
+                    index: 3,
+                    value_type: "float".to_string(),
+                    summary_functions: vec![SummaryFunction::Mean],
+                }],
+            }],
+            window_specs: vec![WindowSpec::Size {
+                size: 2000,
+                remnant_policy: RemnantPolicy::Centered,
+            }],
+        };
+
+        let docs = parse_bed_files(&cfg).unwrap();
+        assert!(docs.keys().any(|id| id.contains("chr1:0-2000:win-2k")));
+        assert!(docs.keys().any(|id| id.contains("chr1:2000-5000:win-2k")));
+        assert!(!docs.keys().any(|id| id.contains("chr1:4000-5000:win-2k")));
     }
 
     #[test]
@@ -697,6 +1046,7 @@ mod tests {
             lines_per_unit: 1000,
             bed_configs: vec![BedConfig {
                 path: tmp,
+                local_path: None,
                 value_columns: vec![ValueColumn {
                     label: "gc".to_string(),
                     index: 3,
@@ -705,7 +1055,10 @@ mod tests {
                 }],
             }],
             window_specs: vec![
-                WindowSpec::Size { size: 2000 },
+                WindowSpec::Size {
+                    size: 2000,
+                    remnant_policy: RemnantPolicy::Trailing,
+                },
                 WindowSpec::Proportion { proportion: 0.1 },
             ],
         };
@@ -735,6 +1088,7 @@ mod tests {
     fn test_parse_bed_files() {
         let bed_config_gc = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.GC.1k.bedGraph.gz"),
+            local_path: Some(PathBuf::from("GCA_016920705.1.GC.1k.bedGraph.gz")),
             value_columns: vec![ValueColumn {
                 label: "gc".to_string(),
                 index: 3,
@@ -744,6 +1098,7 @@ mod tests {
         };
         let bed_config_n = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.N.1k.bedGraph.gz"),
+            local_path: Some(PathBuf::from("GCA_016920705.1.N.1k.bedGraph.gz")),
             value_columns: vec![ValueColumn {
                 label: "n".to_string(),
                 index: 3,
@@ -753,6 +1108,7 @@ mod tests {
         };
         let bed_config_at_skew = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.AT_skew.1k.bedGraph.gz"),
+            local_path: Some(PathBuf::from("GCA_016920705.1.AT_skew.1k.bedGraph.gz")),
             value_columns: vec![ValueColumn {
                 label: "at_skew".to_string(),
                 index: 3,
@@ -762,6 +1118,7 @@ mod tests {
         };
         let bed_config_gc_skew = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.GC_skew.1k.bedGraph.gz"),
+            local_path: Some(PathBuf::from("GCA_016920705.1.GC_skew.1k.bedGraph.gz")),
             value_columns: vec![ValueColumn {
                 label: "gc_skew".to_string(),
                 index: 3,
@@ -771,6 +1128,7 @@ mod tests {
         };
         let bed_config_shannon = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.nucShannon.1k.bedGraph.gz"),
+            local_path: Some(PathBuf::from("GCA_016920705.1.nucShannon.1k.bedGraph.gz")),
             value_columns: vec![ValueColumn {
                 label: "nucShannon".to_string(),
                 index: 3,
@@ -780,6 +1138,7 @@ mod tests {
         };
         let bed_config_cpg = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k2/GCA_016920705.1.CpG.1k.bedGraph.gz"),
+            local_path: Some(PathBuf::from("GCA_016920705.1.CpG.1k.bedGraph.gz")),
             value_columns: vec![ValueColumn {
                 label: "cpg".to_string(),
                 index: 3,
@@ -800,7 +1159,10 @@ mod tests {
                 bed_config_shannon,
                 bed_config_cpg,
             ],
-            window_specs: vec![WindowSpec::Size { size: 1000000 }],
+            window_specs: vec![WindowSpec::Size {
+                size: 1000000,
+                remnant_policy: RemnantPolicy::Trailing,
+            }],
         };
         let features = parse_bed_files(&multi_bed_config).unwrap();
         let json_features = serde_json::to_string_pretty(&features).unwrap();

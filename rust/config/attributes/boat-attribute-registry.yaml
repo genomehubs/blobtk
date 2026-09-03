@@ -327,6 +327,14 @@ attributes:
     description: Highest-frequency group transitions retained for richer synteny analysis
     type: nested
     status: active
+  gc:
+    display_name: GC
+    display_group: summary
+    display_level: 1
+    description: GC proportion for the sequence or feature, expressed as a proportion in the range 0-1.
+    type: half_float
+    source: derived
+    status: active
   midpoint:
     display_name: Midpoint
     display_group: summary
