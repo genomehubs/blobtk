@@ -267,15 +267,25 @@ pub enum RemnantPolicy {
     Distributed, // distribute the remnant across the entire sequence
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct RemnantBoundsConfig {
+    pub min_fraction: f64,
+    pub max_fraction: f64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum WindowSpec {
     Size {
         size: usize,
         remnant_policy: RemnantPolicy,
+        #[serde(default)]
+        remnant_bounds: Option<RemnantBoundsConfig>,
     },
     Proportion {
         proportion: f64,
+        #[serde(default)]
+        min_size: Option<usize>,
     },
 }
 
@@ -285,6 +295,7 @@ impl WindowSpec {
             WindowSpec::Size {
                 size,
                 remnant_policy: _,
+                remnant_bounds: _,
             } => {
                 // format size with si suffix
                 let si_size = if *size >= 1_000_000_000 {
@@ -303,7 +314,10 @@ impl WindowSpec {
                 let s = format!("win-{}", si_size);
                 s
             }
-            WindowSpec::Proportion { proportion } => {
+            WindowSpec::Proportion {
+                proportion,
+                min_size: _,
+            } => {
                 let s = format!("win-{:.2}", proportion);
                 s
             }
@@ -316,170 +330,329 @@ pub fn window_spec_cache_key(window_spec: &WindowSpec) -> String {
         WindowSpec::Size {
             size,
             remnant_policy,
+            remnant_bounds,
         } => {
-            format!("size:{}:{:?}", size, remnant_policy)
+            format!(
+                "size:{}:{:?}:{:?}",
+                size,
+                remnant_policy,
+                remnant_bounds
+                    .as_ref()
+                    .map(|bounds| (bounds.min_fraction, bounds.max_fraction))
+            )
         }
-        WindowSpec::Proportion { proportion } => {
-            format!("proportion:{}", proportion)
+        WindowSpec::Proportion {
+            proportion,
+            min_size,
+        } => {
+            format!("proportion:{}:{:?}", proportion, min_size)
         }
     }
+}
+
+/// A materialized array of bed-resolution step edges for a sequence. Every window
+/// boundary is read directly from this array by step index, so a boundary can
+/// never fall between steps: the last entry absorbs any trailing partial step.
+struct BedSteps {
+    /// (start_bp, end_bp) for each step, in order.
+    edges: Vec<(usize, usize)>,
+}
+
+impl BedSteps {
+    fn build(sequence_length: usize, step_size: usize) -> Self {
+        if sequence_length == 0 || step_size == 0 {
+            return BedSteps { edges: Vec::new() };
+        }
+        let full_steps = sequence_length / step_size;
+        let remnant = sequence_length % step_size;
+        let mut edges = Vec::with_capacity(full_steps + usize::from(remnant > 0));
+        for i in 0..full_steps {
+            edges.push((i * step_size, (i + 1) * step_size));
+        }
+        if remnant > 0 {
+            edges.push((full_steps * step_size, sequence_length));
+        }
+        BedSteps { edges }
+    }
+
+    fn len(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// Convert a [start, end) range of step indices into (start_bp, end_bp).
+    fn bp_range(&self, start_step: usize, end_step: usize) -> (usize, usize) {
+        let start_bp = self.edges[start_step].0;
+        let end_bp = self.edges[end_step - 1].1;
+        (start_bp, end_bp)
+    }
+}
+
+/// Partition `total_steps` into windows of `target_steps`, folding any leftover
+/// steps symmetrically into the innermost windows around the midpoint so the
+/// remnant never appears as its own undersized window at one end.
+fn ends_inward_step_windows(
+    total_steps: usize,
+    target_steps: usize,
+    min_fraction: f64,
+    max_fraction: f64,
+) -> Vec<(usize, usize)> {
+    if total_steps == 0 {
+        return Vec::new();
+    }
+
+    let target_steps = target_steps.max(1);
+    let min_central = ((target_steps as f64 * min_fraction).round() as usize).max(1);
+    let max_central = ((target_steps as f64 * max_fraction).round() as usize).max(min_central);
+
+    let k_pairs = total_steps / (2 * target_steps);
+    if k_pairs == 0 {
+        if total_steps < min_central {
+            return Vec::new();
+        }
+        if total_steps <= max_central {
+            return vec![(0, total_steps)];
+        }
+        let mid = total_steps / 2;
+        return vec![(0, mid), (mid, total_steps)];
+    }
+
+    let mut left_bounds: Vec<(usize, usize)> = Vec::with_capacity(k_pairs);
+    let mut right_bounds: Vec<(usize, usize)> = Vec::with_capacity(k_pairs);
+    for i in 0..k_pairs {
+        let start = i * target_steps;
+        left_bounds.push((start, start + target_steps));
+        let right_start = total_steps - (i + 1) * target_steps;
+        right_bounds.push((right_start, total_steps - i * target_steps));
+    }
+    right_bounds.reverse();
+
+    let left_covered = k_pairs * target_steps;
+    let right_covered_start = total_steps - k_pairs * target_steps;
+    let middle_steps = right_covered_start - left_covered;
+
+    let mut final_bounds = Vec::with_capacity(left_bounds.len() + right_bounds.len() + 2);
+    if middle_steps == 0 {
+        final_bounds.extend(left_bounds);
+        final_bounds.extend(right_bounds);
+    } else if middle_steps < min_central {
+        let left_add = middle_steps / 2;
+        let right_add = middle_steps - left_add;
+        let mut left_bounds = left_bounds;
+        let mut right_bounds = right_bounds;
+        if let Some(last_left) = left_bounds.last_mut() {
+            last_left.1 += left_add;
+        }
+        if let Some(first_right) = right_bounds.first_mut() {
+            first_right.0 = first_right.0.saturating_sub(right_add);
+        }
+        final_bounds.extend(left_bounds);
+        final_bounds.extend(right_bounds);
+    } else if middle_steps <= max_central {
+        final_bounds.extend(left_bounds);
+        final_bounds.push((left_covered, right_covered_start));
+        final_bounds.extend(right_bounds);
+    } else {
+        let mid_split = left_covered + middle_steps / 2;
+        final_bounds.extend(left_bounds);
+        final_bounds.push((left_covered, mid_split));
+        final_bounds.push((mid_split, right_covered_start));
+        final_bounds.extend(right_bounds);
+    }
+
+    final_bounds
+}
+
+/// Partition `total_steps` into `target_steps`-sized windows, merging the whole
+/// leftover into a single central window (no envelope check).
+fn centered_single_merge_step_windows(
+    total_steps: usize,
+    target_steps: usize,
+) -> Vec<(usize, usize)> {
+    if total_steps == 0 {
+        return Vec::new();
+    }
+    let target_steps = target_steps.max(1);
+    let full_bins = total_steps / target_steps;
+    if full_bins == 0 {
+        return vec![(0, total_steps)];
+    }
+    let remnant_steps = total_steps % target_steps;
+    let central_index = full_bins / 2;
+
+    let mut bounds = Vec::with_capacity(full_bins);
+    let mut start_step = 0usize;
+    for i in 0..full_bins {
+        let fixed_end_step = (start_step + target_steps).min(total_steps);
+        let end_step = if i == central_index {
+            (fixed_end_step + remnant_steps).min(total_steps)
+        } else {
+            fixed_end_step
+        };
+        bounds.push((start_step, end_step));
+        start_step = end_step;
+    }
+    bounds
+}
+
+/// Partition `total_steps` into `target_steps`-sized windows, splitting the
+/// leftover between the two flanking windows nearest the midpoint.
+fn symmetric_split_step_windows(total_steps: usize, target_steps: usize) -> Vec<(usize, usize)> {
+    if total_steps == 0 {
+        return Vec::new();
+    }
+    let target_steps = target_steps.max(1);
+    let full_bins = total_steps / target_steps;
+    if full_bins == 0 {
+        return vec![(0, total_steps)];
+    }
+    let remnant_steps = total_steps % target_steps;
+    let central_index = full_bins / 2;
+    let left_extra = remnant_steps / 2;
+    let right_extra = remnant_steps.saturating_sub(left_extra);
+
+    let mut bounds = Vec::with_capacity(full_bins);
+    let mut start_step = 0usize;
+    for i in 0..full_bins {
+        let fixed_end_step = (start_step + target_steps).min(total_steps);
+        let end_step = if i == central_index {
+            if full_bins > 1 {
+                let left_bound = (fixed_end_step + left_extra).min(total_steps);
+                (total_steps - right_extra).max(left_bound)
+            } else {
+                (fixed_end_step + left_extra).min(total_steps)
+            }
+        } else {
+            fixed_end_step
+        };
+        bounds.push((start_step, end_step));
+        start_step = end_step;
+    }
+    if start_step < total_steps {
+        bounds.push((start_step, total_steps));
+    }
+    bounds
 }
 
 pub fn window_bounds_for_sequence(
     sequence_length: usize,
     window_spec: &WindowSpec,
-    _lines_per_unit: usize,
+    lines_per_unit: usize,
 ) -> Vec<(usize, usize)> {
-    let mut bounds = Vec::new();
+    if sequence_length == 0 {
+        return Vec::new();
+    }
+    let step_size = lines_per_unit.max(1);
+    let steps = BedSteps::build(sequence_length, step_size);
+    let total_steps = steps.len();
+    if total_steps == 0 {
+        return Vec::new();
+    }
 
-    match window_spec {
+    let step_ranges: Vec<(usize, usize)> = match window_spec {
         WindowSpec::Size {
             size,
             remnant_policy,
+            remnant_bounds,
         } => {
             if *size == 0 {
-                return bounds;
+                return Vec::new();
             }
-
-            let full_bins = sequence_length / *size;
-            let remnant = sequence_length % *size;
+            let target_steps = ((size + step_size - 1) / step_size).max(1);
 
             match remnant_policy {
                 RemnantPolicy::Trailing => {
-                    let mut start = 0;
-                    while start < sequence_length {
-                        let end = (start + *size).min(sequence_length);
-                        bounds.push((start, end));
-                        start = end;
+                    let mut ranges = Vec::new();
+                    let mut start_step = 0usize;
+                    while start_step < total_steps {
+                        let end_step = (start_step + target_steps).min(total_steps);
+                        ranges.push((start_step, end_step));
+                        start_step = end_step;
                     }
+                    ranges
                 }
                 RemnantPolicy::Discard => {
-                    let mut start = 0;
-                    while start + *size <= sequence_length {
-                        let end = start + *size;
-                        bounds.push((start, end));
-                        start = end;
+                    let mut ranges = Vec::new();
+                    let mut start_step = 0usize;
+                    while start_step + target_steps <= total_steps {
+                        ranges.push((start_step, start_step + target_steps));
+                        start_step += target_steps;
                     }
+                    ranges
                 }
                 RemnantPolicy::Distributed => {
-                    let num_windows = if sequence_length == 0 {
-                        0
-                    } else {
-                        (sequence_length as f64 / *size as f64).ceil() as usize
-                    };
-                    if num_windows == 0 {
-                        return bounds;
-                    }
-
-                    let mut start = 0;
+                    let num_windows =
+                        ((total_steps as f64 / target_steps as f64).ceil() as usize).max(1);
+                    let mut ranges = Vec::with_capacity(num_windows);
+                    let mut start_step = 0usize;
                     for i in 0..num_windows {
-                        let end = if i + 1 == num_windows {
-                            sequence_length
+                        let end_step = if i + 1 == num_windows {
+                            total_steps
                         } else {
-                            ((sequence_length * (i + 1)) + num_windows - 1) / num_windows
+                            (((i + 1) * target_steps).min(total_steps)).max(start_step)
                         };
-                        bounds.push((start, end));
-                        start = end;
+                        ranges.push((start_step, end_step));
+                        start_step = end_step;
                     }
+                    ranges
                 }
-                RemnantPolicy::Centered => {
-                    if sequence_length == 0 {
-                        return bounds;
-                    }
-                    if full_bins == 0 {
-                        bounds.push((0, sequence_length));
-                        return bounds;
-                    }
-                    if remnant == 0 {
-                        let mut start = 0;
-                        for _ in 0..full_bins {
-                            let end = (start + *size).min(sequence_length);
-                            bounds.push((start, end));
-                            start = end;
-                        }
-                        return bounds;
-                    }
-
-                    let mut start = 0;
-                    let central_index = full_bins / 2;
-                    for i in 0..full_bins {
-                        let fixed_end = start + *size;
-                        if i == central_index {
-                            let end = (fixed_end + remnant).min(sequence_length);
-                            bounds.push((start, end));
-                            start = end;
-                        } else {
-                            bounds.push((start, fixed_end));
-                            start = fixed_end;
-                        }
-                    }
-
-                    if start < sequence_length {
-                        bounds.push((start, sequence_length));
-                    }
-                }
-                RemnantPolicy::Symmetric => {
-                    if sequence_length == 0 {
-                        return bounds;
-                    }
-                    if full_bins == 0 {
-                        bounds.push((0, sequence_length));
-                        return bounds;
-                    }
-                    if remnant == 0 {
-                        let mut start = 0;
-                        for _ in 0..full_bins {
-                            let end = (start + *size).min(sequence_length);
-                            bounds.push((start, end));
-                            start = end;
-                        }
-                        return bounds;
-                    }
-
-                    let left_extra = remnant / 2;
-                    let right_extra = remnant - left_extra;
-                    let mut start = 0;
-
-                    if full_bins > 0 {
-                        let left_window_end = (*size + left_extra).min(sequence_length);
-                        bounds.push((0, left_window_end));
-                        start = left_window_end;
-                    }
-
-                    for _ in 1..(full_bins.saturating_sub(1)) {
-                        let end = (start + *size).min(sequence_length);
-                        bounds.push((start, end));
-                        start = end;
-                    }
-
-                    if full_bins > 1 {
-                        let right_window_start =
-                            (sequence_length - (*size + right_extra)).max(start);
-                        if right_window_start > start {
-                            bounds.push((start, right_window_start));
-                        }
-                        bounds.push((right_window_start, sequence_length));
-                    } else {
-                        bounds.push((start, sequence_length));
-                    }
-                }
+                RemnantPolicy::Centered => match remnant_bounds {
+                    Some(bounds_cfg) => ends_inward_step_windows(
+                        total_steps,
+                        target_steps,
+                        bounds_cfg.min_fraction,
+                        bounds_cfg.max_fraction,
+                    ),
+                    None => centered_single_merge_step_windows(total_steps, target_steps),
+                },
+                RemnantPolicy::Symmetric => symmetric_split_step_windows(total_steps, target_steps),
             }
         }
-        WindowSpec::Proportion { proportion } => {
-            if *proportion <= 0.0 || sequence_length == 0 {
-                return bounds;
+        WindowSpec::Proportion {
+            proportion,
+            min_size,
+        } => {
+            if *proportion <= 0.0 {
+                return Vec::new();
             }
-            let window_size = (sequence_length as f64 * proportion).ceil() as usize;
-            let mut start = 0;
-            while start < sequence_length {
-                let end = (start + window_size).min(sequence_length);
-                bounds.push((start, end));
-                start = end;
+            // A short sequence can't hold a full complement of proportion windows at
+            // min_size, so skip entirely rather than emit a single oversized window.
+            if let Some(min_size) = min_size {
+                if *min_size > 0 && (sequence_length as f64) < (*min_size as f64) / proportion {
+                    return Vec::new();
+                }
             }
-        }
-    }
+            let minimum_step_size = min_size
+                .map(|min_size| ((min_size + step_size - 1) / step_size).max(1))
+                .unwrap_or(1);
+            let target_step_size = (((sequence_length as f64 * proportion) / step_size as f64)
+                .ceil() as usize)
+                .max(minimum_step_size)
+                .max(1);
+            let num_windows = if target_step_size >= total_steps {
+                1
+            } else {
+                ((total_steps as f64 / target_step_size as f64).ceil() as usize).max(1)
+            };
 
-    bounds
+            let mut ranges = Vec::with_capacity(num_windows);
+            let mut start_step = 0usize;
+            for idx in 0..num_windows {
+                let end_step = if idx + 1 == num_windows {
+                    total_steps
+                } else {
+                    (((idx + 1) * target_step_size).min(total_steps)).max(start_step)
+                };
+                ranges.push((start_step, end_step));
+                start_step = end_step;
+            }
+            ranges
+        }
+    };
+
+    step_ranges
+        .into_iter()
+        .map(|(start_step, end_step)| steps.bp_range(start_step, end_step))
+        .collect()
 }
 
 pub fn window_bounds_for_sequence_cached(
@@ -1089,6 +1262,7 @@ pub fn window_flags_for_telomere(
 
 pub fn parse_bed_files(
     config: &MultiBedConfig,
+    canonical_sequence_lengths: Option<&HashMap<String, usize>>,
 ) -> Result<HashMap<String, FeatureDocument>, error::Error> {
     let mut feature_docs: HashMap<String, FeatureDocument> = HashMap::new();
 
@@ -1138,7 +1312,14 @@ pub fn parse_bed_files(
                 .collect();
 
             for (seq_id, buffer) in per_seq_buffers {
-                let sequence_length = buffer.iter().map(|feature| feature.end).max().unwrap_or(0);
+                // Use the canonical (sequence-report) length when available so every
+                // bed track and the BUSCO/synteny window assignment agree on the same
+                // window boundaries; otherwise fall back to this track's own extent.
+                let bed_derived_length =
+                    buffer.iter().map(|feature| feature.end).max().unwrap_or(0);
+                let sequence_length = canonical_sequence_lengths
+                    .and_then(|lengths| lengths.get(&seq_id).copied())
+                    .unwrap_or(bed_derived_length);
                 for window_spec in config.window_specs.iter() {
                     let bounds = window_bounds_for_sequence(
                         sequence_length,
@@ -1473,10 +1654,11 @@ mod tests {
             &WindowSpec::Size {
                 size: 4,
                 remnant_policy: RemnantPolicy::Symmetric,
+                remnant_bounds: None,
             },
             1,
         );
-        assert_eq!(bounds, vec![(0, 5), (5, 10)]);
+        assert_eq!(bounds, vec![(0, 4), (4, 9), (9, 10)]);
     }
 
     #[test]
@@ -1486,6 +1668,7 @@ mod tests {
             &WindowSpec::Size {
                 size: 4,
                 remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: None,
             },
             1,
         );
@@ -1503,11 +1686,186 @@ mod tests {
             &WindowSpec::Size {
                 size: 4,
                 remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: None,
             },
             1,
             &mut cache,
         );
         assert_eq!(window_ids, vec!["chr1:4-10:win-4".to_string()]);
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_respects_remnant_bounds() {
+        let bounds = window_bounds_for_sequence(
+            10_000,
+            &WindowSpec::Size {
+                size: 4_000,
+                remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: Some(RemnantBoundsConfig {
+                    min_fraction: 0.67,
+                    max_fraction: 1.33,
+                }),
+            },
+            1,
+        );
+
+        assert_eq!(bounds, vec![(0, 5_000), (5_000, 10_000)]);
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_centered_remnant_stays_balanced_when_bin_plus_remnant() {
+        let bounds = window_bounds_for_sequence(
+            1_800_000,
+            &WindowSpec::Size {
+                size: 1_000_000,
+                remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: Some(RemnantBoundsConfig {
+                    min_fraction: 0.67,
+                    max_fraction: 1.33,
+                }),
+            },
+            1,
+        );
+
+        assert_eq!(bounds, vec![(0, 900_000), (900_000, 1_800_000)]);
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_skips_short_scaffolds_below_min_remnant_band() {
+        let bounds = window_bounds_for_sequence(
+            1_000,
+            &WindowSpec::Size {
+                size: 1_000_000,
+                remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: Some(RemnantBoundsConfig {
+                    min_fraction: 0.67,
+                    max_fraction: 1.33,
+                }),
+            },
+            1,
+        );
+
+        assert!(bounds.is_empty());
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_splits_overlong_centered_remnant_around_midpoint() {
+        let bounds = window_bounds_for_sequence(
+            3_800_000,
+            &WindowSpec::Size {
+                size: 1_000_000,
+                remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: Some(RemnantBoundsConfig {
+                    min_fraction: 0.67,
+                    max_fraction: 1.33,
+                }),
+            },
+            1,
+        );
+
+        assert_eq!(
+            bounds,
+            vec![
+                (0, 1_000_000),
+                (1_000_000, 1_900_000),
+                (1_900_000, 2_800_000),
+                (2_800_000, 3_800_000),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_proportion_skips_sequence_shorter_than_min_size_over_proportion(
+    ) {
+        // A 15kb mitochondrion can't hold even one min_size window at 10% proportion.
+        let bounds = window_bounds_for_sequence(
+            15_000,
+            &WindowSpec::Proportion {
+                proportion: 0.1,
+                min_size: Some(100_000),
+            },
+            1_000,
+        );
+
+        assert!(bounds.is_empty());
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_size_remnant_respects_bed_resolution() {
+        let bounds = window_bounds_for_sequence(
+            8_500,
+            &WindowSpec::Size {
+                size: 3_000,
+                remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: None,
+            },
+            1_000,
+        );
+
+        assert_eq!(bounds, vec![(0, 3_000), (3_000, 6_000), (6_000, 8_500)]);
+    }
+
+    #[test]
+    fn test_window_bounds_for_sequence_respects_proportion_min_size() {
+        let bounds = window_bounds_for_sequence(
+            20_000,
+            &WindowSpec::Proportion {
+                proportion: 0.25,
+                min_size: Some(4_000),
+            },
+            1_000,
+        );
+
+        assert_eq!(
+            bounds,
+            vec![
+                (0, 5_000),
+                (5_000, 10_000),
+                (10_000, 15_000),
+                (15_000, 20_000)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_window_bounds_all_interior_boundaries_are_step_aligned() {
+        let step = 1_000usize;
+        let specs = vec![
+            WindowSpec::Size {
+                size: 1_000_000,
+                remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: Some(RemnantBoundsConfig {
+                    min_fraction: 0.67,
+                    max_fraction: 1.33,
+                }),
+            },
+            WindowSpec::Size {
+                size: 1_000_000,
+                remnant_policy: RemnantPolicy::Symmetric,
+                remnant_bounds: None,
+            },
+            WindowSpec::Proportion {
+                proportion: 0.1,
+                min_size: Some(100_000),
+            },
+        ];
+
+        for sequence_length in [8_500usize, 1_234_567, 3_800_321, 950_003] {
+            for spec in &specs {
+                let bounds = window_bounds_for_sequence(sequence_length, spec, step);
+                for &(start, end) in &bounds {
+                    assert_eq!(
+                        start % step,
+                        0,
+                        "start {start} not step-aligned for {spec:?} over {sequence_length}"
+                    );
+                    assert!(
+                        end % step == 0 || end == sequence_length,
+                        "end {end} not step-aligned for {spec:?} over {sequence_length}"
+                    );
+                }
+            }
+        }
     }
 
     // temporary test for parse_bed_files function
@@ -1539,10 +1897,11 @@ mod tests {
             window_specs: vec![WindowSpec::Size {
                 size: 5000,
                 remnant_policy: RemnantPolicy::Trailing,
+                remnant_bounds: None,
             }],
         };
 
-        let docs = parse_bed_files(&cfg).unwrap();
+        let docs = parse_bed_files(&cfg, None).unwrap();
         assert!(docs.keys().any(|id| id.contains("chr1:0-5000:win-5k")));
         assert!(docs.keys().any(|id| id.contains("chr1:5000-8000:win-5k")));
         assert!(!docs.keys().any(|id| id.contains("chr1:7000-8000:win-5k")));
@@ -1580,10 +1939,11 @@ mod tests {
             window_specs: vec![WindowSpec::Size {
                 size: 3000,
                 remnant_policy: RemnantPolicy::Trailing,
+                remnant_bounds: None,
             }],
         };
 
-        let docs = parse_bed_files(&cfg).unwrap();
+        let docs = parse_bed_files(&cfg, None).unwrap();
         let window = docs
             .values()
             .find(|doc| doc.sequence_id == "chr1" && doc.primary_type.starts_with("win"))
@@ -1626,10 +1986,11 @@ mod tests {
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
                 remnant_policy: RemnantPolicy::Trailing,
+                remnant_bounds: None,
             }],
         };
 
-        let docs = parse_bed_files(&cfg).unwrap();
+        let docs = parse_bed_files(&cfg, None).unwrap();
         assert!(!docs.is_empty());
         assert!(docs.keys().any(|id| id.contains("chr1:0-2000:win-2k")));
         assert!(docs.keys().any(|id| id.contains("chr1:2000-3000:win-2k")));
@@ -1663,10 +2024,11 @@ mod tests {
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
                 remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: None,
             }],
         };
 
-        let docs = parse_bed_files(&cfg).unwrap();
+        let docs = parse_bed_files(&cfg, None).unwrap();
         assert!(docs.keys().any(|id| id.contains("chr1:0-2000:win-2k")));
         assert!(docs.keys().any(|id| id.contains("chr1:2000-5000:win-2k")));
         assert!(!docs.keys().any(|id| id.contains("chr1:4000-5000:win-2k")));
@@ -1701,12 +2063,16 @@ mod tests {
                 WindowSpec::Size {
                     size: 2000,
                     remnant_policy: RemnantPolicy::Trailing,
+                    remnant_bounds: None,
                 },
-                WindowSpec::Proportion { proportion: 0.1 },
+                WindowSpec::Proportion {
+                    proportion: 0.1,
+                    min_size: None,
+                },
             ],
         };
 
-        let docs = parse_bed_files(&cfg).unwrap();
+        let docs = parse_bed_files(&cfg, None).unwrap();
         let win_doc = docs
             .values()
             .find(|doc| doc.primary_type.starts_with("win"))
@@ -1751,10 +2117,11 @@ mod tests {
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
                 remnant_policy: RemnantPolicy::Trailing,
+                remnant_bounds: None,
             }],
         };
 
-        let docs = parse_bed_files(&cfg).unwrap();
+        let docs = parse_bed_files(&cfg, None).unwrap();
         let window = docs
             .values()
             .find(|doc| doc.primary_type.starts_with("win"))
@@ -1770,6 +2137,104 @@ mod tests {
             has_double_distance,
             "distance_to_telomere must be stored as a double to match the registry and histogram contracts"
         );
+    }
+
+    #[test]
+    fn test_parse_bed_files_proportion_windows_are_consistent_across_tracks_with_canonical_length()
+    {
+        // Two tracks whose own data happens to stop at different bp offsets
+        // (e.g. GC vs N content bedgraphs with different trailing coverage).
+        let gc_tmp = std::env::temp_dir().join("blobtk_bed_gc_track_length_mismatch.bed");
+        std::fs::write(
+            &gc_tmp,
+            "chr1\t0\t1000\t0.1\nchr1\t1000\t9000\t0.2\nchr1\t9000\t10000\t0.3\n",
+        )
+        .unwrap();
+        let n_tmp = std::env::temp_dir().join("blobtk_bed_n_track_length_mismatch.bed");
+        std::fs::write(&n_tmp, "chr1\t0\t1000\t0.0\nchr1\t1000\t9500\t0.0\n").unwrap();
+
+        let cfg = MultiBedConfig {
+            accession: "GCA_test".to_string(),
+            taxon_id: "123".to_string(),
+            ancestors: vec!["1".to_string(), "2".to_string()],
+            lines_per_unit: 1000,
+            bed_configs: vec![
+                BedConfig {
+                    path: gc_tmp,
+                    local_path: None,
+                    value_columns: vec![ValueColumn {
+                        label: "gc".to_string(),
+                        index: 3,
+                        value_type: "float".to_string(),
+                        summary_functions: vec![SummaryFunction::Mean],
+                        normalisation: None,
+                    }],
+                },
+                BedConfig {
+                    path: n_tmp,
+                    local_path: None,
+                    value_columns: vec![ValueColumn {
+                        label: "n".to_string(),
+                        index: 3,
+                        value_type: "float".to_string(),
+                        summary_functions: vec![SummaryFunction::Mean],
+                        normalisation: None,
+                    }],
+                },
+            ],
+            window_specs: vec![WindowSpec::Proportion {
+                proportion: 0.5,
+                min_size: None,
+            }],
+        };
+
+        // Without a canonical length, the two tracks disagree (10_000 vs 9_500)
+        // and produce different window boundaries for the same nominal windows.
+        let docs_without_canonical = parse_bed_files(&cfg, None).unwrap();
+        let mut window_names: Vec<_> = docs_without_canonical
+            .values()
+            .filter(|doc| doc.primary_type.starts_with("win"))
+            .map(|doc| doc.feature_id.clone())
+            .collect();
+        window_names.sort();
+        assert!(
+            window_names.len() > 2,
+            "tracks with mismatched lengths fragment into more than the expected 2 windows: {window_names:?}"
+        );
+
+        // With a canonical length shared by both tracks, both produce the same
+        // two window boundaries and their attributes land on the same documents.
+        let canonical_lengths = HashMap::from([("chr1".to_string(), 10_000usize)]);
+        let docs_with_canonical = parse_bed_files(&cfg, Some(&canonical_lengths)).unwrap();
+        let mut window_names: Vec<_> = docs_with_canonical
+            .values()
+            .filter(|doc| doc.primary_type.starts_with("win"))
+            .map(|doc| doc.feature_id.clone())
+            .collect();
+        window_names.sort();
+        assert_eq!(
+            window_names,
+            vec![
+                "chr1:0-5000:win-0.50".to_string(),
+                "chr1:5000-10000:win-0.50".to_string(),
+            ]
+        );
+        for doc in docs_with_canonical
+            .values()
+            .filter(|doc| doc.primary_type.starts_with("win"))
+        {
+            let keys: Vec<_> = doc
+                .attributes
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|attr| attr.key.as_str())
+                .collect();
+            assert!(
+                keys.contains(&"gc") && keys.contains(&"n"),
+                "both tracks should contribute to the same window doc: {keys:?}"
+            );
+        }
     }
 
     #[test]
@@ -1857,9 +2322,10 @@ mod tests {
             window_specs: vec![WindowSpec::Size {
                 size: 1000000,
                 remnant_policy: RemnantPolicy::Trailing,
+                remnant_bounds: None,
             }],
         };
-        let features = parse_bed_files(&multi_bed_config).unwrap();
+        let features = parse_bed_files(&multi_bed_config, None).unwrap();
         let json_features = serde_json::to_string_pretty(&features).unwrap();
         // print the json_features to stdout for inspection
         println!("{}", &json_features);

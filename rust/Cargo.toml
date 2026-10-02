@@ -59,6 +59,7 @@ reqwest = { version = "0.11", features = [
     "blocking",
     "json",
     "rustls-tls",
+    "trust-dns",
 ], default-features = false }
 resvg = "0.31.0"
 rust-htslib = "1.0.1"

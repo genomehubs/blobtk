@@ -1353,7 +1353,12 @@ fn parse_bed_and_index(
 ) -> Result<(), error::Error> {
     let client = ElasticsearchClient::try_from(es_cfg)?;
 
-    let window_docs = parse_bed_files(bed_cfg)?;
+    let canonical_sequence_lengths: HashMap<String, usize> = state
+        .sequences
+        .iter()
+        .map(|(seq_id, feature)| (seq_id.clone(), feature.sequence_length))
+        .collect();
+    let window_docs = parse_bed_files(bed_cfg, Some(&canonical_sequence_lengths))?;
 
     // Attach tallied BUSCO counts to windows.
     // Intentionally do not attach sequence-level synteny summary metrics here:
@@ -1605,6 +1610,7 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
     if is_staged_config {
         let mut staged_cfg: crate::config::schema::StagedImportConfig =
             serde_yaml::from_str(&yaml_text)?;
+        crate::config::normalize::normalize_staged_import_config(&mut staged_cfg);
         crate::config::legacy::expand_staged_placeholders(&mut staged_cfg);
         crate::config::legacy::validate_staged_import_config(&staged_cfg)?;
         let mut cfg = crate::config::legacy::staged_import_config_to_legacy_config(&staged_cfg);
@@ -2508,10 +2514,11 @@ busco:
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
                 remnant_policy: RemnantPolicy::Centered,
+                remnant_bounds: None,
             }],
         };
 
-        let window_docs = parse_bed_files(&bed_config).unwrap();
+        let window_docs = parse_bed_files(&bed_config, None).unwrap();
         let sequence_doc = seq_features.values().next().unwrap().clone();
         let window_doc = window_docs.values().next().unwrap().clone();
 

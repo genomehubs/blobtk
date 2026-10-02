@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::config::normalize::normalize_staged_import_config;
 use crate::config::schema::{
-    AnnotationSourceConfig, DerivedMetricConfig, ResolvedPathConfig, SequenceMetadataConfig,
-    StagedImportConfig, WindowingConfig,
+    AnnotationSourceConfig, AssemblyPolicyConfig, DerivedMetricConfig, IndexingConfig,
+    ResolvedPathConfig, ScaffoldPolicyConfig, SequenceMetadataConfig, StagedImportConfig,
+    WindowingConfig,
 };
 use crate::import::{ImportConfig, SequenceReportImportConfig};
 
@@ -197,6 +198,10 @@ pub fn normalize_legacy_import_config(cfg: &ImportConfig) -> StagedImportConfig 
         lines_per_unit: cfg.bed.lines_per_unit,
         windows: cfg.bed.window_specs.clone(),
         files: cfg.bed.bed_configs.clone(),
+        target_size: None,
+        bed_resolution: Some(cfg.bed.lines_per_unit),
+        remnant_policy: None,
+        remnant_bounds: None,
     };
 
     let mut metadata = HashMap::new();
@@ -267,6 +272,18 @@ pub fn normalize_legacy_import_config(cfg: &ImportConfig) -> StagedImportConfig 
         },
         annotations,
         windowing,
+        assembly_policy: Some(AssemblyPolicyConfig {
+            min_chromosome_fraction: 0.9,
+            fallback_mode: "minimal".to_string(),
+        }),
+        scaffold_policy: Some(ScaffoldPolicyConfig {
+            min_scaffold_length: 1_000_000,
+            skip_short_scaffolds_without_data: true,
+            index_small_scaffold_as_parent_if: vec!["busco".to_string()],
+        }),
+        indexing: Some(IndexingConfig {
+            profile: "standard".to_string(),
+        }),
         derived_metrics: vec![DerivedMetricConfig {
             name: "distance_to_telomere".to_string(),
             target: "window".to_string(),
@@ -371,6 +388,7 @@ mod tests {
                 window_specs: vec![crate::parse::bed::WindowSpec::Size {
                     size: 1_000_000,
                     remnant_policy: crate::parse::bed::RemnantPolicy::Centered,
+                    remnant_bounds: None,
                 }],
             },
             busco: crate::parse::busco::MultiBuscoConfig {

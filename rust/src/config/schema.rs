@@ -29,13 +29,47 @@ pub struct SequenceMetadataConfig {
     pub metadata: HashMap<String, AnnotationSourceConfig>,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct RemnantBoundsConfig {
+    pub min_fraction: f64,
+    pub max_fraction: f64,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct WindowingConfig {
+    #[serde(default, alias = "lines_per_unit")]
     pub lines_per_unit: usize,
     #[serde(default)]
     pub windows: Vec<crate::parse::bed::WindowSpec>,
     #[serde(default)]
     pub files: Vec<crate::parse::bed::BedConfig>,
+    #[serde(default, alias = "target_size")]
+    pub target_size: Option<usize>,
+    #[serde(default)]
+    pub bed_resolution: Option<usize>,
+    #[serde(default, alias = "remnant_policy")]
+    pub remnant_policy: Option<crate::parse::bed::RemnantPolicy>,
+    #[serde(default, alias = "remnant_bounds")]
+    pub remnant_bounds: Option<RemnantBoundsConfig>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct AssemblyPolicyConfig {
+    pub min_chromosome_fraction: f64,
+    pub fallback_mode: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct ScaffoldPolicyConfig {
+    pub min_scaffold_length: usize,
+    pub skip_short_scaffolds_without_data: bool,
+    #[serde(default)]
+    pub index_small_scaffold_as_parent_if: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct IndexingConfig {
+    pub profile: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -59,6 +93,12 @@ pub struct StagedImportConfig {
     #[serde(default)]
     pub annotations: HashMap<String, AnnotationSourceConfig>,
     pub windowing: WindowingConfig,
+    #[serde(default)]
+    pub assembly_policy: Option<AssemblyPolicyConfig>,
+    #[serde(default)]
+    pub scaffold_policy: Option<ScaffoldPolicyConfig>,
+    #[serde(default)]
+    pub indexing: Option<IndexingConfig>,
     #[serde(default)]
     pub derived_metrics: Vec<DerivedMetricConfig>,
     #[serde(default)]
