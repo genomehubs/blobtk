@@ -92,6 +92,7 @@ pub struct StagedImportConfig {
     pub sequence: SequenceMetadataConfig,
     #[serde(default)]
     pub annotations: HashMap<String, AnnotationSourceConfig>,
+    #[serde(default)]
     pub windowing: WindowingConfig,
     #[serde(default)]
     pub assembly_policy: Option<AssemblyPolicyConfig>,

@@ -119,6 +119,7 @@ mod tests {
         }
     }
 
+    #[ignore = "requires a live Elasticsearch service"]
     #[test]
     fn test_bulk_index() {
         // test the bulk_index method of the Indexer struct
@@ -169,6 +170,7 @@ mod tests {
         );
     }
 
+    #[ignore = "requires a live Elasticsearch service"]
     #[test]
     fn test_create_indices() {
         // test the create_indices method of the Indexer struct

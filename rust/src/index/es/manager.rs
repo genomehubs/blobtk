@@ -97,6 +97,7 @@ mod tests {
         assert_eq!(generated_index_name, expected_index_name);
     }
 
+    #[ignore = "requires a live Elasticsearch service"]
     #[test]
     fn test_create_index() {
         let index_name = "test_index_create".to_string();
@@ -115,6 +116,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[ignore = "requires a live Elasticsearch service"]
     #[test]
     fn test_delete_index() {
         let index_name = "test_index_delete".to_string();
@@ -135,6 +137,7 @@ mod tests {
         assert!(delete_result.is_ok());
     }
 
+    #[ignore = "requires a live Elasticsearch service"]
     #[test]
     fn test_get_index_info() {
         let index_name = "test_index_info".to_string();
@@ -184,6 +187,7 @@ mod tests {
         );
     }
 
+    #[ignore = "requires a live Elasticsearch service"]
     #[test]
     fn test_index_document() {
         let index_name = "test_index_document".to_string();

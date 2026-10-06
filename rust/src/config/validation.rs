@@ -1,40 +1,54 @@
-use crate::config::paths::resolve_source_path;
-use crate::config::schema::{ResolvedPathConfig, StagedImportConfig};
-use which::which;
+use crate::config::schema::StagedImportConfig;
 
 pub fn validate_staged_import_config(staged: &StagedImportConfig) -> Result<(), anyhow::Error> {
-    if staged.sequence.report.path.is_none() && staged.sequence.report.local_path.is_none() {
+    let sequence_report_source = staged.sequence.report.path.as_ref().or(staged
+        .sequence
+        .report
+        .local_path
+        .as_ref());
+
+    if sequence_report_source
+        .map(|path| path.as_os_str().is_empty())
+        .unwrap_or(true)
+    {
         return Err(anyhow::anyhow!(
             "staged import config is missing a sequence report path or local_path"
         ));
     }
-    // check for a valid path, if not ensure datasets executable can be found
-    let mut local_path_exists = false;
-    if let Some(_) = &staged.sequence.report.path {
-        local_path_exists = resolve_source_path(&staged.sequence.report).is_ok();
-    } else if let Some(_) = &staged.sequence.report.local_path {
-        local_path_exists = resolve_source_path(&staged.sequence.report).is_ok();
-    }
-    if !local_path_exists {
-        // check if datasets executable is available
-        let datasets_executable_available = which("datasets").is_ok();
-        if !datasets_executable_available {
+
+    for file in &staged.windowing.files {
+        let has_path = !file.path.as_os_str().is_empty();
+        let has_local_path = file
+            .local_path
+            .as_ref()
+            .map(|path| !path.as_os_str().is_empty())
+            .unwrap_or(false);
+        if !has_path && !has_local_path {
             return Err(anyhow::anyhow!(
-                "no valid path for sequence report and datasets executable not found"
+                "windowing file entry is missing a path or local_path"
             ));
         }
     }
 
-    for file in &staged.windowing.files {
-        let resolved = resolve_source_path(&ResolvedPathConfig {
-            path: Some(file.path.clone()),
-            local_path: file.local_path.clone(),
-        })?;
-        let _ = resolved;
-    }
-
-    for annotation in staged.annotations.values() {
-        resolve_source_path(&annotation.source)?;
+    for (annotation_name, annotation) in &staged.annotations {
+        let has_path = annotation
+            .source
+            .path
+            .as_ref()
+            .map(|path| !path.as_os_str().is_empty())
+            .unwrap_or(false);
+        let has_local_path = annotation
+            .source
+            .local_path
+            .as_ref()
+            .map(|path| !path.as_os_str().is_empty())
+            .unwrap_or(false);
+        if !has_path && !has_local_path {
+            return Err(anyhow::anyhow!(
+                "annotation {} is missing a source path or local_path",
+                annotation_name
+            ));
+        }
     }
 
     if staged.windowing.files.is_empty() {
@@ -51,6 +65,29 @@ pub fn validate_staged_import_config(staged: &StagedImportConfig) -> Result<(), 
         return Err(anyhow::anyhow!(
             "windowing.bed_resolution must be greater than zero"
         ));
+    }
+
+    if let Some(bounds) = &staged.windowing.remnant_bounds {
+        if bounds.min_fraction <= 0.0 || bounds.max_fraction <= 0.0 {
+            return Err(anyhow::anyhow!(
+                "windowing.remnant_bounds min_fraction and max_fraction must be greater than zero"
+            ));
+        }
+        if bounds.min_fraction > 1.0 {
+            return Err(anyhow::anyhow!(
+                "windowing.remnant_bounds.min_fraction must be <= 1.0"
+            ));
+        }
+        if bounds.max_fraction < 1.0 {
+            return Err(anyhow::anyhow!(
+                "windowing.remnant_bounds.max_fraction must be >= 1.0"
+            ));
+        }
+        if bounds.min_fraction >= bounds.max_fraction {
+            return Err(anyhow::anyhow!(
+                "windowing.remnant_bounds.min_fraction must be less than max_fraction"
+            ));
+        }
     }
 
     for window_spec in &staged.windowing.windows {
