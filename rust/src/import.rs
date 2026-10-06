@@ -1521,7 +1521,10 @@ fn clear_feature_data(es_cfg: &EsConfig) -> Result<(), error::Error> {
 
     let attributes_index = client.resolve_index_name("attributes")?;
     if client.get_index_info(&attributes_index).is_ok() {
-        eprintln!("  Clearing feature attribute definitions from {}", attributes_index);
+        eprintln!(
+            "  Clearing feature attribute definitions from {}",
+            attributes_index
+        );
         client.delete_by_query(
             &attributes_index,
             serde_json::json!({
@@ -1663,7 +1666,9 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
         crate::config::legacy::validate_staged_import_config(&staged_cfg)?;
         let mut cfg = crate::config::legacy::staged_import_config_to_legacy_config(&staged_cfg);
         if clear_feature_data {
-            cfg.import.get_or_insert_with(Default::default).clear_feature_data = true;
+            cfg.import
+                .get_or_insert_with(Default::default)
+                .clear_feature_data = true;
         }
         resolve_assembly_taxon_id(&mut cfg)?;
         expand_placeholders(&mut cfg);
@@ -1711,7 +1716,9 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
         )?;
         for mut cfg in member_configs {
             if clear_feature_data {
-                cfg.import.get_or_insert_with(Default::default).clear_feature_data = true;
+                cfg.import
+                    .get_or_insert_with(Default::default)
+                    .clear_feature_data = true;
             }
             resolve_assembly_taxon_id(&mut cfg)?;
             expand_placeholders(&mut cfg);
@@ -1724,7 +1731,9 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
 
     let mut cfg: ImportConfig = serde_yaml::from_str(&yaml_text)?;
     if clear_feature_data {
-        cfg.import.get_or_insert_with(Default::default).clear_feature_data = true;
+        cfg.import
+            .get_or_insert_with(Default::default)
+            .clear_feature_data = true;
     }
     resolve_assembly_taxon_id(&mut cfg)?;
     expand_placeholders(&mut cfg);
@@ -1746,7 +1755,8 @@ mod tests {
         let from_yaml: ImportOptions = serde_yaml::from_str("clear_feature_data: true\n").unwrap();
         assert!(from_yaml.clear_feature_data);
 
-        let from_alias: ImportOptions = serde_yaml::from_str("clear_feature_index: true\n").unwrap();
+        let from_alias: ImportOptions =
+            serde_yaml::from_str("clear_feature_index: true\n").unwrap();
         assert!(from_alias.clear_feature_data);
     }
 
