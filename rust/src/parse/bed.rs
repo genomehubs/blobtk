@@ -251,11 +251,14 @@ impl ValueColumn {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct BedConfig {
     pub path: PathBuf,
+    #[serde(default)]
     pub local_path: Option<PathBuf>,
+    #[serde(default)]
     pub value_columns: Vec<ValueColumn>,
+    #[serde(default)]
     pub has_header: bool,
 }
 
