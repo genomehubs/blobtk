@@ -293,6 +293,31 @@ impl ElasticsearchClient {
         }
     }
 
+    pub fn delete_by_query(
+        &self,
+        index_name: &str,
+        query: serde_json::Value,
+    ) -> Result<(), EsError> {
+        let request_url = format!("{}/{}/_delete_by_query", self.cluster_url, index_name);
+        let request_body = serde_json::to_string(&query)
+            .map_err(|e| EsError::SerializationError(e.to_string()))?;
+        let client = reqwest::blocking::Client::new();
+        let response = client
+            .post(&request_url)
+            .header("Content-Type", "application/json")
+            .body(request_body)
+            .send()
+            .map_err(|e| EsError::ApiError(e.to_string()))?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(EsError::ApiError(format!(
+                "Failed to delete by query: {}",
+                response.text().unwrap_or_default()
+            )))
+        }
+    }
+
     pub fn get_index_info(&self, index_name: &str) -> Result<IndexInfo, EsError> {
         // generate the API request to retrieve information about the index with the specified name
         let request_url = format!("{}/{}", self.cluster_url, index_name);

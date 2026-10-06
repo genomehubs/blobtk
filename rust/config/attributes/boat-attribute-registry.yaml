@@ -47,6 +47,15 @@ attributes:
     type: keyword
     status: active
     destination: both
+  sequence_length:
+    display_name: Sequence length
+    display_group: coordinates
+    display_level: 1
+    description: Length of the parent sequence in base pairs
+    type: long
+    units: bp
+    status: active
+    destination: both
   start:
     display_name: Start
     display_group: coordinates
@@ -139,6 +148,15 @@ attributes:
     status: active
     destination: nested
     pattern: "^[a-z0-9_]+_(complete|duplicated|fragmented|missing|single_copy)_count$"
+  base_content_summary_pattern:
+    display_name: Generated base-content summary metric
+    display_group: summary
+    display_level: 2
+    description: Sequence composition, skew, and entropy metrics derived from base-content summaries
+    type: float
+    status: active
+    destination: nested
+    pattern: "^(at|gc)_skew(_zscore)?$|^cpg(_zscore)?$|^(nucShannon|shannon_entropy)(_zscore)?$"
   group_set_id:
     display_name: Group Set ID
     display_group: synteny

@@ -1,0 +1,37 @@
+schema_version: 1
+taxonomy: ncbi
+generated_at: 2026-09-04T00:00:00Z
+
+min_members: 3
+
+defaults:
+  template:
+    path: ./templates/import.config.yaml
+
+batches:
+  - id: family:7157
+    rank: family
+    taxon_id: "7157"
+    taxon_name: "Testaceae"
+
+    template:
+      path: ./templates/family_import.config.yaml
+
+    members:
+      - accession: GCA_016920705.1
+      - accession: GCA_016920715.1
+      - accession: GCA_038994775.1
+      - accession: GCA_943734635.1
+      - accession: GCA_943734655.2
+
+  # - id: order:5678
+  #   rank: order
+  #   taxon_id: "5678"
+  #   taxon_name: "Testales"
+  #
+  #   members:
+  #     - accession: GCA_00001001.1
+  #     - accession: GCA_00001002.1
+  #     - accession: GCA_00001003.1
+  #     - accession: GCA_00001004.1
+  #     - accession: GCA_00001005.1

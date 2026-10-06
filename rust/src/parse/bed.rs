@@ -256,6 +256,7 @@ pub struct BedConfig {
     pub path: PathBuf,
     pub local_path: Option<PathBuf>,
     pub value_columns: Vec<ValueColumn>,
+    pub has_header: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -962,6 +963,17 @@ fn fill_per_seq_buffers(
     bed_path: &std::path::Path,
 ) -> Result<HashMap<String, Vec<Feature>>, error::Error> {
     let mut per_seq_buffers: HashMap<String, Vec<Feature>> = HashMap::new();
+    if bed_config.has_header {
+        // Skip the header line
+        let mut header = String::new();
+        bed_reader.read_line(&mut header).map_err(|e| {
+            error::Error::ReaderError(format!(
+                "Error reading header line from BED file {}: {}",
+                bed_path.display(),
+                e
+            ))
+        })?;
+    }
     for line in bed_reader.lines() {
         let line = line.map_err(|e| {
             error::Error::ReaderError(format!(
@@ -1893,6 +1905,7 @@ mod tests {
                     summary_functions: vec![SummaryFunction::Mean],
                     normalisation: None,
                 }],
+                has_header: false,
             }],
             window_specs: vec![WindowSpec::Size {
                 size: 5000,
@@ -1935,6 +1948,7 @@ mod tests {
                         scope: NormalisationScope::Sequence,
                     }),
                 }],
+                has_header: false,
             }],
             window_specs: vec![WindowSpec::Size {
                 size: 3000,
@@ -1982,6 +1996,7 @@ mod tests {
                     summary_functions: vec![SummaryFunction::Mean],
                     normalisation: None,
                 }],
+                has_header: false,
             }],
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
@@ -2020,6 +2035,7 @@ mod tests {
                     summary_functions: vec![SummaryFunction::Mean],
                     normalisation: None,
                 }],
+                has_header: false,
             }],
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
@@ -2058,6 +2074,7 @@ mod tests {
                     summary_functions: vec![SummaryFunction::Mean],
                     normalisation: None,
                 }],
+                has_header: false,
             }],
             window_specs: vec![
                 WindowSpec::Size {
@@ -2113,6 +2130,7 @@ mod tests {
                     summary_functions: vec![SummaryFunction::Mean],
                     normalisation: None,
                 }],
+                has_header: false,
             }],
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
@@ -2169,6 +2187,7 @@ mod tests {
                         summary_functions: vec![SummaryFunction::Mean],
                         normalisation: None,
                     }],
+                    has_header: false,
                 },
                 BedConfig {
                     path: n_tmp,
@@ -2180,6 +2199,7 @@ mod tests {
                         summary_functions: vec![SummaryFunction::Mean],
                         normalisation: None,
                     }],
+                    has_header: false,
                 },
             ],
             window_specs: vec![WindowSpec::Proportion {
@@ -2249,6 +2269,7 @@ mod tests {
                 summary_functions: vec![SummaryFunction::Mean,SummaryFunction::SubWindowVariance { size: 100 }],
                 normalisation: None,
             }],
+            has_header: false
         };
         let bed_config_n = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.N.1k.bedGraph.gz"),
@@ -2260,6 +2281,7 @@ mod tests {
                 summary_functions: vec![SummaryFunction::Count, SummaryFunction::Mean, SummaryFunction::Sum],
                 normalisation: None,
             }],
+            has_header: false,
         };
         let bed_config_at_skew = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.AT_skew.1k.bedGraph.gz"),
@@ -2271,6 +2293,7 @@ mod tests {
                 summary_functions: vec![SummaryFunction::Count, SummaryFunction::Mean, SummaryFunction::Sum],
                 normalisation: None,
             }],
+            has_header: false,
         };
         let bed_config_gc_skew = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.GC_skew.1k.bedGraph.gz"),
@@ -2282,6 +2305,7 @@ mod tests {
                 summary_functions: vec![SummaryFunction::Count, SummaryFunction::Mean, SummaryFunction::Sum],
                 normalisation: None,
             }],
+            has_header: false,
         };
         let bed_config_shannon = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k1/GCA_016920705.1.nucShannon.1k.bedGraph.gz"),
@@ -2293,6 +2317,7 @@ mod tests {
                 summary_functions: vec![SummaryFunction::Count, SummaryFunction::Mean, SummaryFunction::Sum],
                 normalisation: None,
             }],
+            has_header: false,
         };
         let bed_config_cpg = BedConfig {
             path: PathBuf::from("https://gap.cog.sanger.ac.uk/GCA_016920705.1/base_content/k2/GCA_016920705.1.CpG.1k.bedGraph.gz"),
@@ -2304,6 +2329,7 @@ mod tests {
                 summary_functions: vec![SummaryFunction::Mean, SummaryFunction::SubWindowVariance { size: 100 }],
                 normalisation: None,
             }],
+            has_header: false,
         };
 
         let multi_bed_config = MultiBedConfig {

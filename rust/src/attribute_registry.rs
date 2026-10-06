@@ -249,6 +249,45 @@ mod tests {
     }
 
     #[test]
+    fn registry_keeps_sequence_length_as_feature_attribute() {
+        let registry = AttributeRegistry::load_default().unwrap();
+        let sequence_length = registry.lookup("sequence_length").unwrap();
+
+        assert_eq!(
+            sequence_length.display_name.as_deref(),
+            Some("Sequence length")
+        );
+        assert_eq!(
+            sequence_length.destination,
+            Some(AttributeDestination::Both)
+        );
+        assert!(registry.require_registered("sequence_length").is_ok());
+        assert!(registry.is_nested_attribute("sequence_length"));
+    }
+
+    #[test]
+    fn registry_accepts_pattern_based_summary_metrics() {
+        let registry = AttributeRegistry::load_default().unwrap();
+
+        for key in [
+            "at_skew",
+            "at_skew_zscore",
+            "cpg",
+            "cpg_zscore",
+            "gc_skew",
+            "gc_skew_zscore",
+            "shannon_entropy",
+            "shannon_entropy_zscore",
+        ] {
+            assert!(
+                registry.require_registered(key).is_ok(),
+                "expected `{}` to be registered",
+                key
+            );
+        }
+    }
+
+    #[test]
     fn registry_requires_known_keys_and_reports_unmapped_fields() {
         let registry = AttributeRegistry::load_default().unwrap();
 

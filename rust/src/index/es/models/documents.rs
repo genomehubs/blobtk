@@ -180,6 +180,14 @@ impl FeatureDocument {
                 },
             ),
             (
+                "sequence_length".to_string(),
+                NestedAttribute {
+                    key: "sequence_length".to_string(),
+                    long_value: Some(sequence_length as i64),
+                    ..Default::default()
+                },
+            ),
+            (
                 "seq_proportion".to_string(),
                 NestedAttribute {
                     key: "seq_proportion".to_string(),
@@ -501,5 +509,33 @@ mod tests {
         assert_eq!(doc.sequence_id, "chr1");
         assert_eq!(doc.assembly_id, "asm1");
         assert_eq!(doc.taxon_id, "9606");
+    }
+
+    #[test]
+    fn feature_document_includes_sequence_length_in_nested_attributes() {
+        let doc = FeatureDocument::new(
+            "feat1".to_string(),
+            None,
+            "gene".to_string(),
+            100,
+            500,
+            Some(1),
+            None,
+            "chr1".to_string(),
+            1000,
+            "asm1".to_string(),
+            "9606".to_string(),
+            None,
+            None,
+            None,
+        );
+
+        let sequence_length = doc
+            .attributes
+            .as_ref()
+            .and_then(|attrs| attrs.iter().find(|attr| attr.key == "sequence_length"))
+            .expect("sequence_length should be present in nested feature attributes");
+
+        assert_eq!(sequence_length.long_value, Some(1000));
     }
 }

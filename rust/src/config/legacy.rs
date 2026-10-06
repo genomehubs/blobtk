@@ -384,6 +384,7 @@ mod tests {
                     path: std::path::PathBuf::from("/tmp/gc.bed.gz"),
                     local_path: None,
                     value_columns: vec![],
+                    has_header: false,
                 }],
                 window_specs: vec![crate::parse::bed::WindowSpec::Size {
                     size: 1_000_000,

@@ -7,8 +7,8 @@ es:
     taxonomy: ncbi
 
 assembly:
-  accession: GCA_016920705.1
-  taxon_id: 7157
+  accession: GCA_016920715.1
+  taxon_id: 7173
 
 sequence:
   report:

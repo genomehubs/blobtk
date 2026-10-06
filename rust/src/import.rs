@@ -65,10 +65,15 @@ pub struct AssemblyImportConfig {
     pub lineage: Vec<TaxonLineageEntry>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct ImportOptions {
+    #[serde(default, alias = "clear_feature_index")]
+    pub clear_feature_data: bool,
+    #[serde(default)]
     pub entity_types: Option<Vec<String>>, // ["sequence", "window", "busco"]
+    #[serde(default)]
     pub busco_tallies: Option<BuscoTalliesConfig>,
+    #[serde(default)]
     pub synteny_index: Option<SyntenyIndexMode>,
 }
 
@@ -1499,10 +1504,52 @@ fn create_attribute_docs_from_features(
     sync_attribute_documents(attribute_docs, state, es_cfg, import_opts)
 }
 
+fn clear_feature_data(es_cfg: &EsConfig) -> Result<(), error::Error> {
+    let client = ElasticsearchClient::try_from(es_cfg)?;
+    let feature_index = client.resolve_index_name("feature")?;
+
+    if client.get_index_info(&feature_index).is_ok() {
+        eprintln!("  Clearing existing feature index {}", feature_index);
+        client.delete_index(&feature_index)?;
+    }
+
+    ensure_index_exists(
+        es_cfg,
+        "feature",
+        crate::index::es::mappings::feature_index_mappings(),
+    )?;
+
+    let attributes_index = client.resolve_index_name("attributes")?;
+    if client.get_index_info(&attributes_index).is_ok() {
+        eprintln!("  Clearing feature attribute definitions from {}", attributes_index);
+        client.delete_by_query(
+            &attributes_index,
+            serde_json::json!({
+                "query": {
+                    "term": {
+                        "group": "feature"
+                    }
+                }
+            }),
+        )?;
+        client.refresh("attributes")?;
+    }
+
+    Ok(())
+}
+
 fn run_single_import_config(
     mut cfg: ImportConfig,
     staged_cfg: Option<&crate::config::schema::StagedImportConfig>,
 ) -> Result<(), anyhow::Error> {
+    if cfg
+        .import
+        .as_ref()
+        .is_some_and(|import_opts| import_opts.clear_feature_data)
+    {
+        clear_feature_data(&cfg.es)?;
+    }
+
     resolve_assembly_taxon_id(&mut cfg)?;
     expand_placeholders(&mut cfg);
     if let Some(staged_cfg) = staged_cfg {
@@ -1602,6 +1649,7 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
     let config_path = &options.config;
     let yaml_text = std::fs::read_to_string(config_path)?;
     let yaml_value: serde_yaml::Value = serde_yaml::from_str(&yaml_text)?;
+    let clear_feature_data = options.clear_feature_data;
 
     let is_staged_config = yaml_value.get("sequence").is_some()
         || yaml_value.get("windowing").is_some()
@@ -1614,6 +1662,9 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
         crate::config::legacy::expand_staged_placeholders(&mut staged_cfg);
         crate::config::legacy::validate_staged_import_config(&staged_cfg)?;
         let mut cfg = crate::config::legacy::staged_import_config_to_legacy_config(&staged_cfg);
+        if clear_feature_data {
+            cfg.import.get_or_insert_with(Default::default).clear_feature_data = true;
+        }
         resolve_assembly_taxon_id(&mut cfg)?;
         expand_placeholders(&mut cfg);
         run_single_import_config(cfg, Some(&staged_cfg))?;
@@ -1659,6 +1710,9 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
             &options.local_root,
         )?;
         for mut cfg in member_configs {
+            if clear_feature_data {
+                cfg.import.get_or_insert_with(Default::default).clear_feature_data = true;
+            }
             resolve_assembly_taxon_id(&mut cfg)?;
             expand_placeholders(&mut cfg);
             let staged_cfg = normalize_legacy_import_config(&cfg);
@@ -1669,6 +1723,9 @@ pub fn import(options: &crate::cli::ImportOptions) -> Result<(), anyhow::Error> 
     }
 
     let mut cfg: ImportConfig = serde_yaml::from_str(&yaml_text)?;
+    if clear_feature_data {
+        cfg.import.get_or_insert_with(Default::default).clear_feature_data = true;
+    }
     resolve_assembly_taxon_id(&mut cfg)?;
     expand_placeholders(&mut cfg);
     let staged_cfg = normalize_legacy_import_config(&cfg);
@@ -1683,6 +1740,15 @@ mod tests {
     use crate::index::es::models::nested_documents::NestedAttribute;
     use std::io::{Read, Write};
     use std::net::TcpListener;
+
+    #[test]
+    fn import_options_allow_clear_feature_data_flag() {
+        let from_yaml: ImportOptions = serde_yaml::from_str("clear_feature_data: true\n").unwrap();
+        assert!(from_yaml.clear_feature_data);
+
+        let from_alias: ImportOptions = serde_yaml::from_str("clear_feature_index: true\n").unwrap();
+        assert!(from_alias.clear_feature_data);
+    }
 
     #[test]
     fn expand_placeholders_replaces_accession_and_lineage_in_config_paths() {
@@ -1721,6 +1787,7 @@ mod tests {
                     path: PathBuf::from("https://example.org/{ACCESSION}/track.bed.gz"),
                     local_path: Some(PathBuf::from("~/tmp/{ACCESSION}.track.bed.gz")),
                     value_columns: vec![],
+                    has_header: false,
                 }],
             },
             busco: MultiBuscoConfig {
@@ -2351,6 +2418,7 @@ busco:
                     summary_functions: vec![crate::parse::bed::SummaryFunction::Mean],
                     normalisation: None,
                 }],
+                has_header: false,
             }],
             window_specs: vec![],
         };
@@ -2411,6 +2479,7 @@ busco:
             },
         };
         let import_opts = Some(ImportOptions {
+            clear_feature_data: false,
             entity_types: Some(vec![]),
             busco_tallies: None,
             synteny_index: None,
@@ -2510,6 +2579,7 @@ busco:
                     summary_functions: vec![SummaryFunction::Mean],
                     normalisation: None,
                 }],
+                has_header: false,
             }],
             window_specs: vec![WindowSpec::Size {
                 size: 2000,
@@ -2535,6 +2605,7 @@ busco:
             },
         };
         let import_opts = Some(ImportOptions {
+            clear_feature_data: false,
             entity_types: Some(vec!["sequence".to_string(), "window".to_string()]),
             busco_tallies: None,
             synteny_index: None,

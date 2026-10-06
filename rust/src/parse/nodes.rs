@@ -750,10 +750,16 @@ impl Nodes {
                 let node_names = node.names.as_mut();
                 if let Some(node_names) = node_names {
                     for name in names {
-                        //check if name already exists
+                        // Treat a name as duplicate only if it matches the same class or unique
+                        // identifier. The same display name can legitimately exist as a scientific
+                        // name and a TOLID/xref alias on the same taxon without being a duplicate.
                         let mut found = false;
                         for node_name in node_names.iter() {
-                            if node_name.name == name.name {
+                            if node_name.name == name.name && node_name.class == name.class {
+                                found = true;
+                                break;
+                            }
+                            if node_name.unique_name == name.unique_name {
                                 found = true;
                                 break;
                             }
@@ -1459,5 +1465,63 @@ impl Nodes {
             }
         }
         self.add_names(&name_map)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_names_preserves_same_name_when_class_differs() {
+        let mut nodes = Nodes {
+            nodes: HashMap::from([(
+                "tax-1".to_string(),
+                Node {
+                    tax_id: "tax-1".to_string(),
+                    parent_tax_id: "root".to_string(),
+                    rank: "species".to_string(),
+                    scientific_name: Some("Homo sapiens".to_string()),
+                    names: Some(vec![Name {
+                        tax_id: "tax-1".to_string(),
+                        name: "Homo sapiens".to_string(),
+                        unique_name: "ncbi:Homo sapiens".to_string(),
+                        class: Some("scientific name".to_string()),
+                    }]),
+                    ..Default::default()
+                },
+            )]),
+            children: HashMap::new(),
+        };
+
+        let new_names = HashMap::from([(
+            "tax-1".to_string(),
+            vec![
+                Name {
+                    tax_id: "tax-1".to_string(),
+                    name: "Homo sapiens".to_string(),
+                    unique_name: "tolid:Homo sapiens".to_string(),
+                    class: Some("xref".to_string()),
+                },
+                Name {
+                    tax_id: "tax-1".to_string(),
+                    name: "tolid:123".to_string(),
+                    unique_name: "tolid:123".to_string(),
+                    class: Some("xref".to_string()),
+                },
+            ],
+        )]);
+
+        nodes.add_names(&new_names).unwrap();
+
+        let merged_names = nodes.nodes.get("tax-1").unwrap().names.as_ref().unwrap();
+        assert!(merged_names.iter().any(|n| {
+            n.name == "Homo sapiens"
+                && n.class == Some("xref".to_string())
+                && n.unique_name == "tolid:Homo sapiens"
+        }));
+        assert!(merged_names
+            .iter()
+            .any(|n| { n.name == "tolid:123" && n.class == Some("xref".to_string()) }));
     }
 }

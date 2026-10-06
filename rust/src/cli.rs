@@ -207,6 +207,9 @@ pub struct ImportOptions {
     /// Local root used for batch template expansion
     #[arg(long = "local-root", default_value = ".")]
     pub local_root: String,
+    /// Delete the existing feature index and any feature-scoped attribute documents before importing.
+    #[arg(long = "clear-feature-data", alias = "clear-feature-index", default_value_t = false)]
+    pub clear_feature_data: bool,
 }
 
 /// Options to pass to `blobtk index`

@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Rust: cargo test (local toolchain)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "export CARGO_HOME=\"${env:CARGO_HOME:-${env:HOME}/.cargo}\"; export RUSTUP_HOME=\"${env:RUSTUP_HOME:-${env:HOME}/.rustup}\"; export PATH=\"${env:HOME}/.cargo/bin:$PATH\"; export CARGO_BIN=\"${env:CARGO_BIN:-$(ls -d ${env:HOME}/.rustup/toolchains/*/bin/cargo 2>/dev/null | sort | tail -n 1 || echo ${env:HOME}/.cargo/bin/cargo)}\"; cd \"${workspaceFolder}/rust\"; \"$CARGO_BIN\" test --lib"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/rust"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Rust: cargo check (local toolchain)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-lc",
+        "export CARGO_HOME=\"${env:CARGO_HOME:-${env:HOME}/.cargo}\"; export RUSTUP_HOME=\"${env:RUSTUP_HOME:-${env:HOME}/.rustup}\"; export PATH=\"${env:HOME}/.cargo/bin:$PATH\"; export CARGO_BIN=\"${env:CARGO_BIN:-$(ls -d ${env:HOME}/.rustup/toolchains/*/bin/cargo 2>/dev/null | sort | tail -n 1 || echo ${env:HOME}/.cargo/bin/cargo)}\"; cd \"${workspaceFolder}/rust\"; \"$CARGO_BIN\" check"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/rust"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

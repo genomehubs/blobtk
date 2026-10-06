@@ -1,0 +1,64 @@
+path: /Users/rchallis/projects/genomehubs/boat-resources/taxdump/ncbi_20241203
+out: test/taxonomy/isopoda/combined
+output_format:
+  - jsonl
+  - ncbi
+taxonomy_format: ncbi
+root_taxon_id:
+  - 2925007
+  - 13347
+  - 92525
+  - 1955234
+  - 2922061
+  - 2976924
+  - 96851
+  - 2067965
+  - 2613951
+  - 96875
+  - 462846
+  - 2895740
+  - 2707950
+  - 203899
+  - 2810139
+  - 155701
+  - 3422613
+  - 3092609
+  - 324910
+  - 3076376
+  - 3102972
+base_taxon_id: 6820
+leaf_taxon_id:
+  - 2925007
+  - 13347
+  - 92525
+  - 1955234
+  - 2922061
+  - 2976924
+  - 96851
+  - 2067965
+  - 2613951
+  - 96875
+  - 462846
+  - 2895740
+  - 2707950
+  - 203899
+  - 2810139
+  - 155701
+  - 3422613
+  - 3092609
+  - 324910
+  - 3076376
+  - 3102972
+name_classes:
+  - scientific name
+  - synonym
+  - merged taxon id
+taxonomies:
+  - path: test/taxonomy/canidae/genomehubs/tolids.names.yaml
+    taxonomy_format: genomehubs
+    name_classes:
+      - scientific name
+      - synonym
+      - merged taxon id
+    xref_label: tolid
+    create_taxa: true

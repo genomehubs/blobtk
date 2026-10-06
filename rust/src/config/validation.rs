@@ -1,5 +1,6 @@
 use crate::config::paths::resolve_source_path;
 use crate::config::schema::{ResolvedPathConfig, StagedImportConfig};
+use which::which;
 
 pub fn validate_staged_import_config(staged: &StagedImportConfig) -> Result<(), anyhow::Error> {
     if staged.sequence.report.path.is_none() && staged.sequence.report.local_path.is_none() {
@@ -7,7 +8,22 @@ pub fn validate_staged_import_config(staged: &StagedImportConfig) -> Result<(), 
             "staged import config is missing a sequence report path or local_path"
         ));
     }
-    resolve_source_path(&staged.sequence.report)?;
+    // check for a valid path, if not ensure datasets executable can be found
+    let mut local_path_exists = false;
+    if let Some(_) = &staged.sequence.report.path {
+        local_path_exists = resolve_source_path(&staged.sequence.report).is_ok();
+    } else if let Some(_) = &staged.sequence.report.local_path {
+        local_path_exists = resolve_source_path(&staged.sequence.report).is_ok();
+    }
+    if !local_path_exists {
+        // check if datasets executable is available
+        let datasets_executable_available = which("datasets").is_ok();
+        if !datasets_executable_available {
+            return Err(anyhow::anyhow!(
+                "no valid path for sequence report and datasets executable not found"
+            ));
+        }
+    }
 
     for file in &staged.windowing.files {
         let resolved = resolve_source_path(&ResolvedPathConfig {
@@ -32,7 +48,9 @@ pub fn validate_staged_import_config(staged: &StagedImportConfig) -> Result<(), 
         .bed_resolution
         .unwrap_or(staged.windowing.lines_per_unit.max(1));
     if bed_resolution == 0 {
-        return Err(anyhow::anyhow!("windowing.bed_resolution must be greater than zero"));
+        return Err(anyhow::anyhow!(
+            "windowing.bed_resolution must be greater than zero"
+        ));
     }
 
     for window_spec in &staged.windowing.windows {
@@ -70,7 +88,10 @@ pub fn validate_staged_import_config(staged: &StagedImportConfig) -> Result<(), 
                     }
                 }
             }
-            crate::parse::bed::WindowSpec::Proportion { proportion, min_size } => {
+            crate::parse::bed::WindowSpec::Proportion {
+                proportion,
+                min_size,
+            } => {
                 if *proportion <= 0.0 {
                     return Err(anyhow::anyhow!(
                         "proportion window proportion must be greater than zero"
@@ -187,6 +208,7 @@ mod tests {
                     path: std::path::PathBuf::from("/tmp/window.bed.gz"),
                     local_path: None,
                     value_columns: vec![],
+                    has_header: false,
                 }],
                 target_size: None,
                 bed_resolution: None,
@@ -247,6 +269,7 @@ mod tests {
                     path: std::path::PathBuf::from("/tmp/window.bed.gz"),
                     local_path: None,
                     value_columns: vec![],
+                    has_header: false,
                 }],
                 target_size: Some(1_000_000),
                 bed_resolution: Some(1_000),
