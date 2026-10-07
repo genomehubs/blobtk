@@ -1,0 +1,40 @@
+# Keep the Docker build context focused on the Rust crate and skip repo data that is never used during compilation.
+.git
+.github
+.vscode
+.venv
+.pytest_cache
+.conda
+.cargo-home
+.rustup-home
+.sigrepeat_cache
+.DS_Store
+
+# Large workspace directories and generated content
+actions-runner/
+buscos/
+conda/
+docs/
+examples/
+figure*/
+fw_out/
+logo/
+scripts-copy/
+sigrepeat/
+sigrepeat2/
+sigrepeat2_v2_cache/
+target/
+tests/
+tmp/
+tmp_gbif/
+
+# Rust build artifacts
+rust/target/
+rust/dist/
+rust/figure*/
+rust/output.svg
+rust/test.png
+rust/test/
+rust/tmp_gbif/
+rust/~/
+rust/{ACCESSION}/

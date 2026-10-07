@@ -1,11 +1,12 @@
 FROM rust:1.91 as builder
 WORKDIR /usr/src/blobtk
-COPY . .
+COPY rust/ .
 RUN apt-get update && apt-get install -y cmake python3 pkg-config libssl-dev perl zlib1g-dev clang libclang-dev && rm -rf /var/lib/apt/lists/*
 # RUN cargo install --path .
 RUN RUSTFLAGS="-C target-feature=+crt-static" cargo install --path . --target x86_64-unknown-linux-gnu
 
-FROM debian:bullseye-slim
+# Bullseye reached end-of-life, so use a supported Debian release for CI/runtime installs.
+FROM debian:bookworm-slim
 # RUN sed -r -i 's/^deb(.*)$/deb\1 contrib/g' /etc/apt/sources.list \
 #     && apt-get update \
 #     && apt-get install -y ttf-mscorefonts-installer \

@@ -1,1 +1,11 @@
-target
+# generated build artifacts and large test data are not needed for the image build
+target/
+dist/
+figure*/
+output.svg
+test.png
+/tmp_gbif/
+~/
+{ACCESSION}/
+test/
+.pytest_cache/
