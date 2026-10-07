@@ -1,4 +1,19 @@
 #!/bin/bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUST_SCRIPT="$ROOT_DIR/scripts/run-local-rust.sh"
+
+if [[ -x "$RUST_SCRIPT" ]]; then
+  export CARGO_BIN="$($RUST_SCRIPT --print-cargo-bin)"
+  export PATH="$(dirname "$CARGO_BIN"):${PATH:-}"
+  export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+  export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+  echo "Using Rust toolchain: $($CARGO_BIN --version)"
+else
+  echo "Missing local Rust wrapper script: $RUST_SCRIPT" >&2
+  exit 1
+fi
 
 LEVEL=$1
 
@@ -20,7 +35,7 @@ fi
 
 cd rust &&
 
-cargo fmt --all -- --check
+"$CARGO_BIN" fmt --all -- --check
 
 if [ $? != "0" ]; then
   cd -
@@ -50,7 +65,7 @@ if [ ! -z "$(git status --porcelain)" ]; then
   exit 1;
 fi
 
-cargo bump $LEVEL &&
+"$CARGO_BIN" bump $LEVEL &&
 
 while [ $? == 0 ]; do
   sleep 2;

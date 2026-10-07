@@ -75,6 +75,11 @@ else
   exit 1
 fi
 
+if [[ "${1:-}" == "--print-cargo-bin" ]]; then
+  printf '%s\n' "$CARGO_BIN"
+  exit 0
+fi
+
 export PATH="$(dirname "$CARGO_BIN"):${PATH}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$RUST_DIR/target}"
 
