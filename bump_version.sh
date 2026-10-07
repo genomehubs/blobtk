@@ -34,6 +34,7 @@ if [ "$CURRENT_VERSION" != "$CARGO_VERSION" ]; then
 fi
 
 cd rust &&
+export PYTHONPATH="$ROOT_DIR/rust${PYTHONPATH:+:$PYTHONPATH}"
 
 "$CARGO_BIN" fmt --all -- --check
 

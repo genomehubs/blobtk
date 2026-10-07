@@ -18,6 +18,7 @@ if [[ -x "$RUST_SCRIPT" ]]; then
   echo "Using Rust toolchain: $($CARGO_BIN --version)"
 fi
 
+export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 export PYO3_PYTHON="$PYTHON_BIN"
 echo "Using Python interpreter: $PYTHON_BIN ($($PYTHON_BIN -c 'import sys; print(sys.version)'))"
 
@@ -52,12 +53,12 @@ rm -f ./target/wheels/blobtk-*.whl &&
     "$PYTHON_BIN" -m pip uninstall -y blobtk >/dev/null 2>&1 || true &&
     "$PYTHON_BIN" -m pip install --force-reinstall ./target/wheels/blobtk-*.whl || exit 1
 
-CMD="$PYTHON_BIN ./test/depth.py"
+CMD="PYTHONPATH=\"$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}\" $PYTHON_BIN ./test/depth.py"
 printf "\n\nrunning command\n$CMD\n\n"
-$CMD || exit 1
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" ./test/depth.py || exit 1
 
-CMD="$PYTHON_BIN ./test/filter.py"
+CMD="PYTHONPATH=\"$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}\" $PYTHON_BIN ./test/filter.py"
 printf "\n\nrunning command\n$CMD\n\n"
-$CMD || exit 1
+PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" ./test/filter.py || exit 1
 
 printf "\nFinished running integration tests\n\n"
