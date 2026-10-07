@@ -33,6 +33,12 @@ if [ "$CURRENT_VERSION" != "$CARGO_VERSION" ]; then
   exit 1
 fi
 
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Working tree is dirty. Commit or stash changes before running bump_version.sh."
+  git status --short
+  exit 1
+fi
+
 cd rust &&
 export PYTHONPATH="$ROOT_DIR/rust${PYTHONPATH:+:$PYTHONPATH}"
 
@@ -60,18 +66,7 @@ if [ "$LEVEL" == "test" ]; then
   exit
 fi
 
-if [ ! -z "$(git status --porcelain)" ]; then
-  cd -
-  echo "Commit changes before running bumping version"
-  exit 1;
-fi
-
-"$CARGO_BIN" bump $LEVEL &&
-
-while [ $? == 0 ]; do
-  sleep 2;
-  git diff --exit-code --name-only Cargo.lock
-done;
+"$CARGO_BIN" bump "$LEVEL"
 
 cd - &&
 
