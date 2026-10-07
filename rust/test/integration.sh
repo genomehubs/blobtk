@@ -3,6 +3,12 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUST_SCRIPT="$ROOT_DIR/../scripts/run-local-rust.sh"
+PYTHON_BIN="${PYTHON_BIN:-$(command -v python || command -v python3 || true)}"
+
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "No Python interpreter found on PATH; set PYTHON_BIN explicitly." >&2
+  exit 1
+fi
 
 if [[ -x "$RUST_SCRIPT" ]]; then
   export CARGO_BIN="$($RUST_SCRIPT --print-cargo-bin)"
@@ -11,6 +17,9 @@ if [[ -x "$RUST_SCRIPT" ]]; then
   export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
   echo "Using Rust toolchain: $($CARGO_BIN --version)"
 fi
+
+export PYO3_PYTHON="$PYTHON_BIN"
+echo "Using Python interpreter: $PYTHON_BIN ($($PYTHON_BIN -c 'import sys; print(sys.version)'))"
 
 echo "Runnning integration tests"
 
@@ -34,20 +43,20 @@ printf "\n\nrunning command\n$CMD\n\n"
 $CMD || exit 1
 
 CMD="rm -f ./target/wheels/blobtk-*.whl && 
-    maturin build --release &&
-    yes | pip uninstall blobtk &&
-    yes | pip install ./target/wheels/blobtk-*.whl"
+    maturin build --release -i \"$PYTHON_BIN\" &&
+    $PYTHON_BIN -m pip uninstall -y blobtk || true &&
+    $PYTHON_BIN -m pip install --force-reinstall ./target/wheels/blobtk-*.whl"
 printf "\nrunning command\n$CMD\n\n"
 rm -f ./target/wheels/blobtk-*.whl &&
-    maturin build --release &&
-    yes | pip uninstall blobtk &&
-    yes | pip install ./target/wheels/blobtk-*.whl || exit 1
+    maturin build --release -i "$PYTHON_BIN" &&
+    "$PYTHON_BIN" -m pip uninstall -y blobtk >/dev/null 2>&1 || true &&
+    "$PYTHON_BIN" -m pip install --force-reinstall ./target/wheels/blobtk-*.whl || exit 1
 
-CMD="./test/depth.py"
+CMD="$PYTHON_BIN ./test/depth.py"
 printf "\n\nrunning command\n$CMD\n\n"
 $CMD || exit 1
 
-CMD="./test/filter.py"
+CMD="$PYTHON_BIN ./test/filter.py"
 printf "\n\nrunning command\n$CMD\n\n"
 $CMD || exit 1
 
