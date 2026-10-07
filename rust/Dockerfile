@@ -1,4 +1,4 @@
-FROM rust:1.91 as builder
+FROM rust:1.91 AS builder
 WORKDIR /usr/src/blobtk
 COPY rust/ .
 RUN apt-get update && apt-get install -y cmake python3 pkg-config libssl-dev perl zlib1g-dev clang libclang-dev && rm -rf /var/lib/apt/lists/*

@@ -57,7 +57,7 @@ jobs:
       artifact_name: binaries-linux
       rust_toolchain: "1.91.0"
       rustflags: "-C target-feature=+crt-static -C relocation-model=static"
-    needs: [ test ]
+    needs: [test]
 
   macos-binary:
     uses: ./.github/workflows/build-macos-binary.yml
@@ -68,7 +68,7 @@ jobs:
       artifact_name: binaries-macos-x64
       rust_toolchain: "1.91.0"
       mac_deployment_target: "10.13"
-    needs: [ test ]
+    needs: [test]
 
   macos-binary-arm64:
     uses: ./.github/workflows/build-macos-binary.yml
@@ -79,45 +79,45 @@ jobs:
       artifact_name: binaries-macos-arm64
       rust_toolchain: "1.91.0"
       mac_deployment_target: "11.0"
-    needs: [ test ]
+    needs: [test]
 
   linux-wheels:
     uses: ./.github/workflows/build-wheels.yml
     with:
       rust_directory: ./rust
-      python_versions: "[\"3.11\"]"
+      python_versions: '["3.11"]'
       target: x86_64-unknown-linux-gnu
       platform: linux
       rust_toolchain: "1.91.0"
       manylinux: "2014"
-    needs: [ test ]
+    needs: [test]
 
   verify-linux-wheels:
     uses: ./.github/workflows/verify-wheels.yml
     with:
-      python_versions: "[\"3.11\"]"
+      python_versions: '["3.11"]'
       artifact_prefix: "wheels-linux-"
       test_path: "tests/test_grid_smoke.py::test_grid_smoke"
-    needs: [ linux-wheels ]
+    needs: [linux-wheels]
 
   verify-linux-wheels-rust-tests:
     uses: ./.github/workflows/verify-wheels.yml
     with:
-      python_versions: "[\"3.11\"]"
+      python_versions: '["3.11"]'
       artifact_prefix: "wheels-linux-"
       test_path: "rust/test"
-    needs: [ linux-wheels ]
+    needs: [linux-wheels]
 
   verify-linux-binary:
     uses: ./.github/workflows/verify-binary.yml
     with:
       artifact_name: binaries-linux
       binary_glob: "blobtk-*"
-    needs: [ linux-binary ]
+    needs: [linux-binary]
 
   verify-docker-image:
     uses: ./.github/workflows/verify-docker.yml
     with:
-      build_context: ./rust
+      build_context: .
       fixture_dir: tests/fixtures/minimal_blobdir
-    needs: [ test ]
+    needs: [test]

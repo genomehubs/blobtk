@@ -8,7 +8,7 @@ on:
             build_context:
                 required: false
                 type: string
-                default: ./rust
+                default: .
             fixture_dir:
                 required: false
                 type: string
@@ -27,7 +27,7 @@ jobs:
                     docker pull "$IMG" || true
                   else
                     IMG=genomehubs/blobtk:dev-${{ github.run_id }}
-                    docker build -t "$IMG" ${{ inputs.build_context }}
+                    docker build -f rust/Dockerfile -t "$IMG" ${{ inputs.build_context }}
                   fi
                   docker run --rm -v ${{ github.workspace }}/${{ inputs.fixture_dir }}:/data/fixtures -v ${{ github.workspace }}/dist:/out "$IMG" blobtk plot --shape grid --view blob -d /data/fixtures -o /out/out-docker.svg
                   ls -l dist/out-docker.svg || true
