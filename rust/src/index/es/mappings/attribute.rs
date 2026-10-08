@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::index::es::mappings::common::{
-    keyword_property, numeric_property, object_property, text_property, Mappings, Normalizer,
-    Property,
+    keyword_property, numeric_property, numeric_with_null_value_property, object_property,
+    text_property, Mappings, Normalizer, Property,
 };
 
 // Set of properties for the attribute index
@@ -38,7 +38,12 @@ pub fn attribute_index_properties() -> HashMap<String, Property> {
         ),
         (
             "sequence".to_string(),
-            numeric_property("Attribute display order", "integer", Some(0)),
+            numeric_with_null_value_property(
+                "Attribute display order",
+                "integer",
+                None,
+                Some(serde_json::Value::Number(0.into())),
+            ),
         ),
         (
             "constraint".to_string(),

@@ -245,12 +245,41 @@ pub fn numeric_property(
     field_type: &str,
     scaling_factor: Option<u32>,
 ) -> Property {
+    let scaling_factor = if field_type == "scaled_float" {
+        scaling_factor
+    } else {
+        None
+    };
+
     Property {
         field_type: field_type.to_string(),
         meta: Some(PropertyMeta {
             description: description.to_string(),
         }),
         scaling_factor,
+        ..Default::default()
+    }
+}
+
+pub fn numeric_with_null_value_property(
+    description: &str,
+    field_type: &str,
+    scaling_factor: Option<u32>,
+    null_value: Option<serde_json::Value>,
+) -> Property {
+    let scaling_factor = if field_type == "scaled_float" {
+        scaling_factor
+    } else {
+        None
+    };
+
+    Property {
+        field_type: field_type.to_string(),
+        meta: Some(PropertyMeta {
+            description: description.to_string(),
+        }),
+        scaling_factor,
+        null_value,
         ..Default::default()
     }
 }
@@ -768,6 +797,22 @@ mod tests {
         assert!(
             !json.contains("\"meta"),
             "object fields must not include unsupported meta metadata: {json}"
+        );
+    }
+
+    #[test]
+    fn numeric_property_omits_scaling_factor_for_integer_fields() {
+        let property = numeric_property("Attribute display order", "integer", Some(0));
+
+        assert_eq!(property.field_type, "integer");
+        assert!(property.scaling_factor.is_none());
+
+        let serialized = serde_json::to_value(&property).unwrap();
+        let json = serialized.to_string();
+
+        assert!(
+            !json.contains("\"scaling_factor\""),
+            "integer fields must not include scaling_factor: {json}"
         );
     }
 }
