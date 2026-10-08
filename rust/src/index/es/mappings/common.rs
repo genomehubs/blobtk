@@ -285,13 +285,10 @@ pub fn geo_point_property(description: &str) -> Property {
     }
 }
 
-pub fn object_property(description: &str) -> Property {
+pub fn object_property(_description: &str) -> Property {
     Property {
         field_type: "object".to_string(),
-        index: Some(false),
-        meta: Some(PropertyMeta {
-            description: description.to_string(),
-        }),
+        enabled: Some(false),
         ..Default::default()
     }
 }
@@ -742,4 +739,35 @@ pub fn nested_taxon_names_properties() -> HashMap<String, Property> {
             keyword_property("URL template", None, None),
         ),
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn object_property_disables_indexing_with_enabled_flag() {
+        let property = object_property("Attribute translation");
+
+        assert_eq!(property.field_type, "object");
+        assert_eq!(property.enabled, Some(false));
+        assert!(property.meta.is_none());
+        assert!(property.index.is_none());
+
+        let serialized = serde_json::to_value(&property).unwrap();
+        let json = serialized.to_string();
+
+        assert!(
+            json.contains("\"enabled\":false"),
+            "unexpected JSON: {json}"
+        );
+        assert!(
+            !json.contains("\"index\":false"),
+            "object fields must not use index=false: {json}"
+        );
+        assert!(
+            !json.contains("\"meta"),
+            "object fields must not include unsupported meta metadata: {json}"
+        );
+    }
 }
